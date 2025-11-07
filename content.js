@@ -212,12 +212,305 @@
     link.href = chrome.runtime.getURL('style/reader.css');
     document.head.appendChild(link);
 
-    // 注入主逻辑脚本
-    window.ehReaderData = pageData;
-    
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('js/reader.js');
-    document.head.appendChild(script);
+    // 等待 CSS 加载完成后初始化阅读器
+    link.onload = () => {
+      console.log('[EH Modern Reader] CSS 加载完成');
+      initializeReader(pageData);
+    };
+
+    // 如果 CSS 加载失败，仍然初始化
+    link.onerror = () => {
+      console.warn('[EH Modern Reader] CSS 加载失败，使用默认样式');
+      initializeReader(pageData);
+    };
+  }
+
+  /**
+   * 初始化阅读器功能
+   */
+  function initializeReader(pageData) {
+    console.log('[EH Modern Reader] 初始化阅读器，页面数:', pageData.pagecount);
+    console.log('[EH Modern Reader] 图片列表:', pageData.imagelist);
+
+    // 阅读器状态
+    const state = {
+      currentPage: 1,
+      pageCount: pageData.pagecount,
+      imagelist: pageData.imagelist,
+      settings: {
+        fitMode: 'contain',
+        sidebarVisible: true,
+        darkMode: false
+      }
+    };
+
+    // 获取 DOM 元素
+    const elements = {
+      currentImage: document.getElementById('eh-current-image'),
+      loading: document.getElementById('eh-loading'),
+      pageInfo: document.getElementById('eh-page-info'),
+      progressBar: document.getElementById('eh-progress-bar'),
+      pageInput: document.getElementById('eh-page-input'),
+      thumbnails: document.getElementById('eh-thumbnails'),
+      sidebar: document.getElementById('eh-sidebar'),
+      prevBtn: document.getElementById('eh-prev-btn'),
+      nextBtn: document.getElementById('eh-next-btn'),
+      closeBtn: document.getElementById('eh-close-btn'),
+      toggleSidebarBtn: document.getElementById('eh-toggle-sidebar'),
+      themeBtn: document.getElementById('eh-theme-btn'),
+      fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
+      settingsBtn: document.getElementById('eh-settings-btn'),
+      fitModeSelect: document.getElementById('eh-fit-mode')
+    };
+
+    // 显示加载状态
+    function showLoading() {
+      if (elements.loading) elements.loading.style.display = 'flex';
+    }
+
+    function hideLoading() {
+      if (elements.loading) elements.loading.style.display = 'none';
+    }
+
+    // 获取图片 URL
+    function getImageUrl(pageIndex) {
+      const imageData = state.imagelist[pageIndex];
+      if (!imageData) return null;
+      // E-Hentai imagelist 中的图片 URL 在不同字段中
+      return imageData.url || imageData.src || imageData;
+    }
+
+    // 加载图片
+    function loadImage(pageIndex) {
+      return new Promise((resolve, reject) => {
+        const imageUrl = getImageUrl(pageIndex);
+        if (!imageUrl) {
+          reject(new Error('图片 URL 不存在'));
+          return;
+        }
+
+        console.log('[EH Modern Reader] 加载图片:', imageUrl);
+
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('图片加载失败'));
+        img.src = imageUrl;
+      });
+    }
+
+    // 显示指定页面
+    async function showPage(pageNum) {
+      if (pageNum < 1 || pageNum > state.pageCount) return;
+
+      state.currentPage = pageNum;
+      showLoading();
+
+      try {
+        const img = await loadImage(pageNum - 1);
+        
+        // 更新图片
+        if (elements.currentImage) {
+          elements.currentImage.src = img.src;
+          elements.currentImage.style.display = 'block';
+        }
+
+        // 更新页码显示
+        if (elements.pageInfo) {
+          elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+        }
+
+        if (elements.progressBar) {
+          elements.progressBar.value = pageNum;
+        }
+
+        if (elements.pageInput) {
+          elements.pageInput.value = pageNum;
+        }
+
+        // 更新缩略图高亮
+        updateThumbnailHighlight(pageNum);
+
+        console.log('[EH Modern Reader] 显示页面:', pageNum);
+        hideLoading();
+
+        // 预加载下一页
+        if (pageNum < state.pageCount) {
+          loadImage(pageNum).catch(() => {});
+        }
+
+      } catch (error) {
+        console.error('[EH Modern Reader] 加载图片失败:', error);
+        hideLoading();
+        alert('图片加载失败: ' + error.message);
+      }
+    }
+
+    // 更新缩略图高亮
+    function updateThumbnailHighlight(pageNum) {
+      const thumbnails = document.querySelectorAll('.eh-thumbnail');
+      thumbnails.forEach((thumb, index) => {
+        if (index === pageNum - 1) {
+          thumb.classList.add('active');
+          thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          thumb.classList.remove('active');
+        }
+      });
+    }
+
+    // 生成缩略图
+    function generateThumbnails() {
+      if (!elements.thumbnails) return;
+
+      elements.thumbnails.innerHTML = '';
+      
+      state.imagelist.forEach((imageData, index) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'eh-thumbnail';
+        if (index === 0) thumb.classList.add('active');
+        
+        const pageNum = index + 1;
+        thumb.innerHTML = `
+          <div class="eh-thumbnail-placeholder">
+            <span>${pageNum}</span>
+          </div>
+          <div class="eh-thumbnail-number">${pageNum}</div>
+        `;
+
+        thumb.onclick = () => showPage(pageNum);
+        elements.thumbnails.appendChild(thumb);
+
+        // 异步加载缩略图
+        const imageUrl = getImageUrl(index);
+        if (imageUrl) {
+          const img = new Image();
+          img.onload = () => {
+            thumb.querySelector('.eh-thumbnail-placeholder').style.backgroundImage = `url(${img.src})`;
+          };
+          img.src = imageUrl;
+        }
+      });
+    }
+
+    // 事件监听
+    if (elements.prevBtn) {
+      elements.prevBtn.onclick = () => showPage(state.currentPage - 1);
+    }
+
+    if (elements.nextBtn) {
+      elements.nextBtn.onclick = () => showPage(state.currentPage + 1);
+    }
+
+    if (elements.closeBtn) {
+      elements.closeBtn.onclick = () => {
+        if (pageData.gallery_url) {
+          window.location.href = pageData.gallery_url;
+        } else {
+          window.history.back();
+        }
+      };
+    }
+
+    if (elements.toggleSidebarBtn) {
+      elements.toggleSidebarBtn.onclick = () => {
+        state.settings.sidebarVisible = !state.settings.sidebarVisible;
+        if (elements.sidebar) {
+          elements.sidebar.classList.toggle('eh-sidebar-hidden');
+        }
+      };
+    }
+
+    if (elements.themeBtn) {
+      elements.themeBtn.onclick = () => {
+        state.settings.darkMode = !state.settings.darkMode;
+        document.body.classList.toggle('eh-dark-mode');
+      };
+    }
+
+    if (elements.fullscreenBtn) {
+      elements.fullscreenBtn.onclick = () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      };
+    }
+
+    if (elements.progressBar) {
+      elements.progressBar.onchange = () => {
+        showPage(parseInt(elements.progressBar.value));
+      };
+    }
+
+    if (elements.pageInput) {
+      elements.pageInput.onchange = () => {
+        const pageNum = parseInt(elements.pageInput.value);
+        if (pageNum >= 1 && pageNum <= state.pageCount) {
+          showPage(pageNum);
+        }
+      };
+    }
+
+    if (elements.fitModeSelect) {
+      elements.fitModeSelect.onchange = () => {
+        state.settings.fitMode = elements.fitModeSelect.value;
+        if (elements.currentImage) {
+          elements.currentImage.style.objectFit = state.settings.fitMode;
+        }
+      };
+    }
+
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+      switch(e.key) {
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          showPage(state.currentPage - 1);
+          e.preventDefault();
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+        case ' ':
+          showPage(state.currentPage + 1);
+          e.preventDefault();
+          break;
+        case 'Home':
+          showPage(1);
+          e.preventDefault();
+          break;
+        case 'End':
+          showPage(state.pageCount);
+          e.preventDefault();
+          break;
+        case 'Escape':
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          }
+          break;
+      }
+    });
+
+    // 鼠标滚轮翻页
+    let wheelTimeout;
+    document.addEventListener('wheel', (e) => {
+      clearTimeout(wheelTimeout);
+      wheelTimeout = setTimeout(() => {
+        if (e.deltaY > 0) {
+          showPage(state.currentPage + 1);
+        } else if (e.deltaY < 0) {
+          showPage(state.currentPage - 1);
+        }
+      }, 100);
+    }, { passive: true });
+
+    // 初始化
+    generateThumbnails();
+    showPage(1);
+
+    console.log('[EH Modern Reader] 阅读器初始化完成');
   }
 
   /**
