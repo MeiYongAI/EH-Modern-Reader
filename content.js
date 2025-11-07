@@ -407,57 +407,9 @@
       }
     };
 
-    // 读取上次阅读进度
-    function loadProgress() {
-      try {
-        const saved = localStorage.getItem(`eh-progress-${state.galleryId}`);
-        if (saved) {
-          const progress = JSON.parse(saved);
-          if (progress && typeof progress === 'object') {
-            // 若为横向模式并保存了scrollLeft则稍后恢复
-            if (progress.mode && progress.mode === 'continuous-horizontal' && typeof progress.scrollLeft === 'number') {
-              state._savedScrollLeft = progress.scrollLeft; // 临时存储，进入模式后恢复
-            }
-            if (progress.mode && typeof progress.mode === 'string') {
-              state.settings.readMode = progress.mode; // 恢复阅读模式
-            }
-            return progress.page || 1;
-          }
-        }
-      } catch (e) {
-        console.warn('[EH Modern Reader] 读取进度失败:', e);
-      }
-      return 1;
-    }
-
-    // 保存阅读进度
-    function saveProgress(page) {
-      try {
-        let scrollLeft = null;
-        if (state.settings.readMode === 'continuous-horizontal') {
-          const c = document.getElementById('eh-continuous-horizontal');
-          if (c) scrollLeft = c.scrollLeft;
-        }
-        const record = {
-          page: page,
-          timestamp: Date.now(),
-          mode: state.settings.readMode,
-          scrollLeft
-        };
-        localStorage.setItem(`eh-progress-${state.galleryId}`, JSON.stringify(record));
-        // 维护历史列表 (LRU 样式)
-        const histKey = 'eh-reading-history';
-        let list = [];
-        try { list = JSON.parse(localStorage.getItem(histKey) || '[]'); } catch {}
-        // 去重同 galleryId
-        list = list.filter(item => item && item.gid !== state.galleryId);
-        list.unshift({ gid: state.galleryId, title: state.galleryTitle || '', ...record });
-        if (list.length > 200) list.length = 200; // 上限
-        localStorage.setItem(histKey, JSON.stringify(list));
-      } catch (e) {
-        console.warn('[EH Modern Reader] 保存进度失败:', e);
-      }
-    }
+    // 读取/保存进度（关闭阅读记忆：总是从第1页开始，且不写入存储）
+    function loadProgress() { return 1; }
+    function saveProgress(page) { /* no-op: disabled progress memory */ }
 
     // 获取 DOM 元素（带判空）
     const elements = {
@@ -970,7 +922,7 @@
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
 
-  thumb.onclick = () => scheduleShowPage(pageNum);
+  thumb.onclick = () => scheduleShowPage(pageNum, { instant: true });
         elements.thumbnails.appendChild(thumb);
 
         // 缩略图加载逻辑
@@ -1676,21 +1628,9 @@
     // 初始化
     generateThumbnails();
     
-    // 加载上次阅读进度
-    const savedPage = loadProgress();
+    // 默认从第1页开始显示（关闭阅读记忆）
+    const savedPage = 1;
     internalShowPage(savedPage);
-    // 若保存的阅读模式是横向连续，则进入并恢复滚动位置
-    if (state.settings.readMode === 'continuous-horizontal') {
-      enterContinuousHorizontalMode();
-      if (typeof state._savedScrollLeft === 'number') {
-        const c = document.getElementById('eh-continuous-horizontal');
-        if (c) c.scrollLeft = state._savedScrollLeft;
-        delete state._savedScrollLeft;
-      } else {
-        // 没有 scrollLeft 就滚动到当前页中心
-        scheduleShowPage(savedPage, { instant: true });
-      }
-    }
     // 默认隐藏底部菜单（仅在开启“缩略图悬停开关”且靠近底部时显示）
     if (elements.bottomMenu) {
       elements.bottomMenu.classList.add('eh-menu-hidden');
