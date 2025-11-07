@@ -229,8 +229,23 @@
    * 初始化阅读器功能
    */
   function initializeReader(pageData) {
-    console.log('[EH Modern Reader] 初始化阅读器，页面数:', pageData.pagecount);
-    console.log('[EH Modern Reader] 图片列表:', pageData.imagelist);
+    console.log('[EH Modern Reader] 初始化阅读器');
+    console.log('[EH Modern Reader] 页面数:', pageData.pagecount);
+    console.log('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
+    console.log('[EH Modern Reader] 第一张图片数据示例:', pageData.imagelist?.[0]);
+    console.log('[EH Modern Reader] GID:', pageData.gid);
+
+    // 验证必要数据
+    if (!pageData.imagelist || pageData.imagelist.length === 0) {
+      console.error('[EH Modern Reader] 图片列表为空');
+      alert('错误：无法加载图片列表');
+      return;
+    }
+
+    if (!pageData.pagecount || pageData.pagecount === 0) {
+      console.error('[EH Modern Reader] 页面数为 0');
+      return;
+    }
 
     // 阅读器状态
     const state = {
@@ -276,8 +291,33 @@
     function getImageUrl(pageIndex) {
       const imageData = state.imagelist[pageIndex];
       if (!imageData) return null;
-      // E-Hentai imagelist 中的图片 URL 在不同字段中
-      return imageData.url || imageData.src || imageData;
+      
+      console.log('[EH Modern Reader] 图片数据格式:', imageData);
+      
+      // E-Hentai MPV 的 imagelist 通常包含多种格式
+      // 1. 如果是数组: [key, xres, yres] 或 [url, ...]
+      if (Array.isArray(imageData)) {
+        // 检查第一个元素是否是 URL
+        if (typeof imageData[0] === 'string' && imageData[0].startsWith('http')) {
+          return imageData[0];
+        }
+        // 如果是 key，需要构造 URL（但这通常需要额外的 API 调用）
+        const key = imageData[0];
+        return `https://e-hentai.org/s/${key}/${pageData.gid}-${pageIndex + 1}`;
+      }
+      
+      // 2. 如果是对象
+      if (typeof imageData === 'object') {
+        return imageData.url || imageData.src || imageData.u || imageData.s;
+      }
+      
+      // 3. 如果直接是字符串 URL
+      if (typeof imageData === 'string' && imageData.startsWith('http')) {
+        return imageData;
+      }
+      
+      console.error('[EH Modern Reader] 无法解析图片数据:', imageData);
+      return null;
     }
 
     // 加载图片
