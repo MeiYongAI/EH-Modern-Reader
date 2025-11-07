@@ -12,60 +12,59 @@
   }
   window.ehModernReaderInjected = true;
 
-  console.log('[EH Modern Reader] 正在初始化...');
-
-  // 提前阻止原 MPV 脚本注入与执行（document_start 生效）
+  // 早期脚本拦截：阻止原站 MPV 脚本注入与执行
   try {
-    const blockScriptObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (node && node.tagName === 'SCRIPT') {
-            const src = node.src || '';
-            if (/ehg_mpv\./i.test(src)) {
-              console.warn('[EH Modern Reader] 阻止原MPV脚本加载:', src);
-              node.remove();
-            } else if (!src && node.textContent && /var\s+imagelist\s*=\s*\[/s.test(node.textContent)) {
-              // 捕获 imagelist 的出现（早期注入场景）
-              try {
-                const content = node.textContent;
-                const imagelistMatch = content.match(/var imagelist = (\[.*?\]);/s);
-                const pagecountMatch = content.match(/var pagecount = (\d+);/);
-                const gidMatch = content.match(/var gid=(\d+);/);
-                const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
-                if (imagelistMatch) {
-                  window.__eh_pre_extracted__ = window.__eh_pre_extracted__ || {};
-                  window.__eh_pre_extracted__.imagelist = JSON.parse(imagelistMatch[1]);
-                  if (pagecountMatch) window.__eh_pre_extracted__.pagecount = parseInt(pagecountMatch[1]);
-                  if (gidMatch) window.__eh_pre_extracted__.gid = gidMatch[1];
-                  if (mpvkeyMatch) window.__eh_pre_extracted__.mpvkey = mpvkeyMatch[1];
-                  console.log('[EH Modern Reader] 预捕获 imagelist 于 document_start');
-                }
-              } catch (e) {
-                console.warn('[EH Modern Reader] 预捕获 imagelist 失败:', e);
-              }
-            }
-          }
+    const shouldBlockScript = (node) => {
+      try {
+        if (!node) return false;
+        const src = node.src || '';
+        const text = node.textContent || '';
+        // 阻止 ehg_mpv 相关脚本
+        if (/ehg_mpv\.|mpv\.|mpv\.js/i.test(src) || /var\s+imagelist\s*=|load_image\(|preload_scroll_images\(/i.test(text)) {
+          return true;
         }
+      } catch {}
+      return false;
+    };
+
+    const originalAppendChild = Element.prototype.appendChild;
+    const originalInsertBefore = Element.prototype.insertBefore;
+
+    Element.prototype.appendChild = function(child) {
+      if (child && child.tagName === 'SCRIPT' && shouldBlockScript(child)) {
+        return child; // 丢弃
+      }
+      return originalAppendChild.call(this, child);
+    };
+
+    Element.prototype.insertBefore = function(newNode, referenceNode) {
+      if (newNode && newNode.tagName === 'SCRIPT' && shouldBlockScript(newNode)) {
+        return newNode; // 丢弃
+      }
+      return originalInsertBefore.call(this, newNode, referenceNode);
+    };
+
+    // 观察动态添加的脚本并移除
+    const mo = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        m.addedNodes && m.addedNodes.forEach((n) => {
+          if (n.tagName === 'SCRIPT' && shouldBlockScript(n)) {
+            n.remove();
+          }
+        });
       }
     });
-    blockScriptObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
 
-    // 在页面上下文内注入极简防护脚本，避免原函数执行（双保险）
-    const guard = document.createElement('script');
-    guard.textContent = `
-      (function(){
-        try {
-          window.preload_generic = window.preload_generic || function(){};
-          window.preload_scroll_images = window.preload_scroll_images || function(){};
-          window.load_image = window.load_image || function(){};
-        } catch(e) {}
-      })();
-    `;
-    (document.documentElement || document.head || document.body).appendChild(guard);
-    guard.remove();
+    // 兜底：屏蔽相关全局函数，避免已注入脚本继续运行
+    window.preload_generic = function() {};
+    window.preload_scroll_images = function() {};
+    window.load_image = function() {};
   } catch (e) {
-    console.warn('[EH Modern Reader] 早期脚本拦截初始化失败:', e);
+    console.warn('[EH Modern Reader] 早期脚本拦截失败:', e);
   }
+
+  console.log('[EH Modern Reader] 正在初始化...');
 
   /**
    * 从原页面提取必要数据
@@ -73,16 +72,6 @@
   function extractPageData() {
     const scriptTags = document.querySelectorAll('script');
     let pageData = {};
-
-    // 如果早期已预捕获（MutationObserver阶段）则直接使用
-    if (window.__eh_pre_extracted__ && Array.isArray(window.__eh_pre_extracted__.imagelist)) {
-      pageData.imagelist = window.__eh_pre_extracted__.imagelist;
-      pageData.pagecount = window.__eh_pre_extracted__.pagecount || window.__eh_pre_extracted__.imagelist.length;
-      pageData.gid = window.__eh_pre_extracted__.gid;
-      pageData.mpvkey = window.__eh_pre_extracted__.mpvkey;
-      console.log('[EH Modern Reader] 使用预捕获数据');
-      return pageData;
-    }
 
     try {
       for (let script of scriptTags) {
@@ -356,6 +345,7 @@
       imagelist: pageData.imagelist,
       galleryId: galleryId,
       imageCache: new Map(), // pageIndex -> { img, status: 'loaded'|'loading'|'error', promise }
+      imageRequests: new Map(), // pageIndex -> { controller }
       settings: {
         fitMode: 'contain',
         menuVisible: false,  // 初始隐藏底部菜单
@@ -467,11 +457,11 @@
     }
     
     // 从 E-Hentai 图片页面提取真实图片 URL
-    async function fetchRealImageUrl(pageUrl, abortSignal) {
+    async function fetchRealImageUrl(pageUrl, signal) {
       try {
         console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
-        const response = await fetch(pageUrl, { signal: abortSignal });
+        const response = await fetch(pageUrl, { signal });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -504,10 +494,6 @@
         console.log('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
         throw new Error('无法从页面提取图片 URL');
       } catch (error) {
-        if (abortSignal && abortSignal.aborted) {
-          console.warn('[EH Modern Reader] 图片页面请求已取消:', pageUrl);
-          return null;
-        }
         console.error('[EH Modern Reader] 获取图片 URL 失败:', pageUrl, error);
         throw error;
       }
@@ -532,8 +518,12 @@
 
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
-          // 每次请求创建新的 AbortController，旧的在竞态中会被忽略
+          // 为本页创建/覆盖一个 AbortController，便于取消请求
+          const existing = state.imageRequests.get(pageIndex);
+          if (existing && existing.controller) existing.controller.abort('navigate-cancel');
           const controller = new AbortController();
+          state.imageRequests.set(pageIndex, { controller });
+
           const realImageUrl = await fetchRealImageUrl(pageUrl, controller.signal);
           if (!realImageUrl) {
             throw new Error('无法获取真实图片 URL');
@@ -606,6 +596,12 @@
       if (navTimer) clearTimeout(navTimer);
       navTimer = setTimeout(() => {
         navTimer = null;
+        // 取消除目标页以外的正在加载请求，避免占用带宽
+        state.imageRequests.forEach((entry, idx) => {
+          if (idx !== lastRequestedPage - 1 && entry && entry.controller) {
+            try { entry.controller.abort('navigation-switch'); } catch {}
+          }
+        });
         internalShowPage(lastRequestedPage);
       }, navDelay);
     }
@@ -704,7 +700,9 @@
       
       // 异步预加载，不阻塞主流程
       pagesToPreload.forEach(pageIndex => {
+        // 若存在正在加载且用户跳转到其他页，将在调度层面进行取消；这里直接尝试预取
         loadImage(pageIndex).catch(error => {
+          if (error && error.name === 'AbortError') return;
           console.log(`[EH Modern Reader] 预加载失败 (页面 ${pageIndex + 1}):`, error.message);
         });
       });
