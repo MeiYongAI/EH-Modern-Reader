@@ -215,8 +215,8 @@ body.eh-dark-mode #eh-bottom-menu {
 /* 缩略图容器 */
 
 .eh-thumbnails-container {
-  height: 90px;  /* 70px thumbnail + 20px padding */
-  padding: 6px 0 6px 0;
+  height: 120px;  /* 增加高度以显示更大的缩略图 */
+  padding: 8px 0 8px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -254,7 +254,7 @@ body.eh-dark-mode #eh-bottom-menu {
 
 .eh-thumbnail {
   flex-shrink: 0;
-  width: 50px;  /* 200 * 0.25 = 50px */
+  width: auto;  /* 自适应原生缩略图宽度 */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -271,9 +271,34 @@ body.eh-dark-mode #eh-bottom-menu {
   box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.5);
 }
 
+/* 原生缩略图样式调整 */
+.eh-thumbnail a {
+  display: block;
+  text-decoration: none;
+}
+
+.eh-thumbnail a > div {
+  margin: 0 !important;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+  max-height: 100px; /* 增加最大高度 */
+}
+
+.eh-thumbnail.active a > div {
+  border-color: #FF6B9D !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.5);
+}
+
+.eh-thumbnail a > div:hover {
+  border-color: rgba(255, 107, 157, 0.6) !important;
+}
+
+/* 降级方案: 页码缩略图 */
 .eh-thumbnail-placeholder {
-  width: 50px;   /* 200 * 0.25 */
-  height: 70px;  /* 281 * 0.25 */
+  width: 50px;
+  height: 70px;
   background: #2a2a2a;
   border-radius: 4px;
   overflow: hidden;

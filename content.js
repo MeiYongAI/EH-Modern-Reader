@@ -58,6 +58,13 @@
    * 替换原页面内容
    */
   function injectModernReader(pageData) {
+    // 保存原始DOM中的缩略图容器（在清空之前）
+    const originalThumbs = document.getElementById('pane_thumbs');
+    if (originalThumbs) {
+      window.__originalThumbs__ = originalThumbs.cloneNode(true);
+      console.log('[EH Modern Reader] 已保存原生缩略图, 数量:', originalThumbs.children.length);
+    }
+    
     // 阻止原始脚本继续运行
     try {
       window.stop(); // 停止页面加载
@@ -535,84 +542,68 @@
       });
     }
 
-    // 生成缩略图
+    // 生成缩略图 - 使用原生E-Hentai缩略图
     function generateThumbnails() {
       if (!elements.thumbnails) return;
 
       elements.thumbnails.innerHTML = '';
       
-      state.imagelist.forEach((imageData, index) => {
-        const thumb = document.createElement('div');
-        thumb.className = 'eh-thumbnail';
-        if (index === 0) thumb.classList.add('active');
+      // 从保存的原生DOM中获取缩略图
+      const nativeThumbs = window.__originalThumbs__;
+      
+      if (nativeThumbs && nativeThumbs.children.length > 0) {
+        // 方案A: 使用原生缩略图（推荐）
+        console.log('[EH Modern Reader] 使用原生E-Hentai缩略图，数量:', nativeThumbs.children.length);
         
-        const pageNum = index + 1;
-        thumb.innerHTML = `
-          <div class="eh-thumbnail-placeholder">
-            <span>${pageNum}</span>
-          </div>
-          <div class="eh-thumbnail-number">${pageNum}</div>
-        `;
-
-        thumb.onclick = () => showPage(pageNum);
-        elements.thumbnails.appendChild(thumb);
-
-        // 使用 E-Hentai 的 t 字段作为缩略图背景
-        // t 字段格式: "(https://...webp) -200px 0" (注意:Y坐标没有px单位)
-        if (imageData && imageData.t) {
-          const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
-          try {
-            // 提取 URL 和位置 - 修正: Y坐标可能没有px单位
-            const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/) || 
-                         imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/);
-            
-            if (match) {
-              let [, url, xPos, yPos] = match;
-              // 确保Y坐标有px单位
-              if (!yPos.endsWith('px')) {
-                yPos = yPos + 'px';
-              }
-              
-              // E-Hentai sprite sheet: 每张缩略图200x281px
-              // 我们缩放到50x70px (缩放因子 0.25)
-              const xOffset = parseInt(xPos);
-              const yOffset = parseInt(yPos);
-              const scale = 0.25; // 缩放因子
-              const scaledX = Math.round(xOffset * scale);
-              const scaledY = Math.round(yOffset * scale);
-              
-              // 先设置基本样式
-              placeholder.style.backgroundImage = `url("${url}")`;
-              placeholder.style.backgroundPosition = `${scaledX}px ${scaledY}px`;
-              placeholder.style.backgroundRepeat = 'no-repeat';
-              
-              // 动态加载sprite sheet图片以获取实际宽度
-              const img = new Image();
-              img.onload = () => {
-                // 计算缩放后的sprite sheet宽度
-                const actualSpriteWidth = Math.round(img.naturalWidth * scale);
-                placeholder.style.backgroundSize = `${actualSpriteWidth}px auto`;
-                console.log(`[EH Modern Reader] 缩略图 ${pageNum}: 实际宽度 ${img.naturalWidth}px → 缩放后 ${actualSpriteWidth}px`);
-              };
-              img.onerror = () => {
-                // 如果加载失败，使用默认值
-                console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败，使用默认宽度`);
-                placeholder.style.backgroundSize = `1000px auto`;
-              };
-              img.src = url;
-              
-              // 隐藏页码数字(因为有真实缩略图了)
-              const pageNumSpan = placeholder.querySelector('span');
-              if (pageNumSpan) pageNumSpan.style.display = 'none';
-              
-            } else {
-              console.warn(`[EH Modern Reader] 缩略图格式错误:`, imageData.t);
-            }
-          } catch (e) {
-            console.error(`[EH Modern Reader] 解析缩略图失败:`, e, imageData.t);
+        Array.from(nativeThumbs.children).forEach((nativeThumb, index) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'eh-thumbnail';
+          if (index === 0) wrapper.classList.add('active');
+          
+          // 克隆原生缩略图
+          const cloned = nativeThumb.cloneNode(true);
+          
+          // 重置样式以适配我们的布局
+          if (cloned.tagName === 'A') {
+            cloned.style.display = 'block';
+            cloned.style.textDecoration = 'none';
+            cloned.onclick = (e) => {
+              e.preventDefault();
+              showPage(index + 1);
+            };
           }
-        }
-      });
+          
+          // 查找并设置子元素样式
+          const divElement = cloned.querySelector('div');
+          if (divElement) {
+            divElement.style.margin = '0';
+            divElement.style.border = 'none';
+          }
+          
+          wrapper.appendChild(cloned);
+          elements.thumbnails.appendChild(wrapper);
+        });
+        
+      } else {
+        // 方案B: 降级为页码缩略图
+        console.log('[EH Modern Reader] 未找到原生缩略图，使用页码显示');
+        
+        state.imagelist.forEach((imageData, index) => {
+          const thumb = document.createElement('div');
+          thumb.className = 'eh-thumbnail';
+          if (index === 0) thumb.classList.add('active');
+          
+          const pageNum = index + 1;
+          thumb.innerHTML = `
+            <div class="eh-thumbnail-placeholder">
+              <span>${pageNum}</span>
+            </div>
+          `;
+
+          thumb.onclick = () => showPage(pageNum);
+          elements.thumbnails.appendChild(thumb);
+        });
+      }
     }
 
     // 事件监听
