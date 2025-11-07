@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "EH Modern Reader",
+  "version": "1.0.0",
+  "description": "现代化的 E-Hentai 阅读器扩展，提供更优雅的阅读体验",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://e-hentai.org/*",
+    "https://exhentai.org/*"
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://e-hentai.org/mpv/*",
+        "https://exhentai.org/mpv/*"
+      ],
+      "js": ["content.js"],
+      "css": ["style/reader.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["js/reader.js", "style/reader.css"],
+      "matches": ["https://e-hentai.org/*", "https://exhentai.org/*"]
+    }
+  ]
+}

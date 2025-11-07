@@ -1,0 +1,807 @@
+/**
+ * EH Modern Reader - 样式表
+ * 现代化的阅读器界面设计
+ */
+
+/* ==================== 全局样式 ==================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.eh-modern-reader {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow: hidden;
+  background: #f5f5f5;
+  color: #333;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ==================== 暗色模式 ==================== */
+
+body.eh-dark-mode {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode #eh-header {
+  background: #2d2d2d;
+  border-bottom-color: #404040;
+}
+
+body.eh-dark-mode #eh-sidebar {
+  background: #2d2d2d;
+  border-right-color: #404040;
+}
+
+body.eh-dark-mode #eh-footer {
+  background: #2d2d2d;
+  border-top-color: #404040;
+}
+
+body.eh-dark-mode .eh-thumb {
+  background-color: #3a3a3a;
+  border-color: #505050;
+}
+
+body.eh-dark-mode .eh-thumb:hover {
+  border-color: #FF6B9D;
+  background-color: #454545;
+}
+
+body.eh-dark-mode .eh-thumb.active {
+  border-color: #FF6B9D;
+  background-color: #505050;
+}
+
+body.eh-dark-mode .eh-panel-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode #eh-image-container {
+  background: #1a1a1a;
+}
+
+body.eh-dark-mode .eh-loading {
+  color: #e0e0e0;
+}
+
+/* ==================== 容器布局 ==================== */
+
+#eh-reader-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ==================== 顶部工具栏 ==================== */
+
+#eh-header {
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.eh-header-left,
+.eh-header-center,
+.eh-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eh-header-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.eh-header-center {
+  flex: 0 0 auto;
+}
+
+.eh-header-right {
+  flex: 0 0 auto;
+}
+
+#eh-title {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+#eh-page-info {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  min-width: 80px;
+  text-align: center;
+}
+
+body.eh-dark-mode #eh-page-info {
+  color: #aaa;
+}
+
+/* ==================== 按钮样式 ==================== */
+
+.eh-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  color: inherit;
+}
+
+.eh-icon-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+body.eh-dark-mode .eh-icon-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.eh-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.eh-icon-btn-small {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  color: inherit;
+}
+
+.eh-icon-btn-small:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+body.eh-dark-mode .eh-icon-btn-small:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* ==================== 主内容区 ==================== */
+
+#eh-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==================== 侧边栏 ==================== */
+
+#eh-sidebar {
+  width: 0;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#eh-sidebar.eh-sidebar-visible {
+  width: 240px;
+}
+
+.eh-sidebar-header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #e0e0e0;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+body.eh-dark-mode .eh-sidebar-header {
+  border-bottom-color: #404040;
+}
+
+#eh-thumbnails {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
+#eh-thumbnails::-webkit-scrollbar {
+  width: 6px;
+}
+
+#eh-thumbnails::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#eh-thumbnails::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+
+body.eh-dark-mode #eh-thumbnails::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+}
+
+/* ==================== 缩略图 ==================== */
+
+.eh-thumb {
+  width: 100%;
+  aspect-ratio: 200 / 281;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background-color: #f0f0f0;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.eh-thumb:hover {
+  border-color: #FF6B9D;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.eh-thumb.active {
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
+}
+
+.eh-thumb-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+
+.eh-thumb-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* ==================== 图片查看区 ==================== */
+
+#eh-viewer {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#eh-image-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  position: relative;
+}
+
+body.eh-dark-mode #eh-image-container {
+  background: #1a1a1a;
+}
+
+#eh-current-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+#eh-current-image[src] {
+  opacity: 1;
+}
+
+/* ==================== 加载动画 ==================== */
+
+#eh-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 10;
+}
+
+.eh-loading {
+  color: #666;
+}
+
+.eh-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 107, 157, 0.2);
+  border-top-color: #FF6B9D;
+  border-radius: 50%;
+  animation: eh-spin 1s linear infinite;
+}
+
+@keyframes eh-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== 翻页按钮 ==================== */
+
+.eh-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 20;
+}
+
+body.eh-dark-mode .eh-nav-btn {
+  background: rgba(45, 45, 45, 0.9);
+}
+
+#eh-viewer:hover .eh-nav-btn {
+  opacity: 1;
+}
+
+.eh-nav-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+}
+
+body.eh-dark-mode .eh-nav-btn:hover {
+  background: rgba(45, 45, 45, 1);
+}
+
+.eh-nav-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.eh-nav-btn:disabled {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.eh-nav-prev {
+  left: 24px;
+}
+
+.eh-nav-next {
+  right: 24px;
+}
+
+/* ==================== 底部控制栏 ==================== */
+
+#eh-footer {
+  height: 64px;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  gap: 8px;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.eh-progress-container {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.eh-progress-bar {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+
+.eh-progress-bar::-webkit-slider-track {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+body.eh-dark-mode .eh-progress-bar::-webkit-slider-track {
+  background: #404040;
+}
+
+.eh-progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #FF6B9D;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+
+.eh-progress-bar::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.eh-progress-bar::-moz-range-track {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+body.eh-dark-mode .eh-progress-bar::-moz-range-track {
+  background: #404040;
+}
+
+.eh-progress-bar::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #FF6B9D;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+
+.eh-progress-bar::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.eh-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: linear-gradient(90deg, #FF6B9D 0%, #FFB6C1 100%);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+  transition: width 0.3s ease;
+}
+
+.eh-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.eh-btn-small {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+body.eh-dark-mode .eh-btn-small {
+  background: #3a3a3a;
+  border-color: #505050;
+}
+
+.eh-btn-small:hover {
+  background: #f5f5f5;
+  border-color: #FF6B9D;
+}
+
+body.eh-dark-mode .eh-btn-small:hover {
+  background: #454545;
+  border-color: #FF6B9D;
+}
+
+.eh-btn-small:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+#eh-page-input {
+  width: 60px;
+  height: 32px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fff;
+  color: #333;
+}
+
+body.eh-dark-mode #eh-page-input {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+
+#eh-page-input:focus {
+  outline: none;
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+}
+
+/* ==================== 设置面板 ==================== */
+
+.eh-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.3s;
+}
+
+.eh-panel.eh-hidden {
+  display: none;
+  opacity: 0;
+}
+
+.eh-panel-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  animation: eh-slideIn 0.3s ease;
+}
+
+@keyframes eh-slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.eh-panel-content h3 {
+  font-size: 20px;
+  margin-bottom: 20px;
+  font-weight: 600;
+}
+
+.eh-setting-item {
+  margin-bottom: 16px;
+}
+
+.eh-setting-item label {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #666;
+}
+
+body.eh-dark-mode .eh-setting-item label {
+  color: #aaa;
+}
+
+.eh-setting-item select {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+body.eh-dark-mode .eh-setting-item select {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+
+.eh-setting-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #FF6B9D;
+}
+
+.eh-btn {
+  width: 100%;
+  height: 40px;
+  border: none;
+  background: #FF6B9D;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: background-color 0.2s;
+}
+
+.eh-btn:hover {
+  background: #FF5A8C;
+}
+
+.eh-btn:active {
+  transform: scale(0.98);
+}
+
+/* ==================== 响应式设计 ==================== */
+
+@media (max-width: 768px) {
+  #eh-sidebar.eh-sidebar-visible {
+    width: 180px;
+  }
+
+  #eh-title {
+    font-size: 14px;
+  }
+
+  .eh-nav-btn {
+    width: 48px;
+    height: 48px;
+    opacity: 0.6;
+  }
+
+  .eh-nav-prev {
+    left: 16px;
+  }
+
+  .eh-nav-next {
+    right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  #eh-header {
+    height: 48px;
+    padding: 0 8px;
+  }
+
+  #eh-sidebar.eh-sidebar-visible {
+    position: absolute;
+    left: 0;
+    top: 48px;
+    height: calc(100% - 48px - 64px);
+    z-index: 50;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  }
+
+  .eh-header-left {
+    gap: 8px;
+  }
+
+  #eh-title {
+    display: none;
+  }
+
+  .eh-nav-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .eh-nav-prev {
+    left: 8px;
+  }
+
+  .eh-nav-next {
+    right: 8px;
+  }
+}
+
+/* ==================== 打印样式 ==================== */
+
+@media print {
+  #eh-header,
+  #eh-footer,
+  #eh-sidebar,
+  .eh-nav-btn {
+    display: none !important;
+  }
+
+  #eh-viewer {
+    width: 100%;
+    height: auto;
+  }
+
+  #eh-current-image {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* ==================== 无障碍 ==================== */
+
+.eh-icon-btn:focus,
+.eh-btn-small:focus,
+.eh-btn:focus {
+  outline: 2px solid #FF6B9D;
+  outline-offset: 2px;
+}
+
+/* ==================== 性能优化 ==================== */
+
+#eh-current-image {
+  will-change: opacity;
+}
+
+.eh-thumb {
+  will-change: transform;
+  contain: layout style paint;
+}
+
+.eh-nav-btn {
+  will-change: opacity, transform;
+}
