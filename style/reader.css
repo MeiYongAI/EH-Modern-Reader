@@ -180,6 +180,17 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   position: relative;
 }
 
+/* 隐藏横向连续模式容器的原生滚动条（使用自定义进度条） */
+#eh-continuous-horizontal {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+#eh-continuous-horizontal::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;            /* Chrome/Safari/Edge (Blink/WebKit) */
+}
+
 /* ==================== 图片查看区 ==================== */
 
 #eh-viewer {

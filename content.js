@@ -490,6 +490,13 @@
       throw new Error(`缺少必要的 DOM 元素: ${missingElements.join(', ')}`);
     }
 
+    // 同步 UI 的阅读模式选择器到状态（确保切换可靠）
+    if (elements.readModeSelect) {
+      try {
+        elements.readModeSelect.value = state.settings.readMode || 'single';
+      } catch {}
+    }
+
     // 显示加载状态
     function showLoading() {
       if (elements.loading) elements.loading.style.display = 'flex';
@@ -787,6 +794,16 @@
             }, 50);
           } else {
             img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          }
+          // 横向模式下手动跳转时立即更新当前页相关状态（之前只依赖滚动事件，导致瞬移后状态滞后）
+          const newPageNum = idx + 1;
+          if (newPageNum !== state.currentPage) {
+            state.currentPage = newPageNum;
+            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
+            if (elements.progressBar) elements.progressBar.value = newPageNum;
+            updateThumbnailHighlight(newPageNum);
+            preloadAdjacentPages(newPageNum);
+            saveProgress(newPageNum);
           }
         }
         return;
@@ -1467,7 +1484,7 @@
               }
             }
           });
-        }, { root: continuous.container, rootMargin: '600px', threshold: 0.01 });
+        }, { root: continuous.container, rootMargin: '200px', threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
@@ -1501,6 +1518,25 @@
                 if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
               });
               const pageNum = bestIdx + 1;
+
+              // 确保视口中心页优先加载（做到“看哪里就加载哪里”）
+              const centerImg = continuous.container.querySelector(`img[data-page-index="${bestIdx}"]`);
+              if (centerImg && !centerImg.src && !centerImg.getAttribute('data-loading')) {
+                // 优先取消其他预取，集中带宽到中心页
+                cancelPrefetchExcept(bestIdx);
+                centerImg.setAttribute('data-loading', 'true');
+                loadImage(bestIdx).then(loadedImg => {
+                  if (loadedImg && loadedImg.src) centerImg.src = loadedImg.src;
+                }).catch(err => {
+                  console.warn('[EH Modern Reader] 中心页加载失败:', bestIdx, err);
+                }).finally(() => {
+                  centerImg.removeAttribute('data-loading');
+                });
+                // 立即安排相邻1-2张的高优先级预热
+                const neighbors = [bestIdx - 1, bestIdx + 1].filter(i => i >= 0 && i < state.pageCount);
+                enqueuePrefetch(neighbors, true);
+              }
+
               if (pageNum !== state.currentPage) {
                 state.currentPage = pageNum;
                 if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
@@ -1515,6 +1551,18 @@
           });
         };
         continuous.container.addEventListener('scroll', onScroll);
+
+        // 进入横向模式后若已有 currentPage，确保滚动到该页中心（避免切换模式后位置不对）
+        const targetIdx = state.currentPage - 1;
+        const targetImg = continuous.container.querySelector(`img[data-page-index="${targetIdx}"]`);
+        if (targetImg) {
+          // 等待一次 frame 保证布局完成
+          requestAnimationFrame(() => {
+            const c = continuous.container;
+            const offset = targetImg.offsetLeft - Math.max(0, (c.clientWidth - targetImg.clientWidth) / 2);
+            c.scrollLeft = offset;
+          });
+        }
       }
     }
 
@@ -1527,6 +1575,17 @@
         continuous.container.parentElement.removeChild(continuous.container);
       }
       continuous.container = null;
+      // 退出横向模式时，取消除当前页外的预取与加载，避免占用带宽
+      try {
+        cancelPrefetchExcept(state.currentPage - 1);
+        state.imageRequests.forEach((entry, idx) => {
+          if (idx !== state.currentPage - 1 && entry && entry.controller) {
+            try { entry.controller.abort('exit-horizontal'); } catch {}
+          }
+        });
+      } catch {}
+      // 返回单页模式后主动显示当前页图片（有时还未加载）
+      scheduleShowPage(state.currentPage, { instant: true });
     }
 
     // 键盘导航和缩放
@@ -1559,6 +1618,22 @@
 
       // 页面导航
       switch(e.key) {
+        case 'h':
+        case 'H':
+          // 切到横向连续
+          state.settings.readMode = 'continuous-horizontal';
+          if (elements.readModeSelect) elements.readModeSelect.value = 'continuous-horizontal';
+          enterContinuousHorizontalMode();
+          e.preventDefault();
+          break;
+        case 's':
+        case 'S':
+          // 切到单页
+          state.settings.readMode = 'single';
+          if (elements.readModeSelect) elements.readModeSelect.value = 'single';
+          exitContinuousMode();
+          e.preventDefault();
+          break;
         case 'ArrowLeft':
         case 'a':
         case 'A':
