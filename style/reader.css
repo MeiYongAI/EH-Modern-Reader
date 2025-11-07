@@ -260,7 +260,6 @@ body.eh-dark-mode #eh-bottom-menu {
   align-items: center;
   gap: 2px;
   cursor: pointer;
-  transition: transform 0.2s;
 }
 
 .eh-thumbnail:hover {
@@ -279,7 +278,6 @@ body.eh-dark-mode #eh-bottom-menu {
   border-radius: 4px;
   overflow: hidden;
   border: 2px solid transparent;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
