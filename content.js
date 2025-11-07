@@ -14,6 +14,43 @@
 
   // 早期脚本拦截：阻止原站 MPV 脚本注入与执行
   try {
+    // 提前捕获页面变量（imagelist / pagecount / gid / mpvkey / gallery_url）
+    const captured = (window.__ehCaptured = window.__ehCaptured || {
+      imagelist: null,
+      pagecount: null,
+      gid: null,
+      mpvkey: null,
+      gallery_url: null,
+      title: null
+    });
+
+    function captureFromScriptText(text) {
+      if (!text || typeof text !== 'string') return;
+      try {
+        const listMatch = text.match(/var\s+imagelist\s*=\s*(\[.*?\]);/s);
+        if (listMatch && !captured.imagelist) {
+          try { captured.imagelist = JSON.parse(listMatch[1]); } catch {}
+        }
+        const gidMatch = text.match(/var\s+gid\s*=\s*(\d+);/);
+        if (gidMatch && !captured.gid) captured.gid = gidMatch[1];
+        const keyMatch = text.match(/var\s+mpvkey\s*=\s*"([^"]+)";/);
+        if (keyMatch && !captured.mpvkey) captured.mpvkey = keyMatch[1];
+        const countMatch = text.match(/var\s+pagecount\s*=\s*(\d+);/);
+        if (countMatch && !captured.pagecount) captured.pagecount = parseInt(countMatch[1]);
+        const gurlMatch = text.match(/var\s+gallery_url\s*=\s*"([^"]+)";/);
+        if (gurlMatch && !captured.gallery_url) captured.gallery_url = gurlMatch[1];
+        if (!captured.title) {
+          const tMatch = document.title && document.title.match(/^(.+?) - E-Hentai/);
+          if (tMatch) captured.title = tMatch[1];
+        }
+      } catch {}
+    }
+
+    // 扫描已存在的内联脚本（有些页面在我们注入前已经插入了脚本节点）
+    try {
+      document.querySelectorAll('script:not([src])').forEach(s => captureFromScriptText(s.textContent || ''));
+    } catch {}
+
     const shouldBlockScript = (node) => {
       try {
         if (!node) return false;
@@ -21,6 +58,8 @@
         const text = node.textContent || '';
         // 阻止 ehg_mpv 相关脚本
         if (/ehg_mpv\.|mpv\.|mpv\.js/i.test(src) || /var\s+imagelist\s*=|load_image\(|preload_scroll_images\(/i.test(text)) {
+          // 拦截前先尝试捕获变量
+          captureFromScriptText(text);
           return true;
         }
       } catch {}
@@ -32,6 +71,8 @@
 
     Element.prototype.appendChild = function(child) {
       if (child && child.tagName === 'SCRIPT' && shouldBlockScript(child)) {
+        // 可能是内联脚本，尽量从其文本提取
+        try { captureFromScriptText(child.textContent || ''); } catch {}
         return child; // 丢弃
       }
       return originalAppendChild.call(this, child);
@@ -39,6 +80,7 @@
 
     Element.prototype.insertBefore = function(newNode, referenceNode) {
       if (newNode && newNode.tagName === 'SCRIPT' && shouldBlockScript(newNode)) {
+        try { captureFromScriptText(newNode.textContent || ''); } catch {}
         return newNode; // 丢弃
       }
       return originalInsertBefore.call(this, newNode, referenceNode);
@@ -49,6 +91,8 @@
       for (const m of mutations) {
         m.addedNodes && m.addedNodes.forEach((n) => {
           if (n.tagName === 'SCRIPT' && shouldBlockScript(n)) {
+            // 先尝试捕获再移除
+            try { captureFromScriptText(n.textContent || ''); } catch {}
             n.remove();
           }
         });
@@ -71,14 +115,24 @@
    */
   function extractPageData() {
     const scriptTags = document.querySelectorAll('script');
-    let pageData = {};
+    const captured = window.__ehCaptured || {};
+    let pageData = {
+      // 优先使用早期捕获的数据
+      imagelist: Array.isArray(captured.imagelist) ? captured.imagelist : undefined,
+      gid: captured.gid,
+      mpvkey: captured.mpvkey,
+      pagecount: captured.pagecount,
+      gallery_url: captured.gallery_url,
+      title: captured.title
+    };
 
     try {
       for (let script of scriptTags) {
         const content = script.textContent;
         
         // 提取图片列表
-        const imagelistMatch = content.match(/var imagelist = (\[.*?\]);/s);
+        // 仅当早期捕获没有拿到时，才从脚本中解析
+        const imagelistMatch = !pageData.imagelist && content.match(/var imagelist = (\[.*?\]);/s);
         if (imagelistMatch) {
           try {
             const parsedList = JSON.parse(imagelistMatch[1]);
@@ -94,20 +148,30 @@
         }
 
         // 提取其他配置变量
-        const gidMatch = content.match(/var gid=(\d+);/);
-        if (gidMatch) pageData.gid = gidMatch[1];
+        if (!pageData.gid) {
+          const gidMatch = content.match(/var gid=(\d+);/);
+          if (gidMatch) pageData.gid = gidMatch[1];
+        }
 
-        const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
-        if (mpvkeyMatch) pageData.mpvkey = mpvkeyMatch[1];
+        if (!pageData.mpvkey) {
+          const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
+          if (mpvkeyMatch) pageData.mpvkey = mpvkeyMatch[1];
+        }
 
-        const pagecountMatch = content.match(/var pagecount = (\d+);/);
-        if (pagecountMatch) pageData.pagecount = parseInt(pagecountMatch[1]);
+        if (!pageData.pagecount) {
+          const pagecountMatch = content.match(/var pagecount = (\d+);/);
+          if (pagecountMatch) pageData.pagecount = parseInt(pagecountMatch[1]);
+        }
 
-        const galleryUrlMatch = content.match(/var gallery_url = "([^"]+)";/);
-        if (galleryUrlMatch) pageData.gallery_url = galleryUrlMatch[1];
+        if (!pageData.gallery_url) {
+          const galleryUrlMatch = content.match(/var gallery_url = "([^"]+)";/);
+          if (galleryUrlMatch) pageData.gallery_url = galleryUrlMatch[1];
+        }
 
-        const titleMatch = document.title.match(/^(.+?) - E-Hentai/);
-        if (titleMatch) pageData.title = titleMatch[1];
+        if (!pageData.title) {
+          const titleMatch = document.title.match(/^(.+?) - E-Hentai/);
+          if (titleMatch) pageData.title = titleMatch[1];
+        }
       }
     } catch (e) {
       console.error('[EH Modern Reader] 提取页面数据失败:', e);
@@ -176,6 +240,12 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M12 1v6m0 6v6m6.364-15.364l-4.243 4.243m-4.242 4.242l-4.243 4.243m16.97-4.243l-4.242-4.242m-4.243-4.243L1.636 19.778"/>
+              </svg>
+            </button>
+            <button id="eh-auto-btn" class="eh-icon-btn" title="定时翻页 (单击开关, Alt+单击设置间隔)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 3"/>
               </svg>
             </button>
             <button id="eh-fullscreen-btn" class="eh-icon-btn" title="全屏 (F11)">
@@ -252,41 +322,15 @@
           <div class="eh-panel-content">
             <h3>阅读设置</h3>
             <div class="eh-setting-item">
-              <label>图片适配模式</label>
-              <select id="eh-fit-mode">
-                <option value="contain">适应窗口</option>
-                <option value="width">适应宽度</option>
-                <option value="height">适应高度</option>
-                <option value="none">原始大小</option>
-              </select>
-            </div>
-            <div class="eh-setting-item">
-              <label>图片对齐</label>
-              <select id="eh-align-mode">
-                <option value="center">居中</option>
-                <option value="left">左对齐</option>
-                <option value="right">右对齐</option>
-              </select>
-            </div>
-            <div class="eh-setting-item">
               <label>阅读模式</label>
               <select id="eh-read-mode">
                 <option value="single">单页（默认）</option>
-                <option value="continuous-vertical">纵向连续</option>
                 <option value="continuous-horizontal">横向连续</option>
               </select>
             </div>
             <div class="eh-setting-item">
-              <label>
-                <input type="checkbox" id="eh-preload-next" checked />
-                预加载下一页
-              </label>
-            </div>
-            <div class="eh-setting-item">
-              <label>
-                <input type="checkbox" id="eh-smooth-scroll" checked />
-                平滑滚动
-              </label>
+              <label for="eh-preload-count">预加载页数（向后）</label>
+              <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2" style="width: 64px;">
             </div>
             <button id="eh-close-settings" class="eh-btn">关闭</button>
           </div>
@@ -347,14 +391,19 @@
       imageCache: new Map(), // pageIndex -> { img, status: 'loaded'|'loading'|'error', promise }
       imageRequests: new Map(), // pageIndex -> { controller }
       settings: {
-        fitMode: 'contain',
         menuVisible: false,  // 初始隐藏底部菜单
         darkMode: true,  // 默认启用深色模式
         imageScale: 1,     // 图片缩放比例
         imageOffsetX: 0,   // 图片X偏移
         imageOffsetY: 0,   // 图片Y偏移
         thumbnailsHover: false, // 顶部开关：鼠标靠近底部时显示缩略图
-        readMode: 'single' // 阅读模式：single | continuous-vertical | continuous-horizontal
+        readMode: 'single', // 阅读模式：single | continuous-horizontal
+        prefetchAhead: 2    // 向后预加载页数
+      },
+      autoPage: {
+        running: false,
+        intervalMs: 3000,
+        timer: null
       }
     };
 
@@ -401,11 +450,12 @@
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
+  autoBtn: document.getElementById('eh-auto-btn'),
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
       closeSettingsBtn: document.getElementById('eh-close-settings'),
-      fitModeSelect: document.getElementById('eh-fit-mode'),
-      readModeSelect: document.getElementById('eh-read-mode')
+  readModeSelect: document.getElementById('eh-read-mode'),
+  preloadCountInput: document.getElementById('eh-preload-count')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -454,6 +504,89 @@
       
       console.error('[EH Modern Reader] 无法解析图片数据:', imageData);
       return null;
+    }
+    
+    // 真实图片 URL 缓存与请求复用
+    const realUrlCache = new Map(); // pageIndex -> url
+    const realUrlRequests = new Map(); // pageIndex -> {promise, controller}
+
+    function ensureRealImageUrl(pageIndex) {
+      if (realUrlCache.has(pageIndex)) {
+        return Promise.resolve({ url: realUrlCache.get(pageIndex), controller: null });
+      }
+      const pageUrl = getImageUrl(pageIndex);
+      if (!pageUrl) return Promise.reject(new Error('图片页面 URL 不存在'));
+      const inflight = realUrlRequests.get(pageIndex);
+      if (inflight) return inflight.promise;
+      const controller = new AbortController();
+      const promise = fetchRealImageUrl(pageUrl, controller.signal)
+        .then(url => {
+          realUrlCache.set(pageIndex, url);
+          realUrlRequests.delete(pageIndex);
+          return { url, controller };
+        })
+        .catch(e => {
+          realUrlRequests.delete(pageIndex);
+          throw e;
+        });
+      realUrlRequests.set(pageIndex, { promise, controller });
+      return promise;
+    }
+
+    // 预取队列（限制并发、可取消）
+    const prefetch = { queue: [], running: 0, max: 3, controllers: new Map() };
+    function cancelPrefetchExcept(targetIndex) {
+      prefetch.controllers.forEach((ctl, idx) => {
+        if (idx !== targetIndex && ctl) { try { ctl.abort('prefetch-cancel'); } catch {}
+        }
+      });
+      prefetch.queue = prefetch.queue.filter(it => it.pageIndex === targetIndex);
+    }
+    function startNextPrefetch() {
+      while (prefetch.running < prefetch.max && prefetch.queue.length > 0) {
+        const item = prefetch.queue.shift();
+        const idx = item.pageIndex;
+        if (state.imageCache.get(idx)?.status === 'loaded') continue;
+        prefetch.running++;
+        const ctl = new AbortController();
+        prefetch.controllers.set(idx, ctl);
+        ensureRealImageUrl(idx)
+          .then(({ url }) => {
+            if (ctl.signal.aborted) throw new DOMException('aborted','AbortError');
+            return new Promise((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => resolve(img);
+              img.onerror = (e) => reject(e);
+              img.src = url;
+            }).then(img => {
+              if (ctl.signal.aborted) throw new DOMException('aborted','AbortError');
+              state.imageCache.set(idx, { status: 'loaded', img });
+            });
+          })
+          .catch(e => {
+            if (!(e && e.name === 'AbortError')) {
+              state.imageCache.set(idx, { status: 'error' });
+            }
+          })
+          .finally(() => {
+            prefetch.controllers.delete(idx);
+            prefetch.running--;
+            startNextPrefetch();
+          });
+      }
+    }
+    function enqueuePrefetch(indices, prioritize = false) {
+      const queued = new Set(prefetch.queue.map(i => i.pageIndex));
+      indices.forEach(idx => {
+        if (idx < 0 || idx >= state.pageCount) return;
+        if (state.imageCache.get(idx)?.status === 'loaded') return;
+        if (!queued.has(idx)) {
+          if (prioritize) prefetch.queue.unshift({ pageIndex: idx });
+          else prefetch.queue.push({ pageIndex: idx });
+          queued.add(idx);
+        }
+      });
+      startNextPrefetch();
     }
     
     // 从 E-Hentai 图片页面提取真实图片 URL
@@ -524,7 +657,7 @@
           const controller = new AbortController();
           state.imageRequests.set(pageIndex, { controller });
 
-          const realImageUrl = await fetchRealImageUrl(pageUrl, controller.signal);
+          const { url: realImageUrl } = await ensureRealImageUrl(pageIndex);
           if (!realImageUrl) {
             throw new Error('无法获取真实图片 URL');
           }
@@ -562,7 +695,7 @@
           return pending;
         }
         
-        // 如果已经是直接的图片 URL
+  // 如果已经是直接的图片 URL
         const pending = new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = () => {
@@ -592,6 +725,15 @@
 
     function scheduleShowPage(pageNum) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
+      // 在横向连续模式下，转为滚动定位而不是替换单图
+      if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
+        const idx = pageNum - 1;
+        const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
+        if (img) {
+          img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+        return;
+      }
       lastRequestedPage = pageNum;
       if (navTimer) clearTimeout(navTimer);
       navTimer = setTimeout(() => {
@@ -602,6 +744,8 @@
             try { entry.controller.abort('navigation-switch'); } catch {}
           }
         });
+        // 取消预取队列中非目标页
+        cancelPrefetchExcept(lastRequestedPage - 1);
         internalShowPage(lastRequestedPage);
       }, navDelay);
     }
@@ -686,26 +830,16 @@
 
     // 预加载相邻页面（提升切换体验）
     function preloadAdjacentPages(currentPage) {
-      const pagesToPreload = [];
-      
-      // 预加载下一页
-      if (currentPage < state.pageCount) {
-        pagesToPreload.push(currentPage); // loadImage 使用 index，所以 currentPage 对应下一页
+      const indices = [];
+      const ahead = state.settings.prefetchAhead || 0;
+      for (let i = 1; i <= ahead; i++) {
+        const idx = currentPage - 1 + i; // 向后
+        if (idx < state.pageCount) indices.push(idx);
       }
-      
-      // 预加载上一页
-      if (currentPage > 1) {
-        pagesToPreload.push(currentPage - 2); // currentPage - 2 对应上一页的 index
-      }
-      
-      // 异步预加载，不阻塞主流程
-      pagesToPreload.forEach(pageIndex => {
-        // 若存在正在加载且用户跳转到其他页，将在调度层面进行取消；这里直接尝试预取
-        loadImage(pageIndex).catch(error => {
-          if (error && error.name === 'AbortError') return;
-          console.log(`[EH Modern Reader] 预加载失败 (页面 ${pageIndex + 1}):`, error.message);
-        });
-      });
+      // 向前只预1页，帮助回滚
+      const prevIdx = currentPage - 2;
+      if (prevIdx >= 0) indices.push(prevIdx);
+      enqueuePrefetch(indices, false);
     }
 
     // 更新缩略图高亮（优化性能，只操作当前和上一个）
@@ -935,6 +1069,97 @@
         }
       };
     }
+    // 定时翻页功能
+    function updateAutoButtonVisual() {
+      if (!elements.autoBtn) return;
+      elements.autoBtn.classList.toggle('eh-active', state.autoPage.running);
+      const inHorizontal = state.settings && state.settings.readMode === 'continuous-horizontal';
+      if (state.autoPage.running) {
+        if (inHorizontal) {
+          const spd = state.autoPage.scrollSpeed || 3;
+          elements.autoBtn.title = `自动滚动中 (${spd}px/帧) - 单击停止, Alt+单击设置速度`;
+        } else {
+          elements.autoBtn.title = `定时翻页中 (${Math.round(state.autoPage.intervalMs/1000)}s) - 单击停止, Alt+单击设置间隔`;
+        }
+      } else {
+        elements.autoBtn.title = inHorizontal
+          ? '自动滚动 (单击开始, Alt+单击设置速度)'
+          : '定时翻页 (单击开始, Alt+单击设置间隔)';
+      }
+    }
+    function stopAutoPaging() {
+      if (state.autoPage.timer) {
+        if (typeof state.autoPage.timer === 'object' && state.autoPage.timer.rafId) {
+          cancelAnimationFrame(state.autoPage.timer.rafId);
+        } else {
+          clearInterval(state.autoPage.timer);
+        }
+      }
+      state.autoPage.timer = null;
+      state.autoPage.running = false;
+      updateAutoButtonVisual();
+    }
+    function startAutoPaging() {
+      stopAutoPaging();
+      state.autoPage.running = true;
+      // 横向连续模式：切换为持续水平自动滚动
+      const horizontalContainer = (state.settings && state.settings.readMode === 'continuous-horizontal')
+        ? document.getElementById('eh-continuous-horizontal')
+        : null;
+      if (horizontalContainer) {
+        state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，建议 2~10
+        const step = () => {
+          if (!state.autoPage.running) return;
+          horizontalContainer.scrollLeft += state.autoPage.scrollSpeed;
+          if (horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2) {
+            // 到末尾自动停止
+            stopAutoPaging();
+            return;
+          }
+          state.autoPage.timer.rafId = requestAnimationFrame(step);
+        };
+        state.autoPage.timer = { rafId: requestAnimationFrame(step) };
+      } else {
+        // 单页模式：按间隔翻页
+        state.autoPage.timer = setInterval(() => {
+          const next = Math.min(state.pageCount, state.currentPage + 1);
+          if (next === state.currentPage) {
+            stopAutoPaging();
+          } else {
+            scheduleShowPage(next);
+          }
+        }, state.autoPage.intervalMs);
+      }
+      updateAutoButtonVisual();
+    }
+    if (elements.autoBtn) {
+      elements.autoBtn.onclick = (e) => {
+        if (e.altKey) {
+          if (state.settings && state.settings.readMode === 'continuous-horizontal') {
+            const val = prompt('设置自动滚动速度(px/帧，建议2~10)', String(state.autoPage.scrollSpeed || 3));
+            if (val) {
+              const spd = Math.max(1, Math.min(50, parseFloat(val)));
+              if (!isNaN(spd)) {
+                state.autoPage.scrollSpeed = spd;
+                if (state.autoPage.running) startAutoPaging(); else updateAutoButtonVisual();
+              }
+            }
+          } else {
+            const val = prompt('设置翻页间隔(秒)', String(Math.round(state.autoPage.intervalMs/1000)));
+            if (val) {
+              const sec = Math.max(0.5, Math.min(60, parseFloat(val)));
+              if (!isNaN(sec)) {
+                state.autoPage.intervalMs = Math.round(sec * 1000);
+                if (state.autoPage.running) startAutoPaging(); else updateAutoButtonVisual();
+              }
+            }
+          }
+        } else {
+          if (state.autoPage.running) stopAutoPaging(); else startAutoPaging();
+        }
+      };
+      updateAutoButtonVisual();
+    }
 
     // 设置按钮和面板
     if (elements.settingsBtn) {
@@ -971,27 +1196,39 @@
       };
     }
 
-    if (elements.fitModeSelect) {
-      elements.fitModeSelect.onchange = () => {
-        state.settings.fitMode = elements.fitModeSelect.value;
-        if (elements.currentImage) {
-          elements.currentImage.style.objectFit = state.settings.fitMode;
-        }
-      };
-    }
-
     if (elements.readModeSelect) {
       elements.readModeSelect.onchange = () => {
         state.settings.readMode = elements.readModeSelect.value;
         console.log('[EH Modern Reader] 阅读模式切换为:', state.settings.readMode);
-        // 预留：连续模式布局未来实现，这里仅记录设置。
+        if (state.settings.readMode === 'continuous-horizontal') {
+          enterContinuousHorizontalMode();
+        } else {
+          exitContinuousMode();
+        }
       };
+    }
+
+    if (elements.preloadCountInput) {
+      elements.preloadCountInput.addEventListener('change', () => {
+        const v = parseInt(elements.preloadCountInput.value);
+        if (!isNaN(v) && v >= 0 && v <= 10) {
+          state.settings.prefetchAhead = v;
+          // 立即触发一次基于当前页的预取刷新
+          preloadAdjacentPages(state.currentPage);
+        }
+      });
     }
 
     // 进度条拖动事件
     if (elements.progressBar) {
+      let preheatTimer = null;
       elements.progressBar.oninput = () => {
-        // 不执行即时跳转，等待最终停留
+        if (preheatTimer) clearTimeout(preheatTimer);
+        const page = parseInt(elements.progressBar.value);
+        const idx = page - 1;
+        preheatTimer = setTimeout(() => {
+          enqueuePrefetch([idx], true); // 高优先级仅预热目标页
+        }, 120);
       };
       elements.progressBar.onchange = (e) => {
         const page = parseInt(e.target.value);
@@ -1051,6 +1288,17 @@
           e.preventDefault();
         }
       });
+      // 鼠标滚轮翻页 (单页模式下) 上一页/下一页
+      elements.viewer.addEventListener('wheel', (e) => {
+        if (state.settings.readMode !== 'single') return; // 仅单页模式翻页
+        const delta = e.deltaY;
+        if (delta > 0) {
+          scheduleShowPage(state.currentPage + 1);
+        } else if (delta < 0) {
+          scheduleShowPage(state.currentPage - 1);
+        }
+        e.preventDefault();
+      }, { passive: false });
     }
 
     // 图片拖动 (仅在缩放时生效)
@@ -1085,6 +1333,116 @@
           }
         }
       });
+    }
+
+    // 连续模式：横向 MVP（懒加载 + 观察器）
+    let continuous = { container: null, observer: null };
+    function enterContinuousHorizontalMode() {
+      // 若已存在则直接显示
+      if (!continuous.container) {
+        continuous.container = document.createElement('div');
+        continuous.container.id = 'eh-continuous-horizontal';
+        continuous.container.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:16px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 16px;';
+
+        // 生成占位卡片
+        for (let i = 0; i < state.pageCount; i++) {
+          const card = document.createElement('div');
+          card.className = 'eh-ch-card';
+          card.style.cssText = 'flex:0 0 auto; height:100%; position:relative; display:flex; align-items:center; justify-content:center;';
+          const img = document.createElement('img');
+          img.style.cssText = 'max-height:100%; max-width:100%; display:block;';
+          img.setAttribute('data-page-index', String(i));
+          card.appendChild(img);
+          continuous.container.appendChild(card);
+        }
+
+        // 放入主区域并隐藏单页 viewer
+        const main = document.getElementById('eh-main');
+        if (main) {
+          main.appendChild(continuous.container);
+          const singleViewer = document.getElementById('eh-viewer');
+          if (singleViewer) singleViewer.style.display = 'none';
+        }
+
+        // 观察器懒加载
+        continuous.observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const img = entry.target;
+              const idx = parseInt(img.getAttribute('data-page-index'));
+              // 仅当未加载时触发
+              if (!img.getAttribute('src')) {
+                // 先尝试直接从缓存获取
+                const cached = state.imageCache.get(idx);
+                if (cached && cached.status === 'loaded' && cached.img) {
+                  img.src = cached.img.src;
+                } else {
+                  ensureRealImageUrl(idx).then(({ url }) => {
+                    img.src = url;
+                  }).catch(()=>{});
+                }
+              }
+            }
+          });
+        }, { root: continuous.container, rootMargin: '200px', threshold: 0.01 });
+
+        // 观察所有图片
+        continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
+          continuous.observer.observe(img);
+        });
+
+        // 映射垂直滚轮为水平滚动
+        continuous.container.addEventListener('wheel', (e) => {
+          if (e.deltaY !== 0) {
+            continuous.container.scrollLeft += e.deltaY;
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        // 滚动时根据居中元素更新当前页与进度条/高亮
+        let scrollUpdating = false;
+        const onScroll = () => {
+          if (scrollUpdating) return;
+          scrollUpdating = true;
+          requestAnimationFrame(() => {
+            try {
+              const viewportMid = continuous.container.clientWidth / 2;
+              let bestIdx = 0; let bestDist = Infinity;
+              const imgs = continuous.container.querySelectorAll('img[data-page-index]');
+              imgs.forEach((img) => {
+                const rect = img.getBoundingClientRect();
+                const parentRect = continuous.container.getBoundingClientRect();
+                const mid = rect.left - parentRect.left + rect.width / 2;
+                const dist = Math.abs(mid - viewportMid);
+                const idx = parseInt(img.getAttribute('data-page-index'));
+                if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
+              });
+              const pageNum = bestIdx + 1;
+              if (pageNum !== state.currentPage) {
+                state.currentPage = pageNum;
+                if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+                if (elements.progressBar) elements.progressBar.value = pageNum;
+                updateThumbnailHighlight(pageNum);
+                preloadAdjacentPages(pageNum);
+              }
+            } finally {
+              scrollUpdating = false;
+            }
+          });
+        };
+        continuous.container.addEventListener('scroll', onScroll);
+      }
+    }
+
+    function exitContinuousMode() {
+      // 显示单页 viewer，移除连续容器
+      const singleViewer = document.getElementById('eh-viewer');
+      if (singleViewer) singleViewer.style.display = '';
+      if (continuous.observer) { continuous.observer.disconnect(); continuous.observer = null; }
+      if (continuous.container && continuous.container.parentElement) {
+        continuous.container.parentElement.removeChild(continuous.container);
+      }
+      continuous.container = null;
     }
 
     // 键盘导航和缩放
@@ -1129,6 +1487,16 @@
         case ' ':
           scheduleShowPage(state.currentPage + 1);
           e.preventDefault();
+          break;
+        case 'p':
+        case 'P':
+          // 切换定时翻页
+          if (state.autoPage.running) {
+            // 减少与空格冲突，只有在未焦点输入框时生效
+            stopAutoPaging();
+          } else {
+            startAutoPaging();
+          }
           break;
         case 'Home':
           scheduleShowPage(1);
@@ -1213,6 +1581,21 @@
    */
   function init() {
     try {
+      // 简单等待器：等待早期捕获拿到 imagelist
+      const waitForImagelist = (timeoutMs = 3000) => new Promise((resolve) => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          const cap = window.__ehCaptured || {};
+          if (Array.isArray(cap.imagelist) && cap.imagelist.length > 0) {
+            clearInterval(timer);
+            resolve(true);
+          } else if (Date.now() - start >= timeoutMs) {
+            clearInterval(timer);
+            resolve(false);
+          }
+        }, 50);
+      });
+
       // 等待 DOM 加载完成
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -1221,8 +1604,16 @@
             if (pageData.imagelist && pageData.imagelist.length > 0) {
               injectModernReader(pageData);
             } else {
-              console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
-              alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+              // 再等待一小会儿，给 MutationObserver 捕获变量的时间
+              waitForImagelist().then(() => {
+                const retryData = extractPageData();
+                if (retryData.imagelist && retryData.imagelist.length > 0) {
+                  injectModernReader(retryData);
+                } else {
+                  console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+                  alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+                }
+              });
             }
           } catch (e) {
             console.error('[EH Modern Reader] 初始化失败:', e);
@@ -1234,8 +1625,15 @@
         if (pageData.imagelist && pageData.imagelist.length > 0) {
           injectModernReader(pageData);
         } else {
-          console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
-          alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+          waitForImagelist().then(() => {
+            const retryData = extractPageData();
+            if (retryData.imagelist && retryData.imagelist.length > 0) {
+              injectModernReader(retryData);
+            } else {
+              console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+              alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+            }
+          });
         }
       }
     } catch (e) {
