@@ -58,6 +58,13 @@
    * 替换原页面内容
    */
   function injectModernReader(pageData) {
+    // 阻止原始脚本继续运行
+    try {
+      window.stop(); // 停止页面加载
+    } catch (e) {
+      console.warn('[EH Modern Reader] window.stop() 失败:', e);
+    }
+    
     // 清空原页面
     document.body.innerHTML = '';
     document.body.className = 'eh-modern-reader';
@@ -327,24 +334,42 @@
     // 从 E-Hentai 图片页面提取真实图片 URL
     async function fetchRealImageUrl(pageUrl) {
       try {
-        const response = await fetch(pageUrl);
-        const html = await response.text();
+        console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
-        // 从页面中提取图片 URL
+        const response = await fetch(pageUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const html = await response.text();
+        console.log('[EH Modern Reader] 页面 HTML 长度:', html.length);
+        
+        // 从页面中提取图片 URL (主要方法)
         const match = html.match(/<img[^>]+id="img"[^>]+src="([^"]+)"/);
         if (match && match[1]) {
+          console.log('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
           return match[1];
         }
         
-        // 尝试另一种模式
-        const match2 = html.match(/https?:\/\/[^"'\s]+\.(?:jpg|jpeg|png|gif|webp)/i);
-        if (match2) {
-          return match2[0];
+        // 尝试备用匹配模式
+        const match2 = html.match(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|gif|webp)[^"]*)"/i);
+        if (match2 && match2[1]) {
+          console.log('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
+          return match2[1];
         }
         
+        // 尝试直接匹配 URL
+        const match3 = html.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp))/i);
+        if (match3 && match3[1]) {
+          console.log('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
+          return match3[1];
+        }
+        
+        console.error('[EH Modern Reader] 无法从页面提取图片 URL');
+        console.log('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
         throw new Error('无法从页面提取图片 URL');
       } catch (error) {
-        console.error('[EH Modern Reader] 获取图片 URL 失败:', error);
+        console.error('[EH Modern Reader] 获取图片 URL 失败:', pageUrl, error);
         throw error;
       }
     }
@@ -362,13 +387,33 @@
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
           const realImageUrl = await fetchRealImageUrl(pageUrl);
+          if (!realImageUrl) {
+            throw new Error('无法获取真实图片 URL');
+          }
+          
           console.log('[EH Modern Reader] 真实图片 URL:', realImageUrl);
           
           return new Promise((resolve, reject) => {
             const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error('图片加载失败'));
+            
+            img.onload = () => {
+              console.log('[EH Modern Reader] 图片加载成功:', realImageUrl);
+              resolve(img);
+            };
+            
+            img.onerror = (e) => {
+              console.error('[EH Modern Reader] 图片加载失败:', realImageUrl, e);
+              reject(new Error(`图片加载失败: ${realImageUrl}`));
+            };
+            
             img.src = realImageUrl;
+            
+            // 超时处理 (30秒)
+            setTimeout(() => {
+              if (!img.complete) {
+                reject(new Error('图片加载超时'));
+              }
+            }, 30000);
           });
         }
         
@@ -376,10 +421,14 @@
         return new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error('图片加载失败'));
+          img.onerror = (e) => {
+            console.error('[EH Modern Reader] 图片加载失败:', pageUrl, e);
+            reject(new Error(`图片加载失败: ${pageUrl}`));
+          };
           img.src = pageUrl;
         });
       } catch (error) {
+        console.error('[EH Modern Reader] loadImage 错误:', error);
         throw error;
       }
     }
@@ -398,6 +447,7 @@
         if (elements.currentImage) {
           elements.currentImage.src = img.src;
           elements.currentImage.style.display = 'block';
+          elements.currentImage.alt = `第 ${pageNum} 页`;
         }
 
         // 更新页码显示
@@ -416,7 +466,7 @@
         // 更新缩略图高亮
         updateThumbnailHighlight(pageNum);
 
-        console.log('[EH Modern Reader] 显示页面:', pageNum);
+        console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
         hideLoading();
 
         // 预加载下一页
@@ -427,7 +477,13 @@
       } catch (error) {
         console.error('[EH Modern Reader] 加载图片失败:', error);
         hideLoading();
-        alert('图片加载失败: ' + error.message);
+        
+        // 显示错误信息
+        if (elements.currentImage) {
+          elements.currentImage.style.display = 'none';
+        }
+        
+        alert(`图片加载失败 (第 ${pageNum} 页): ${error.message}\n\n请刷新页面重试。`);
       }
     }
 
@@ -467,12 +523,23 @@
         elements.thumbnails.appendChild(thumb);
 
         // 使用 E-Hentai 的 t 字段作为缩略图背景
+        // t 字段格式: "(https://...webp) -200px 0"
         if (imageData && imageData.t) {
           const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
-          // t 字段格式: "(https://...webp) -200px 0"
-          // 直接使用 url() 格式的 CSS background
-          placeholder.style.background = `transparent url${imageData.t} no-repeat`;
-          placeholder.style.backgroundSize = 'cover';
+          try {
+            // 提取 URL 和位置
+            const match = imageData.t.match(/\((https?:\/\/[^)]+)\)\s*(-?\d+px)\s+(-?\d+px)/);
+            if (match) {
+              const [, url, xPos, yPos] = match;
+              placeholder.style.background = `transparent url("${url}") ${xPos} ${yPos} no-repeat`;
+              placeholder.style.backgroundSize = 'auto';
+              console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, xPos, yPos);
+            } else {
+              console.warn(`[EH Modern Reader] 缩略图格式错误:`, imageData.t);
+            }
+          } catch (e) {
+            console.error(`[EH Modern Reader] 解析缩略图失败:`, e, imageData.t);
+          }
         }
       });
     }
