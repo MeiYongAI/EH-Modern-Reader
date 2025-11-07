@@ -22,12 +22,11 @@ yarn-error.log*
 node_modules/
 bower_components/
 
-# 构建输出（如果未来添加）
-dist/
+# 构建输出（发布包由 build.ps1 生成）
+# dist/ 目录保留用于 Release 附件
+*.tmp
 build/
-*.zip
-*.crx
-*.xpi
+temp_build/
 
 # 临时文件
 tmp/
