@@ -270,11 +270,15 @@
       sidebar: document.getElementById('eh-sidebar'),
       prevBtn: document.getElementById('eh-prev-btn'),
       nextBtn: document.getElementById('eh-next-btn'),
+      firstPageBtn: document.getElementById('eh-first-page'),
+      lastPageBtn: document.getElementById('eh-last-page'),
       closeBtn: document.getElementById('eh-close-btn'),
       toggleSidebarBtn: document.getElementById('eh-toggle-sidebar'),
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
+      settingsPanel: document.getElementById('eh-settings-panel'),
+      closeSettingsBtn: document.getElementById('eh-close-settings'),
       fitModeSelect: document.getElementById('eh-fit-mode')
     };
 
@@ -462,14 +466,13 @@
         thumb.onclick = () => showPage(pageNum);
         elements.thumbnails.appendChild(thumb);
 
-        // 异步加载缩略图
-        const imageUrl = getImageUrl(index);
-        if (imageUrl) {
-          const img = new Image();
-          img.onload = () => {
-            thumb.querySelector('.eh-thumbnail-placeholder').style.backgroundImage = `url(${img.src})`;
-          };
-          img.src = imageUrl;
+        // 使用 E-Hentai 的 t 字段作为缩略图背景
+        if (imageData && imageData.t) {
+          const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
+          // t 字段格式: "(https://...webp) -200px 0"
+          // 直接使用 url() 格式的 CSS background
+          placeholder.style.background = `transparent url${imageData.t} no-repeat`;
+          placeholder.style.backgroundSize = 'cover';
         }
       });
     }
@@ -481,6 +484,14 @@
 
     if (elements.nextBtn) {
       elements.nextBtn.onclick = () => showPage(state.currentPage + 1);
+    }
+
+    if (elements.firstPageBtn) {
+      elements.firstPageBtn.onclick = () => showPage(1);
+    }
+
+    if (elements.lastPageBtn) {
+      elements.lastPageBtn.onclick = () => showPage(state.pageCount);
     }
 
     if (elements.closeBtn) {
@@ -515,6 +526,26 @@
           document.documentElement.requestFullscreen();
         } else {
           document.exitFullscreen();
+        }
+      };
+    }
+
+    // 设置按钮和面板
+    if (elements.settingsBtn) {
+      elements.settingsBtn.onclick = () => {
+        console.log('[EH Modern Reader] 点击设置按钮');
+        if (elements.settingsPanel) {
+          elements.settingsPanel.classList.toggle('eh-hidden');
+          console.log('[EH Modern Reader] 设置面板显示状态:', !elements.settingsPanel.classList.contains('eh-hidden'));
+        }
+      };
+    }
+
+    if (elements.closeSettingsBtn) {
+      elements.closeSettingsBtn.onclick = () => {
+        console.log('[EH Modern Reader] 关闭设置面板');
+        if (elements.settingsPanel) {
+          elements.settingsPanel.classList.add('eh-hidden');
         }
       };
     }
