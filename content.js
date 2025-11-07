@@ -120,12 +120,6 @@
             <span id="eh-page-info" title="快捷键: ← → 翻页 | + - 缩放 | 0 重置 | 空格 下一页">1 / ${pageData.pagecount}</span>
           </div>
           <div class="eh-header-right">
-            <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6m0 6v6m6.364-15.364l-4.243 4.243m-4.242 4.242l-4.243 4.243m16.97-4.243l-4.242-4.242m-4.243-4.243L1.636 19.778"/>
-              </svg>
-            </button>
             <button id="eh-fullscreen-btn" class="eh-icon-btn" title="全屏 (F11)">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
@@ -134,6 +128,11 @@
             <button id="eh-theme-btn" class="eh-icon-btn" title="切换主题">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+              </svg>
+            </button>
+            <button id="eh-mode-toggle-btn" class="eh-icon-btn" title="连续模式">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 7h18M3 12h18M3 17h18"/>
               </svg>
             </button>
             <button id="eh-thumbnails-toggle-btn" class="eh-icon-btn" title="缩略图悬停显示开关">
@@ -156,6 +155,7 @@
                 <p>加载中...</p>
               </div>
               <img id="eh-current-image" alt="当前页" />
+              <div id="eh-continuous" class="eh-continuous" style="display:none;"></div>
             </div>
 
             <!-- 翻页按钮 -->
@@ -164,73 +164,11 @@
                 <path d="M15 18l-6-6 6-6"/>
               </svg>
             </button>
-            <button id="eh-next-btn" class="eh-nav-btn eh-nav-next" title="下一页 (→)">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
-          </section>
-        </main>
-
-        <!-- 底部菜单(缩略图+进度条+快捷按钮) -->
-        <footer id="eh-bottom-menu" class="eh-bottom-menu">
-          <!-- 缩略图横向滚动区 -->
-          <div id="eh-thumbnails-container" class="eh-thumbnails-container">
-            <div id="eh-thumbnails" class="eh-thumbnails-horizontal"></div>
-          </div>
-
-          <!-- 进度条区 -->
-          <div class="eh-slider-container">
-            <div class="eh-slider-track" id="eh-slider-track">
-              <div class="eh-slider-fill" id="eh-slider-fill"></div>
-              <input 
-                type="range" 
-                id="eh-progress-bar" 
-                min="1" 
-                max="${pageData.pagecount}" 
-                value="1" 
-                class="eh-progress-slider"
-              />
             </div>
           </div>
         </footer>
-
-        <!-- 设置面板 -->
-        <div id="eh-settings-panel" class="eh-panel eh-hidden">
-          <div class="eh-panel-content">
-            <h3>阅读设置</h3>
-            <div class="eh-setting-item">
-              <label>图片适配模式</label>
-              <select id="eh-fit-mode">
-                <option value="contain">适应窗口</option>
-                <option value="width">适应宽度</option>
-                <option value="height">适应高度</option>
-                <option value="none">原始大小</option>
-              </select>
-            </div>
-            <div class="eh-setting-item">
-              <label>图片对齐</label>
-              <select id="eh-align-mode">
-                <option value="center">居中</option>
-                <option value="left">左对齐</option>
-                <option value="right">右对齐</option>
-              </select>
-            </div>
-            <div class="eh-setting-item">
-              <label>
-                <input type="checkbox" id="eh-preload-next" checked />
-                预加载下一页
-              </label>
-            </div>
-            <div class="eh-setting-item">
-              <label>
-                <input type="checkbox" id="eh-smooth-scroll" checked />
-                平滑滚动
-              </label>
-            </div>
-            <button id="eh-close-settings" class="eh-btn">关闭</button>
-          </div>
-        </div>
       </div>
     `;
 
@@ -285,8 +223,9 @@
       imagelist: pageData.imagelist,
       galleryId: galleryId,
       imageCache: new Map(), // pageIndex -> { img, status: 'loaded'|'loading'|'error', promise }
+      loadToken: 0, // 跳转请求令牌，保证只应用最后一次
       settings: {
-        fitMode: 'contain',
+        fitMode: 'contain', // 未来可移除（阅读设置将精简）
         menuVisible: true,  // 底部菜单是否显示
         darkMode: true,  // 默认启用深色模式
         imageScale: 1,     // 图片缩放比例
@@ -295,6 +234,30 @@
         thumbnailsHover: false // 顶部开关：鼠标靠近底部时显示缩略图
       }
     };
+
+    // 惰性跳转相关变量（滑动进度条或快速点击触发时，只跳最终目标）
+    let pendingTargetPage = null;
+    let deferredTimer = null;
+
+    function scheduleDeferredJump(immediate = false) {
+      if (deferredTimer) {
+        clearTimeout(deferredTimer);
+        deferredTimer = null;
+      }
+      if (immediate) {
+        if (pendingTargetPage && pendingTargetPage !== state.currentPage) {
+          showPage(pendingTargetPage);
+        }
+        pendingTargetPage = null;
+        return;
+      }
+      deferredTimer = setTimeout(() => {
+        if (pendingTargetPage && pendingTargetPage !== state.currentPage) {
+          showPage(pendingTargetPage);
+        }
+        pendingTargetPage = null;
+      }, 250); // 250ms 无继续操作则跳转
+    }
 
     // 读取上次阅读进度
     function loadProgress() {
@@ -329,8 +292,8 @@
       pageInfo: document.getElementById('eh-page-info'),
       progressBar: document.getElementById('eh-progress-bar'),
       sliderTrack: document.getElementById('eh-slider-track'),
-      sliderFill: document.getElementById('eh-slider-fill'),
       thumbnails: document.getElementById('eh-thumbnails'),
+      thumbnailsContainer: document.getElementById('eh-thumbnails-container'),
       bottomMenu: document.getElementById('eh-bottom-menu'),
       viewer: document.getElementById('eh-viewer'),
       prevBtn: document.getElementById('eh-prev-btn'),
@@ -338,13 +301,56 @@
       closeBtn: document.getElementById('eh-close-btn'),
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
-      settingsBtn: document.getElementById('eh-settings-btn'),
-      thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
-      settingsPanel: document.getElementById('eh-settings-panel'),
-      closeSettingsBtn: document.getElementById('eh-close-settings'),
-      fitModeSelect: document.getElementById('eh-fit-mode')
+      modeToggleBtn: document.getElementById('eh-mode-toggle-btn'),
+      thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn')
     };
 
+      if (elements.modeToggleBtn) {
+        elements.modeToggleBtn.onclick = () => {
+          state.settings.continuous = !state.settings.continuous;
+          elements.modeToggleBtn.classList.toggle('eh-active', state.settings.continuous);
+          if (state.settings.continuous) {
+            // 进入连续模式：预加载所有已读附近图片并展示滚动容器
+            enterContinuousMode();
+          } else {
+            exitContinuousMode();
+          }
+        };
+      }
+
+      function enterContinuousMode() {
+        const container = document.getElementById('eh-continuous');
+        if (!container) return;
+        container.style.display = 'block';
+        // 清空并填充当前/后续若干页的图片（惰性加载）
+        container.innerHTML = '';
+        const range = Math.min(state.pageCount, state.currentPage + 5);
+        for (let i = state.currentPage - 1; i < range; i++) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'eh-continuous-item';
+          const imgEl = document.createElement('img');
+          imgEl.alt = `第 ${i + 1} 页`;
+          wrapper.appendChild(imgEl);
+          container.appendChild(wrapper);
+          loadImage(i).then(img => {
+            imgEl.src = img.src;
+          }).catch(() => {
+            imgEl.style.display = 'none';
+          });
+        }
+        if (elements.currentImage) {
+          elements.currentImage.style.display = 'none';
+        }
+      }
+
+      function exitContinuousMode() {
+        const container = document.getElementById('eh-continuous');
+        if (!container) return;
+        container.style.display = 'none';
+        if (elements.currentImage) {
+          elements.currentImage.style.display = 'block';
+        }
+      }
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
     const missingElements = requiredElements.filter(key => !elements[key]);
@@ -519,6 +525,7 @@
     // 显示指定页面
     async function showPage(pageNum) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
+      const token = ++state.loadToken;
       // 重复点击相同页：若已经是当前页且图片已显示，则短路
       if (pageNum === state.currentPage && elements.currentImage && elements.currentImage.src) {
         return;
@@ -542,8 +549,11 @@
       try {
   const img = await loadImage(targetIndex);
         
-        // 隐藏加载状态
-        hideLoading();
+  // 仅当请求仍然最新时应用
+  if (token !== state.loadToken) return;
+
+  // 隐藏加载状态
+  hideLoading();
         
         // 更新图片
         if (elements.currentImage) {
@@ -567,14 +577,10 @@
           elements.pageInput.value = pageNum;
         }
 
-        // 更新进度条填充(已读进度轨道)
-        if (elements.sliderFill) {
-          const progress = (pageNum / state.pageCount) * 100;
-          elements.sliderFill.style.width = `${progress}%`;
-        }
+        // 取消进度条填充，仅保留拖动球
 
-        // 更新缩略图高亮
-        updateThumbnailHighlight(pageNum);
+  // 更新缩略图高亮
+  updateThumbnailHighlight(pageNum);
 
         // 保存阅读进度
         saveProgress(pageNum);
@@ -586,7 +592,7 @@
 
       } catch (error) {
         console.error('[EH Modern Reader] 加载图片失败:', error);
-        hideLoading();
+        if (token === state.loadToken) hideLoading();
         
         // 显示错误信息
         if (elements.currentImage) {
@@ -670,7 +676,7 @@
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
 
-        thumb.onclick = () => showPage(pageNum);
+  thumb.onclick = () => { pendingTargetPage = pageNum; scheduleDeferredJump(); };
         elements.thumbnails.appendChild(thumb);
 
         // 缩略图加载逻辑
@@ -796,11 +802,11 @@
 
     // 事件监听
     if (elements.prevBtn) {
-      elements.prevBtn.onclick = () => showPage(state.currentPage - 1);
+      elements.prevBtn.onclick = () => { pendingTargetPage = Math.max(1, state.currentPage - 1); scheduleDeferredJump(); };
     }
 
     if (elements.nextBtn) {
-      elements.nextBtn.onclick = () => showPage(state.currentPage + 1);
+      elements.nextBtn.onclick = () => { pendingTargetPage = Math.min(state.pageCount, state.currentPage + 1); scheduleDeferredJump(); };
     }
 
     if (elements.closeBtn) {
@@ -845,6 +851,13 @@
       elements.themeBtn.onclick = () => {
         state.settings.darkMode = !state.settings.darkMode;
         document.body.classList.toggle('eh-dark-mode');
+        // 动态替换图标：暗色模式显示太阳，浅色显示月亮
+        const svg = elements.themeBtn.querySelector('svg');
+        if (svg) {
+          svg.innerHTML = state.settings.darkMode
+            ? '<path d="M12 4.5a1 1 0 0 1 1 1V8a1 1 0 1 1-2 0V5.5a1 1 0 0 1 1-1zm0 11a1 1 0 0 1 1 1V19a1 1 0 1 1-2 0v-2.5a1 1 0 0 1 1-1zm7.5-3.5a1 1 0 0 1-1 1H16a1 1 0 1 1 0-2h2.5a1 1 0 0 1 1 1zM9 12a1 1 0 0 1-1 1H5.5a1 1 0 0 1 0-2H8a1 1 0 0 1 1 1zm8.303 5.303a1 1 0 0 1-1.414 0l-1.327-1.327a1 1 0 0 1 1.414-1.414l1.327 1.327a1 1 0 0 1 0 1.414zM9.024 9.024a1 1 0 0 1-1.414 0L6.283 7.697A1 1 0 0 1 7.697 6.283l1.327 1.327a1 1 0 0 1 0 1.414zm7.606-4.02-1.327 1.327a1 1 0 0 1-1.414-1.414l1.327-1.327a1 1 0 0 1 1.414 1.414zM9.024 14.976l-1.327 1.327a1 1 0 0 1-1.414-1.414l1.327-1.327a1 1 0 1 1 1.414 1.414zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z' // 太阳
+            : '<path d="M21 12.79A9 9 0 0 1 11.21 3a7 7 0 1 0 9.79 9.79z" />'; // 月亮
+        }
       };
     }
 
@@ -859,63 +872,21 @@
     }
 
     // 设置按钮和面板
-    if (elements.settingsBtn) {
-      elements.settingsBtn.onclick = () => {
-        console.log('[EH Modern Reader] 点击设置按钮');
-        if (elements.settingsPanel) {
-          elements.settingsPanel.classList.toggle('eh-hidden');
-          console.log('[EH Modern Reader] 设置面板显示状态:', !elements.settingsPanel.classList.contains('eh-hidden'));
-        }
-      };
-    }
-
-    if (elements.closeSettingsBtn) {
-      elements.closeSettingsBtn.onclick = () => {
-        console.log('[EH Modern Reader] 关闭设置面板');
-        if (elements.settingsPanel) {
-          elements.settingsPanel.classList.add('eh-hidden');
-        }
-      };
-    }
-
-    if (elements.progressBar) {
-      elements.progressBar.onchange = () => {
-        showPage(parseInt(elements.progressBar.value));
-      };
-    }
-
-    if (elements.pageInput) {
-      elements.pageInput.onchange = () => {
-        const pageNum = parseInt(elements.pageInput.value);
-        if (pageNum >= 1 && pageNum <= state.pageCount) {
-          showPage(pageNum);
-        }
-      };
-    }
-
-    if (elements.fitModeSelect) {
-      elements.fitModeSelect.onchange = () => {
-        state.settings.fitMode = elements.fitModeSelect.value;
-        if (elements.currentImage) {
-          elements.currentImage.style.objectFit = state.settings.fitMode;
-        }
-      };
-    }
+    // 移除旧的设置面板相关事件
 
     // 进度条拖动事件
     if (elements.progressBar) {
       elements.progressBar.oninput = (e) => {
+        // 惰性跳转：不立即加载，等待用户停止拖动或 250ms 未继续操作
         const page = parseInt(e.target.value);
-        // 实时更新填充轨道
-        if (elements.sliderFill) {
-          const progress = (page / state.pageCount) * 100;
-          elements.sliderFill.style.width = `${progress}%`;
-        }
+        pendingTargetPage = page;
+        scheduleDeferredJump();
       };
 
       elements.progressBar.onchange = (e) => {
         const page = parseInt(e.target.value);
-        showPage(page);
+        pendingTargetPage = page;
+        scheduleDeferredJump(true); // 立即跳转最终位置
       };
     }
 
@@ -1007,7 +978,7 @@
       });
     }
 
-    // 键盘导航和缩放
+    // 键盘导航和缩放（快速连击时仅跳到最终页）
     document.addEventListener('keydown', (e) => {
       // 图片缩放快捷键（+ / - / 0）
       if (e.key === '+' || e.key === '=') {
@@ -1040,22 +1011,26 @@
         case 'ArrowLeft':
         case 'a':
         case 'A':
-          showPage(state.currentPage - 1);
+          pendingTargetPage = Math.max(1, state.currentPage - 1);
+          scheduleDeferredJump();
           e.preventDefault();
           break;
         case 'ArrowRight':
         case 'd':
         case 'D':
         case ' ':
-          showPage(state.currentPage + 1);
+          pendingTargetPage = Math.min(state.pageCount, state.currentPage + 1);
+          scheduleDeferredJump();
           e.preventDefault();
           break;
         case 'Home':
-          showPage(1);
+          pendingTargetPage = 1;
+          scheduleDeferredJump(true);
           e.preventDefault();
           break;
         case 'End':
-          showPage(state.pageCount);
+          pendingTargetPage = state.pageCount;
+          scheduleDeferredJump(true);
           e.preventDefault();
           break;
         case 'Escape':
@@ -1078,8 +1053,10 @@
       const updateToggleVisual = () => {
         if (state.settings.thumbnailsHover) {
           elements.thumbnailsToggleBtn.classList.add('eh-active');
+          if (elements.bottomMenu) elements.bottomMenu.classList.add('show-thumbnails');
         } else {
           elements.thumbnailsToggleBtn.classList.remove('eh-active');
+          if (elements.bottomMenu) elements.bottomMenu.classList.remove('show-thumbnails');
         }
       };
       updateToggleVisual();
@@ -1090,6 +1067,7 @@
           if (state.settings.thumbnailsHover) {
             // 开启悬停模式时默认隐藏，鼠标靠近底部再显示
             elements.bottomMenu.classList.add('eh-menu-hidden');
+            elements.bottomMenu.classList.add('show-thumbnails');
           } else {
             // 关闭悬停模式时按菜单显隐状态显示
             if (state.settings.menuVisible) {
@@ -1097,6 +1075,7 @@
             } else {
               elements.bottomMenu.classList.add('eh-menu-hidden');
             }
+            elements.bottomMenu.classList.remove('show-thumbnails');
           }
         }
       };
@@ -1111,8 +1090,10 @@
       if (distanceFromBottom < threshold) {
         // 显示
         elements.bottomMenu.classList.remove('eh-menu-hidden');
+        elements.bottomMenu.classList.add('show-thumbnails');
       } else {
         elements.bottomMenu.classList.add('eh-menu-hidden');
+        // 不移除 show-thumbnails，保持悬停模式视觉一致，仅整体隐藏
       }
     });
     

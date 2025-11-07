@@ -1,3 +1,21 @@
+/* ==================== 连续模式容器 ==================== */
+.eh-continuous {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  scroll-behavior: smooth;
+  align-items: center;
+}
+
+.eh-continuous-item img {
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
 /**
  * EH Modern Reader - 样式表
  * 现代化的阅读器界面设计
@@ -224,11 +242,13 @@ body.eh-dark-mode #eh-bottom-menu {
 
 /* 缩略图容器 */
 
+/* 默认隐藏缩略图容器（需开关 + 悬停触发） */
 .eh-thumbnails-container {
-  height: 90px;  /* 70px thumbnail + 20px padding */
+  height: 90px;
   padding: 6px 0 6px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: none;
 }
 
 .eh-thumbnails-horizontal {
@@ -240,6 +260,9 @@ body.eh-dark-mode #eh-bottom-menu {
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
+}
+#eh-bottom-menu.show-thumbnails .eh-thumbnails-container {
+  display: block;
 }
 
 .eh-thumbnails-horizontal::-webkit-scrollbar {
@@ -797,19 +820,7 @@ body.eh-dark-mode .eh-progress-bar::-moz-range-track {
   transform: translateY(-50%);
   height: 6px;
   background: linear-gradient(90deg, #FF6B9D 0%, #FFB6C1 100%);
-  border-radius: 3px;
-  pointer-events: none;
-  z-index: 1;
-  transition: width 0.3s ease;
-}
-
-.eh-footer-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
+/* 移除进度条彩色填充，仅保留轨道与滑块 */
 .eh-btn-small {
   width: 32px;
   height: 32px;
