@@ -14,12 +14,75 @@
 
   console.log('[EH Modern Reader] 正在初始化...');
 
+  // 提前阻止原 MPV 脚本注入与执行（document_start 生效）
+  try {
+    const blockScriptObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (node && node.tagName === 'SCRIPT') {
+            const src = node.src || '';
+            if (/ehg_mpv\./i.test(src)) {
+              console.warn('[EH Modern Reader] 阻止原MPV脚本加载:', src);
+              node.remove();
+            } else if (!src && node.textContent && /var\s+imagelist\s*=\s*\[/s.test(node.textContent)) {
+              // 捕获 imagelist 的出现（早期注入场景）
+              try {
+                const content = node.textContent;
+                const imagelistMatch = content.match(/var imagelist = (\[.*?\]);/s);
+                const pagecountMatch = content.match(/var pagecount = (\d+);/);
+                const gidMatch = content.match(/var gid=(\d+);/);
+                const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
+                if (imagelistMatch) {
+                  window.__eh_pre_extracted__ = window.__eh_pre_extracted__ || {};
+                  window.__eh_pre_extracted__.imagelist = JSON.parse(imagelistMatch[1]);
+                  if (pagecountMatch) window.__eh_pre_extracted__.pagecount = parseInt(pagecountMatch[1]);
+                  if (gidMatch) window.__eh_pre_extracted__.gid = gidMatch[1];
+                  if (mpvkeyMatch) window.__eh_pre_extracted__.mpvkey = mpvkeyMatch[1];
+                  console.log('[EH Modern Reader] 预捕获 imagelist 于 document_start');
+                }
+              } catch (e) {
+                console.warn('[EH Modern Reader] 预捕获 imagelist 失败:', e);
+              }
+            }
+          }
+        }
+      }
+    });
+    blockScriptObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+
+    // 在页面上下文内注入极简防护脚本，避免原函数执行（双保险）
+    const guard = document.createElement('script');
+    guard.textContent = `
+      (function(){
+        try {
+          window.preload_generic = window.preload_generic || function(){};
+          window.preload_scroll_images = window.preload_scroll_images || function(){};
+          window.load_image = window.load_image || function(){};
+        } catch(e) {}
+      })();
+    `;
+    (document.documentElement || document.head || document.body).appendChild(guard);
+    guard.remove();
+  } catch (e) {
+    console.warn('[EH Modern Reader] 早期脚本拦截初始化失败:', e);
+  }
+
   /**
    * 从原页面提取必要数据
    */
   function extractPageData() {
     const scriptTags = document.querySelectorAll('script');
     let pageData = {};
+
+    // 如果早期已预捕获（MutationObserver阶段）则直接使用
+    if (window.__eh_pre_extracted__ && Array.isArray(window.__eh_pre_extracted__.imagelist)) {
+      pageData.imagelist = window.__eh_pre_extracted__.imagelist;
+      pageData.pagecount = window.__eh_pre_extracted__.pagecount || window.__eh_pre_extracted__.imagelist.length;
+      pageData.gid = window.__eh_pre_extracted__.gid;
+      pageData.mpvkey = window.__eh_pre_extracted__.mpvkey;
+      console.log('[EH Modern Reader] 使用预捕获数据');
+      return pageData;
+    }
 
     try {
       for (let script of scriptTags) {
@@ -404,11 +467,11 @@
     }
     
     // 从 E-Hentai 图片页面提取真实图片 URL
-    async function fetchRealImageUrl(pageUrl) {
+    async function fetchRealImageUrl(pageUrl, abortSignal) {
       try {
         console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
-        const response = await fetch(pageUrl);
+        const response = await fetch(pageUrl, { signal: abortSignal });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -441,6 +504,10 @@
         console.log('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
         throw new Error('无法从页面提取图片 URL');
       } catch (error) {
+        if (abortSignal && abortSignal.aborted) {
+          console.warn('[EH Modern Reader] 图片页面请求已取消:', pageUrl);
+          return null;
+        }
         console.error('[EH Modern Reader] 获取图片 URL 失败:', pageUrl, error);
         throw error;
       }
@@ -465,7 +532,9 @@
 
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
-          const realImageUrl = await fetchRealImageUrl(pageUrl);
+          // 每次请求创建新的 AbortController，旧的在竞态中会被忽略
+          const controller = new AbortController();
+          const realImageUrl = await fetchRealImageUrl(pageUrl, controller.signal);
           if (!realImageUrl) {
             throw new Error('无法获取真实图片 URL');
           }
