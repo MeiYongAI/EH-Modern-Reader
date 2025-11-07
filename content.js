@@ -573,23 +573,31 @@
                 yPos = yPos + 'px';
               }
               
-              // 将位置从200x281比例转换到71x100比例 (缩放因子 0.355)
+              // E-Hentai sprite sheet: 每张缩略图200x281px
+              // 我们缩放到50x70px (缩放因子 0.25)
               const xOffset = parseInt(xPos);
               const yOffset = parseInt(yPos);
-              const scaledX = Math.round(xOffset * 0.355);
-              const scaledY = Math.round(yOffset * 0.355);
+              const scale = 0.25; // 缩放因子
+              const scaledX = Math.round(xOffset * scale);
+              const scaledY = Math.round(yOffset * scale);
               
-              // 设置背景图和位置 (E-Hentai 使用 sprite sheet)
+              // 计算sprite sheet的总宽度
+              // E-Hentai通常一行20张图片: 20 * 200px = 4000px
+              // 缩放后: 4000 * 0.25 = 1000px
+              const spriteSheetWidth = 1000; // 或者可以动态计算
+              const thumbnailHeight = 70; // 281 * 0.25 = 70.25
+              
+              // 设置背景图和位置
               placeholder.style.backgroundImage = `url("${url}")`;
               placeholder.style.backgroundPosition = `${scaledX}px ${scaledY}px`;
               placeholder.style.backgroundRepeat = 'no-repeat';
-              placeholder.style.backgroundSize = 'auto 100px'; // sprite sheet高度缩放到100px
+              placeholder.style.backgroundSize = `${spriteSheetWidth}px auto`;
               
               // 隐藏页码数字(因为有真实缩略图了)
               const pageNumSpan = placeholder.querySelector('span');
               if (pageNumSpan) pageNumSpan.style.display = 'none';
               
-              console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, `${scaledX}px ${scaledY}px`);
+              console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, `${scaledX}px ${scaledY}px, size: ${spriteSheetWidth}px`);
             } else {
               console.warn(`[EH Modern Reader] 缩略图格式错误:`, imageData.t);
             }

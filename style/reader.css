@@ -215,7 +215,7 @@ body.eh-dark-mode #eh-bottom-menu {
 /* 缩略图容器 */
 
 .eh-thumbnails-container {
-  height: 120px;  /* 100px thumbnail + 20px padding */
+  height: 90px;  /* 70px thumbnail + 20px padding */
   padding: 6px 0 6px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -254,7 +254,7 @@ body.eh-dark-mode #eh-bottom-menu {
 
 .eh-thumbnail {
   flex-shrink: 0;
-  width: 71px;  /* 200 * 0.355 = 71px */
+  width: 50px;  /* 200 * 0.25 = 50px */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -273,8 +273,8 @@ body.eh-dark-mode #eh-bottom-menu {
 }
 
 .eh-thumbnail-placeholder {
-  width: 71px;   /* 200 * 0.355 */
-  height: 100px; /* 281 * 0.355 */
+  width: 50px;   /* 200 * 0.25 */
+  height: 70px;  /* 281 * 0.25 */
   background: #2a2a2a;
   border-radius: 4px;
   overflow: hidden;
@@ -284,7 +284,6 @@ body.eh-dark-mode #eh-bottom-menu {
   align-items: center;
   justify-content: center;
   background-repeat: no-repeat;
-  background-size: auto 100px !important; /* 保持sprite sheet高度为100px */
 }
 
 .eh-thumbnail-placeholder span {
