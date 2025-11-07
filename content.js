@@ -255,16 +255,47 @@
     }
 
     // 阅读器状态
+    const galleryId = pageData.gid || window.location.pathname.split('/')[2];
     const state = {
       currentPage: 1,
       pageCount: pageData.pagecount,
       imagelist: pageData.imagelist,
+      galleryId: galleryId,
       settings: {
         fitMode: 'contain',
         menuVisible: true,  // 底部菜单是否显示
-        darkMode: true  // 默认启用深色模式
+        darkMode: true,  // 默认启用深色模式
+        imageScale: 1,     // 图片缩放比例
+        imageOffsetX: 0,   // 图片X偏移
+        imageOffsetY: 0    // 图片Y偏移
       }
     };
+
+    // 读取上次阅读进度
+    function loadProgress() {
+      try {
+        const saved = localStorage.getItem(`eh-progress-${state.galleryId}`);
+        if (saved) {
+          const progress = JSON.parse(saved);
+          return progress.page || 1;
+        }
+      } catch (e) {
+        console.warn('[EH Modern Reader] 读取进度失败:', e);
+      }
+      return 1;
+    }
+
+    // 保存阅读进度
+    function saveProgress(page) {
+      try {
+        localStorage.setItem(`eh-progress-${state.galleryId}`, JSON.stringify({
+          page: page,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('[EH Modern Reader] 保存进度失败:', e);
+      }
+    }
 
     // 获取 DOM 元素
     const elements = {
@@ -443,6 +474,9 @@
 
       state.currentPage = pageNum;
       
+      // 重置图片缩放
+      resetImageZoom();
+      
       // 只在当前没有图片时显示加载状态
       if (!elements.currentImage || !elements.currentImage.src || elements.currentImage.style.display === 'none') {
         showLoading();
@@ -486,6 +520,9 @@
 
         // 更新缩略图高亮
         updateThumbnailHighlight(pageNum);
+
+        // 保存阅读进度
+        saveProgress(pageNum);
 
         console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
 
@@ -711,12 +748,112 @@
       };
     }
 
-    // 禁止缩略图滚动时切换图片
-    if (elements.bottomMenu) {
-      elements.bottomMenu.addEventListener('wheel', (e) => {
-        // 阻止滚动事件冒泡,防止触发图片切换
-        e.stopPropagation();
-      }, { passive: true });
+
+    // 缩略图横向滚动支持鼠标滚轮
+    if (elements.thumbnails) {
+      elements.thumbnails.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+          elements.thumbnails.scrollLeft += e.deltaY;
+          e.preventDefault();
+        }
+      }, { passive: false });
+    }
+
+    // 图片缩放功能 (参考PicaComic)
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let lastOffsetX = 0;
+    let lastOffsetY = 0;
+
+    // 重置图片缩放
+    function resetImageZoom() {
+      state.settings.imageScale = 1;
+      state.settings.imageOffsetX = 0;
+      state.settings.imageOffsetY = 0;
+      if (elements.currentImage) {
+        elements.currentImage.style.transform = 'scale(1) translate(0, 0)';
+        elements.currentImage.style.cursor = 'pointer';
+      }
+    }
+
+    // 应用图片缩放
+    function applyImageZoom() {
+      if (elements.currentImage) {
+        const scale = state.settings.imageScale;
+        const offsetX = state.settings.imageOffsetX;
+        const offsetY = state.settings.imageOffsetY;
+        elements.currentImage.style.transform = `scale(${scale}) translate(${offsetX}px, ${offsetY}px)`;
+        elements.currentImage.style.cursor = scale > 1 ? 'grab' : 'pointer';
+      }
+    }
+
+    // 图片区域滚轮缩放
+    if (elements.viewer) {
+      elements.viewer.addEventListener('wheel', (e) => {
+        // 如果在缩略图区域或底部菜单，不处理
+        if (e.target.closest('#eh-bottom-menu')) {
+          return;
+        }
+
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        const newScale = Math.max(0.5, Math.min(5, state.settings.imageScale + delta));
+        
+        if (newScale !== state.settings.imageScale) {
+          state.settings.imageScale = newScale;
+          
+          // 缩放回1.0时重置偏移
+          if (Math.abs(newScale - 1) < 0.01) {
+            state.settings.imageOffsetX = 0;
+            state.settings.imageOffsetY = 0;
+          }
+          
+          applyImageZoom();
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      // 双击重置缩放
+      elements.viewer.addEventListener('dblclick', (e) => {
+        if (!e.target.closest('#eh-bottom-menu') && !e.target.closest('button')) {
+          resetImageZoom();
+          e.preventDefault();
+        }
+      });
+    }
+
+    // 图片拖动 (仅在缩放时生效)
+    if (elements.currentImage) {
+      elements.currentImage.addEventListener('mousedown', (e) => {
+        if (state.settings.imageScale > 1) {
+          isDragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          lastOffsetX = state.settings.imageOffsetX;
+          lastOffsetY = state.settings.imageOffsetY;
+          elements.currentImage.style.cursor = 'grabbing';
+          e.preventDefault();
+        }
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+          const deltaX = e.clientX - dragStartX;
+          const deltaY = e.clientY - dragStartY;
+          state.settings.imageOffsetX = lastOffsetX + deltaX / state.settings.imageScale;
+          state.settings.imageOffsetY = lastOffsetY + deltaY / state.settings.imageScale;
+          applyImageZoom();
+        }
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          if (elements.currentImage && state.settings.imageScale > 1) {
+            elements.currentImage.style.cursor = 'grab';
+          }
+        }
+      });
     }
 
     // 键盘导航
@@ -766,14 +903,17 @@
 
     // 初始化
     generateThumbnails();
-    showPage(1);
+    
+    // 加载上次阅读进度
+    const savedPage = loadProgress();
+    showPage(savedPage);
     
     // 应用默认深色模式
     if (state.settings.darkMode) {
       document.body.classList.add('eh-dark-mode');
     }
 
-    console.log('[EH Modern Reader] 阅读器初始化完成');
+    console.log('[EH Modern Reader] 阅读器初始化完成，从第', savedPage, '页继续阅读');
   }
 
   /**
