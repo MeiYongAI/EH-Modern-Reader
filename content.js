@@ -206,6 +206,12 @@
 
     document.body.insertAdjacentHTML('beforeend', readerHTML);
 
+    // 注入 CSS 样式
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('style/reader.css');
+    document.head.appendChild(link);
+
     // 注入主逻辑脚本
     window.ehReaderData = pageData;
     

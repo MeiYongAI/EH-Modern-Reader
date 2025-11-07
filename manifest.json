@@ -34,8 +34,7 @@
         "https://exhentai.org/mpv/*"
       ],
       "js": ["content.js"],
-      "css": ["style/reader.css"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
