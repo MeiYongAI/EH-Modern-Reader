@@ -79,16 +79,29 @@
    * 替换原页面内容
    */
   function injectModernReader(pageData) {
-    // 阻止原始脚本继续运行
+    // 阻止原始脚本继续运行 - 更彻底的方式
     try {
-      window.stop(); // 停止页面加载
+      // 移除所有原始脚本
+      document.querySelectorAll('script[src*="ehg_mpv"]').forEach(s => s.remove());
+      
+      // 停止页面加载
+      window.stop();
     } catch (e) {
-      console.warn('[EH Modern Reader] window.stop() 失败:', e);
+      console.warn('[EH Modern Reader] 阻止原脚本失败:', e);
     }
     
     // 清空原页面
     document.body.innerHTML = '';
     document.body.className = 'eh-modern-reader';
+    
+    // 禁用原脚本的全局变量
+    try {
+      window.preload_generic = function() {};
+      window.preload_scroll_images = function() {};
+      window.load_image = function() {};
+    } catch (e) {
+      // 忽略错误
+    }
 
     // 创建新的阅读器结构(参考JHentai,缩略图在底部)
     const readerHTML = `
@@ -616,7 +629,7 @@
         const pageNum = index + 1;
         thumb.innerHTML = `
           <div class="eh-thumbnail-placeholder" title="第 ${pageNum} 页" role="img" aria-label="缩略图 ${pageNum}">
-            <span>${pageNum}</span>
+            <span style="display: none;">${pageNum}</span>
           </div>
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
@@ -735,13 +748,13 @@
       placeholder.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
       placeholder.style.backgroundSize = 'cover';
       
-      // 显示页码
+      // 显示 placeholder 内的页码（作为备用显示）
       const pageNumSpan = placeholder.querySelector('span');
       if (pageNumSpan) {
         pageNumSpan.style.display = 'block';
         pageNumSpan.style.color = 'rgba(255, 255, 255, 0.9)';
-        pageNumSpan.style.fontSize = '16px';
-        pageNumSpan.style.fontWeight = 'bold';
+        pageNumSpan.style.fontSize = '14px';  // 改小一点，避免与外部数字冲突
+        pageNumSpan.style.fontWeight = '600';
       }
     }
 
@@ -767,12 +780,16 @@
     // 点击图片中央区域切换底部菜单显示/隐藏
     if (elements.viewer) {
       elements.viewer.onclick = (e) => {
-        // 排除按钮、缩略图、进度条点击
+        // 排除按钮、缩略图、进度条、图片本身的点击
         if (e.target.tagName === 'BUTTON' || 
             e.target.closest('button') || 
-            e.target.closest('#eh-bottom-menu')) {
+            e.target.closest('#eh-bottom-menu') ||
+            e.target.tagName === 'IMG') {
           return;
         }
+        
+        // 阻止事件冒泡
+        e.stopPropagation();
         
         state.settings.menuVisible = !state.settings.menuVisible;
         if (elements.bottomMenu) {
