@@ -1084,7 +1084,11 @@
     
     // 加载上次阅读进度
     const savedPage = loadProgress();
-    showPage(savedPage);
+    internalShowPage(savedPage);
+    // 默认隐藏底部菜单（仅在开启“缩略图悬停开关”且靠近底部时显示）
+    if (elements.bottomMenu) {
+      elements.bottomMenu.classList.add('eh-menu-hidden');
+    }
 
     // 顶部缩略图悬停开关按钮
     if (elements.thumbnailsToggleBtn) {
