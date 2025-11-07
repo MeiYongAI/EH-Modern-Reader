@@ -135,6 +135,16 @@ body.eh-dark-mode .eh-icon-btn:hover {
   background: rgba(255,255,255,0.1);
 }
 
+/* 缩略图悬停开关激活样式 */
+.eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.4);
+}
+body.eh-dark-mode .eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.5);
+}
+
 .eh-icon-btn:active {
   transform: scale(0.95);
 }
@@ -405,13 +415,7 @@ body.eh-dark-mode #eh-bottom-menu {
   transform: scale(1.05);
 }
 
-.eh-slider-page-info {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 13px;
-  text-align: center;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-}
+/* 移除进度条冗余页码（顶部已显示） */
 
 .eh-thumb-number {
   position: absolute;
