@@ -531,7 +531,10 @@
             const match = imageData.t.match(/\((https?:\/\/[^)]+)\)\s*(-?\d+px)\s+(-?\d+px)/);
             if (match) {
               const [, url, xPos, yPos] = match;
-              placeholder.style.background = `transparent url("${url}") ${xPos} ${yPos} no-repeat`;
+              // 设置背景图和位置 (E-Hentai 使用 sprite sheet)
+              placeholder.style.backgroundImage = `url("${url}")`;
+              placeholder.style.backgroundPosition = `${xPos} ${yPos}`;
+              placeholder.style.backgroundRepeat = 'no-repeat';
               placeholder.style.backgroundSize = 'auto';
               console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, xPos, yPos);
             } else {
