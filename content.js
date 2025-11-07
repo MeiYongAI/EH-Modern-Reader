@@ -104,7 +104,7 @@
             <h1 id="eh-title">${pageData.title || '加载中...'}</h1>
           </div>
           <div class="eh-header-center">
-            <span id="eh-page-info">1 / ${pageData.pagecount}</span>
+            <span id="eh-page-info" title="快捷键: ← → 翻页 | + - 缩放 | 0 重置 | 空格 下一页">1 / ${pageData.pagecount}</span>
           </div>
           <div class="eh-header-right">
             <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
@@ -767,11 +767,13 @@
     // 点击图片中央区域切换底部菜单显示/隐藏
     if (elements.viewer) {
       elements.viewer.onclick = (e) => {
-        // 排除按钮点击
-        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+        // 排除按钮、缩略图、进度条点击
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.closest('button') || 
+            e.target.closest('#eh-bottom-menu')) {
           return;
         }
-        console.log('[EH Modern Reader] 切换底部菜单');
+        
         state.settings.menuVisible = !state.settings.menuVisible;
         if (elements.bottomMenu) {
           if (state.settings.menuVisible) {
@@ -877,6 +879,7 @@
     }
 
     // 图片缩放功能 (参考PicaComic)
+    // 图片缩放相关（改用键盘快捷键，避免与滚轮冲突）
     let isDragging = false;
     let dragStartX = 0;
     let dragStartY = 0;
@@ -905,32 +908,17 @@
       }
     }
 
-    // 图片区域滚轮缩放
-    if (elements.viewer) {
-      elements.viewer.addEventListener('wheel', (e) => {
-        // 如果在缩略图区域或底部菜单，不处理
-        if (e.target.closest('#eh-bottom-menu')) {
-          return;
-        }
-
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        const newScale = Math.max(0.5, Math.min(5, state.settings.imageScale + delta));
-        
-        if (newScale !== state.settings.imageScale) {
-          state.settings.imageScale = newScale;
-          
-          // 缩放回1.0时重置偏移
-          if (Math.abs(newScale - 1) < 0.01) {
-            state.settings.imageOffsetX = 0;
-            state.settings.imageOffsetY = 0;
-          }
-          
-          applyImageZoom();
-          e.preventDefault();
-        }
+    // 缩略图区域滚轮横向滚动
+    if (elements.thumbnails) {
+      elements.thumbnails.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        // 横向滚动缩略图
+        elements.thumbnails.scrollLeft += e.deltaY;
       }, { passive: false });
+    }
 
-      // 双击重置缩放
+    // 双击图片重置缩放
+    if (elements.viewer) {
       elements.viewer.addEventListener('dblclick', (e) => {
         if (!e.target.closest('#eh-bottom-menu') && !e.target.closest('button')) {
           resetImageZoom();
@@ -973,8 +961,35 @@
       });
     }
 
-    // 键盘导航
+    // 键盘导航和缩放
     document.addEventListener('keydown', (e) => {
+      // 图片缩放快捷键（+ / - / 0）
+      if (e.key === '+' || e.key === '=') {
+        // 放大
+        const newScale = Math.min(5, state.settings.imageScale + 0.1);
+        state.settings.imageScale = newScale;
+        applyImageZoom();
+        e.preventDefault();
+        return;
+      }
+      
+      if (e.key === '-' || e.key === '_') {
+        // 缩小
+        const newScale = Math.max(0.5, state.settings.imageScale - 0.1);
+        state.settings.imageScale = newScale;
+        applyImageZoom();
+        e.preventDefault();
+        return;
+      }
+      
+      if (e.key === '0') {
+        // 重置缩放
+        resetImageZoom();
+        e.preventDefault();
+        return;
+      }
+
+      // 页面导航
       switch(e.key) {
         case 'ArrowLeft':
         case 'a':
@@ -1004,19 +1019,6 @@
           break;
       }
     });
-
-    // 鼠标滚轮翻页
-    let wheelTimeout;
-    document.addEventListener('wheel', (e) => {
-      clearTimeout(wheelTimeout);
-      wheelTimeout = setTimeout(() => {
-        if (e.deltaY > 0) {
-          showPage(state.currentPage + 1);
-        } else if (e.deltaY < 0) {
-          showPage(state.currentPage - 1);
-        }
-      }, 100);
-    }, { passive: true });
 
     // 初始化
     generateThumbnails();

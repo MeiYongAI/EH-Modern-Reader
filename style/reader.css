@@ -254,7 +254,9 @@ body.eh-dark-mode #eh-bottom-menu {
 
 .eh-thumbnail {
   flex-shrink: 0;
-  width: 50px;  /* 200 * 0.25 = 50px */
+  width: 50px;  /* 固定宽度，防止拉伸 */
+  min-width: 50px;
+  max-width: 50px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -272,8 +274,12 @@ body.eh-dark-mode #eh-bottom-menu {
 }
 
 .eh-thumbnail-placeholder {
-  width: 50px;   /* 200 * 0.25 */
-  height: 70px;  /* 281 * 0.25，保持原始比例约 1:1.4 */
+  width: 50px;   /* 固定宽度 */
+  height: 70px;  /* 固定高度 */
+  min-width: 50px;
+  max-width: 50px;
+  min-height: 70px;
+  max-height: 70px;
   background: #2a2a2a;
   border-radius: 4px;
   overflow: hidden;
