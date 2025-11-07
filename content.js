@@ -164,8 +164,32 @@
                 <path d="M15 18l-6-6 6-6"/>
               </svg>
             </button>
+            <button id="eh-next-btn" class="eh-nav-btn eh-nav-next" title="下一页 (→)">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          </section>
+        </main>
+
+        <!-- 底部菜单(缩略图+进度条) -->
+        <footer id="eh-bottom-menu" class="eh-bottom-menu">
+          <!-- 缩略图横向滚动区 -->
+          <div id="eh-thumbnails-container" class="eh-thumbnails-container">
+            <div id="eh-thumbnails" class="eh-thumbnails-horizontal"></div>
+          </div>
+
+          <!-- 进度条区（仅滑块，无填充） -->
+          <div class="eh-slider-container">
+            <div class="eh-slider-track" id="eh-slider-track">
+              <input 
+                type="range" 
+                id="eh-progress-bar" 
+                min="1" 
+                max="${pageData.pagecount}" 
+                value="1" 
+                class="eh-progress-slider"
+              />
             </div>
           </div>
         </footer>
