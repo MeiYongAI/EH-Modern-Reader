@@ -413,7 +413,16 @@
         const saved = localStorage.getItem(`eh-progress-${state.galleryId}`);
         if (saved) {
           const progress = JSON.parse(saved);
-          return progress.page || 1;
+          if (progress && typeof progress === 'object') {
+            // 若为横向模式并保存了scrollLeft则稍后恢复
+            if (progress.mode && progress.mode === 'continuous-horizontal' && typeof progress.scrollLeft === 'number') {
+              state._savedScrollLeft = progress.scrollLeft; // 临时存储，进入模式后恢复
+            }
+            if (progress.mode && typeof progress.mode === 'string') {
+              state.settings.readMode = progress.mode; // 恢复阅读模式
+            }
+            return progress.page || 1;
+          }
         }
       } catch (e) {
         console.warn('[EH Modern Reader] 读取进度失败:', e);
@@ -424,10 +433,27 @@
     // 保存阅读进度
     function saveProgress(page) {
       try {
-        localStorage.setItem(`eh-progress-${state.galleryId}`, JSON.stringify({
+        let scrollLeft = null;
+        if (state.settings.readMode === 'continuous-horizontal') {
+          const c = document.getElementById('eh-continuous-horizontal');
+          if (c) scrollLeft = c.scrollLeft;
+        }
+        const record = {
           page: page,
-          timestamp: Date.now()
-        }));
+          timestamp: Date.now(),
+          mode: state.settings.readMode,
+          scrollLeft
+        };
+        localStorage.setItem(`eh-progress-${state.galleryId}`, JSON.stringify(record));
+        // 维护历史列表 (LRU 样式)
+        const histKey = 'eh-reading-history';
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(histKey) || '[]'); } catch {}
+        // 去重同 galleryId
+        list = list.filter(item => item && item.gid !== state.galleryId);
+        list.unshift({ gid: state.galleryId, title: state.galleryTitle || '', ...record });
+        if (list.length > 200) list.length = 200; // 上限
+        localStorage.setItem(histKey, JSON.stringify(list));
       } catch (e) {
         console.warn('[EH Modern Reader] 保存进度失败:', e);
       }
@@ -723,14 +749,21 @@
     let lastRequestedPage = null;
     let loadToken = 0; // 用于竞态控制
 
-    function scheduleShowPage(pageNum) {
+    function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
       // 在横向连续模式下，转为滚动定位而不是替换单图
       if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
         const idx = pageNum - 1;
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
-          img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          if (options.instant) {
+            const container = document.getElementById('eh-continuous-horizontal');
+            // 直接计算目标居中位置
+            const offset = img.offsetLeft - Math.max(0, (container.clientWidth - img.clientWidth) / 2);
+            container.scrollLeft = offset;
+          } else {
+            img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+          }
         }
         return;
       }
@@ -810,7 +843,10 @@
           elements.pageInput.value = pageNum;
         }
 
-        console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
+  console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
+
+  // 保存阅读进度
+  saveProgress(pageNum);
 
         // 预加载策略：预加载下一页和上一页（提升切换体验）
         preloadAdjacentPages(pageNum);
@@ -1183,7 +1219,8 @@
 
     if (elements.progressBar) {
       elements.progressBar.onchange = () => {
-        scheduleShowPage(parseInt(elements.progressBar.value));
+        const page = parseInt(elements.progressBar.value);
+        scheduleShowPage(page, { instant: true });
       };
     }
 
@@ -1191,7 +1228,7 @@
       elements.pageInput.onchange = () => {
         const pageNum = parseInt(elements.pageInput.value);
         if (pageNum >= 1 && pageNum <= state.pageCount) {
-          scheduleShowPage(pageNum);
+          scheduleShowPage(pageNum, { instant: true });
         }
       };
     }
@@ -1232,7 +1269,7 @@
       };
       elements.progressBar.onchange = (e) => {
         const page = parseInt(e.target.value);
-        scheduleShowPage(page);
+        scheduleShowPage(page, { instant: true });
       };
     }
 
@@ -1424,6 +1461,7 @@
                 if (elements.progressBar) elements.progressBar.value = pageNum;
                 updateThumbnailHighlight(pageNum);
                 preloadAdjacentPages(pageNum);
+                saveProgress(pageNum);
               }
             } finally {
               scrollUpdating = false;
@@ -1520,6 +1558,18 @@
     // 加载上次阅读进度
     const savedPage = loadProgress();
     internalShowPage(savedPage);
+    // 若保存的阅读模式是横向连续，则进入并恢复滚动位置
+    if (state.settings.readMode === 'continuous-horizontal') {
+      enterContinuousHorizontalMode();
+      if (typeof state._savedScrollLeft === 'number') {
+        const c = document.getElementById('eh-continuous-horizontal');
+        if (c) c.scrollLeft = state._savedScrollLeft;
+        delete state._savedScrollLeft;
+      } else {
+        // 没有 scrollLeft 就滚动到当前页中心
+        scheduleShowPage(savedPage, { instant: true });
+      }
+    }
     // 默认隐藏底部菜单（仅在开启“缩略图悬停开关”且靠近底部时显示）
     if (elements.bottomMenu) {
       elements.bottomMenu.classList.add('eh-menu-hidden');
