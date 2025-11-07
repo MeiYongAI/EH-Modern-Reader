@@ -21,34 +21,55 @@
     const scriptTags = document.querySelectorAll('script');
     let pageData = {};
 
-    for (let script of scriptTags) {
-      const content = script.textContent;
-      
-      // 提取图片列表
-      const imagelistMatch = content.match(/var imagelist = (\[.*?\]);/s);
-      if (imagelistMatch) {
-        try {
-          pageData.imagelist = JSON.parse(imagelistMatch[1]);
-        } catch (e) {
-          console.error('[EH Modern Reader] 解析 imagelist 失败:', e);
+    try {
+      for (let script of scriptTags) {
+        const content = script.textContent;
+        
+        // 提取图片列表
+        const imagelistMatch = content.match(/var imagelist = (\[.*?\]);/s);
+        if (imagelistMatch) {
+          try {
+            const parsedList = JSON.parse(imagelistMatch[1]);
+            // 数据校验：确保是数组且不为空
+            if (Array.isArray(parsedList) && parsedList.length > 0) {
+              pageData.imagelist = parsedList;
+            } else {
+              console.warn('[EH Modern Reader] imagelist 为空或格式错误');
+            }
+          } catch (e) {
+            console.error('[EH Modern Reader] 解析 imagelist 失败:', e);
+          }
         }
+
+        // 提取其他配置变量
+        const gidMatch = content.match(/var gid=(\d+);/);
+        if (gidMatch) pageData.gid = gidMatch[1];
+
+        const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
+        if (mpvkeyMatch) pageData.mpvkey = mpvkeyMatch[1];
+
+        const pagecountMatch = content.match(/var pagecount = (\d+);/);
+        if (pagecountMatch) pageData.pagecount = parseInt(pagecountMatch[1]);
+
+        const galleryUrlMatch = content.match(/var gallery_url = "([^"]+)";/);
+        if (galleryUrlMatch) pageData.gallery_url = galleryUrlMatch[1];
+
+        const titleMatch = document.title.match(/^(.+?) - E-Hentai/);
+        if (titleMatch) pageData.title = titleMatch[1];
       }
+    } catch (e) {
+      console.error('[EH Modern Reader] 提取页面数据失败:', e);
+    }
 
-      // 提取其他配置变量
-      const gidMatch = content.match(/var gid=(\d+);/);
-      if (gidMatch) pageData.gid = gidMatch[1];
-
-      const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
-      if (mpvkeyMatch) pageData.mpvkey = mpvkeyMatch[1];
-
-      const pagecountMatch = content.match(/var pagecount = (\d+);/);
-      if (pagecountMatch) pageData.pagecount = parseInt(pagecountMatch[1]);
-
-      const galleryUrlMatch = content.match(/var gallery_url = "([^"]+)";/);
-      if (galleryUrlMatch) pageData.gallery_url = galleryUrlMatch[1];
-
-      const titleMatch = document.title.match(/^(.+?) - E-Hentai/);
-      if (titleMatch) pageData.title = titleMatch[1];
+    // 兜底处理：确保必要字段存在
+    if (!pageData.imagelist || !Array.isArray(pageData.imagelist)) {
+      pageData.imagelist = [];
+    }
+    if (!pageData.pagecount) {
+      pageData.pagecount = pageData.imagelist.length || 0;
+    }
+    if (!pageData.title) {
+      pageData.title = '未知画廊';
     }
 
     return pageData;
@@ -58,13 +79,6 @@
    * 替换原页面内容
    */
   function injectModernReader(pageData) {
-    // 保存原始DOM中的缩略图容器（在清空之前）
-    const originalThumbs = document.getElementById('pane_thumbs');
-    if (originalThumbs) {
-      window.__originalThumbs__ = originalThumbs.cloneNode(true);
-      console.log('[EH Modern Reader] 已保存原生缩略图, 数量:', originalThumbs.children.length);
-    }
-    
     // 阻止原始脚本继续运行
     try {
       window.stop(); // 停止页面加载
@@ -286,7 +300,7 @@
       }
     }
 
-    // 获取 DOM 元素
+    // 获取 DOM 元素（带判空）
     const elements = {
       currentImage: document.getElementById('eh-current-image'),
       loading: document.getElementById('eh-loading'),
@@ -308,6 +322,13 @@
       closeSettingsBtn: document.getElementById('eh-close-settings'),
       fitModeSelect: document.getElementById('eh-fit-mode')
     };
+
+    // 验证必要的 DOM 元素
+    const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
+    const missingElements = requiredElements.filter(key => !elements[key]);
+    if (missingElements.length > 0) {
+      throw new Error(`缺少必要的 DOM 元素: ${missingElements.join(', ')}`);
+    }
 
     // 显示加载状态
     function showLoading() {
@@ -511,10 +532,8 @@
 
         console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
 
-        // 预加载下一页
-        if (pageNum < state.pageCount) {
-          loadImage(pageNum).catch(() => {});
-        }
+        // 预加载策略：预加载下一页和上一页（提升切换体验）
+        preloadAdjacentPages(pageNum);
 
       } catch (error) {
         console.error('[EH Modern Reader] 加载图片失败:', error);
@@ -529,80 +548,200 @@
       }
     }
 
-    // 更新缩略图高亮
-    function updateThumbnailHighlight(pageNum) {
-      const thumbnails = document.querySelectorAll('.eh-thumbnail');
-      thumbnails.forEach((thumb, index) => {
-        if (index === pageNum - 1) {
-          thumb.classList.add('active');
-          thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        } else {
-          thumb.classList.remove('active');
-        }
+    // 预加载相邻页面（提升切换体验）
+    function preloadAdjacentPages(currentPage) {
+      const pagesToPreload = [];
+      
+      // 预加载下一页
+      if (currentPage < state.pageCount) {
+        pagesToPreload.push(currentPage); // loadImage 使用 index，所以 currentPage 对应下一页
+      }
+      
+      // 预加载上一页
+      if (currentPage > 1) {
+        pagesToPreload.push(currentPage - 2); // currentPage - 2 对应上一页的 index
+      }
+      
+      // 异步预加载，不阻塞主流程
+      pagesToPreload.forEach(pageIndex => {
+        loadImage(pageIndex).catch(error => {
+          console.log(`[EH Modern Reader] 预加载失败 (页面 ${pageIndex + 1}):`, error.message);
+        });
       });
     }
 
-    // 生成缩略图 - 使用原生E-Hentai缩略图
-    function generateThumbnails() {
-      if (!elements.thumbnails) return;
+    // 更新缩略图高亮（优化性能，只操作当前和上一个）
+    function updateThumbnailHighlight(pageNum) {
+      const thumbnails = document.querySelectorAll('.eh-thumbnail');
+      if (!thumbnails || thumbnails.length === 0) return;
 
+      const currentThumb = thumbnails[pageNum - 1];
+      const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
+      
+      // 移除旧的高亮
+      if (prevActiveThumb && prevActiveThumb !== currentThumb) {
+        prevActiveThumb.classList.remove('active');
+      }
+      
+      // 添加新的高亮
+      if (currentThumb) {
+        currentThumb.classList.add('active');
+        // 平滑滚动到当前缩略图
+        currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+
+    // 生成缩略图
+    function generateThumbnails() {
+      if (!elements.thumbnails) {
+        console.warn('[EH Modern Reader] 缩略图容器不存在');
+        return;
+      }
+
+      // 清空容器，防止重复添加
       elements.thumbnails.innerHTML = '';
       
-      // 从保存的原生DOM中获取缩略图
-      const nativeThumbs = window.__originalThumbs__;
+      // 数据校验
+      if (!Array.isArray(state.imagelist) || state.imagelist.length === 0) {
+        console.warn('[EH Modern Reader] 图片列表为空');
+        elements.thumbnails.innerHTML = '<div style="color: rgba(255,255,255,0.6); padding: 20px; text-align: center;">暂无缩略图</div>';
+        return;
+      }
       
-      if (nativeThumbs && nativeThumbs.children.length > 0) {
-        // 方案A: 使用原生缩略图（推荐）
-        console.log('[EH Modern Reader] 使用原生E-Hentai缩略图，数量:', nativeThumbs.children.length);
+      state.imagelist.forEach((imageData, index) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'eh-thumbnail';
+        if (index === 0) thumb.classList.add('active');
         
-        Array.from(nativeThumbs.children).forEach((nativeThumb, index) => {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'eh-thumbnail';
-          if (index === 0) wrapper.classList.add('active');
-          
-          // 克隆原生缩略图
-          const cloned = nativeThumb.cloneNode(true);
-          
-          // 重置样式以适配我们的布局
-          if (cloned.tagName === 'A') {
-            cloned.style.display = 'block';
-            cloned.style.textDecoration = 'none';
-            cloned.onclick = (e) => {
-              e.preventDefault();
-              showPage(index + 1);
-            };
-          }
-          
-          // 查找并设置子元素样式
-          const divElement = cloned.querySelector('div');
-          if (divElement) {
-            divElement.style.margin = '0';
-            divElement.style.border = 'none';
-          }
-          
-          wrapper.appendChild(cloned);
-          elements.thumbnails.appendChild(wrapper);
-        });
-        
-      } else {
-        // 方案B: 降级为页码缩略图
-        console.log('[EH Modern Reader] 未找到原生缩略图，使用页码显示');
-        
-        state.imagelist.forEach((imageData, index) => {
-          const thumb = document.createElement('div');
-          thumb.className = 'eh-thumbnail';
-          if (index === 0) thumb.classList.add('active');
-          
-          const pageNum = index + 1;
-          thumb.innerHTML = `
-            <div class="eh-thumbnail-placeholder">
-              <span>${pageNum}</span>
-            </div>
-          `;
+        const pageNum = index + 1;
+        thumb.innerHTML = `
+          <div class="eh-thumbnail-placeholder" title="第 ${pageNum} 页" role="img" aria-label="缩略图 ${pageNum}">
+            <span>${pageNum}</span>
+          </div>
+          <div class="eh-thumbnail-number">${pageNum}</div>
+        `;
 
-          thumb.onclick = () => showPage(pageNum);
-          elements.thumbnails.appendChild(thumb);
-        });
+        thumb.onclick = () => showPage(pageNum);
+        elements.thumbnails.appendChild(thumb);
+
+        // 缩略图加载逻辑
+        loadThumbnail(thumb, imageData, pageNum);
+      });
+    }
+
+    // 加载单个缩略图（支持容错和默认图）
+    function loadThumbnail(thumb, imageData, pageNum) {
+      const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
+      if (!placeholder) return;
+
+      // 添加 loading 状态
+      placeholder.classList.add('loading');
+
+      // 数据校验
+      if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
+        console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效，使用默认图`);
+        setDefaultThumbnail(placeholder);
+        return;
+      }
+
+      try {
+        // 提取 URL 和位置 - 修正: Y坐标可能没有px单位
+        const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/) || 
+                     imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/);
+        
+        if (!match) {
+          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
+          setDefaultThumbnail(placeholder);
+          return;
+        }
+
+        let [, url, xPos, yPos] = match;
+        
+        // 参数校验
+        if (!url || !xPos || !yPos) {
+          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 参数不完整`);
+          setDefaultThumbnail(placeholder);
+          return;
+        }
+
+        // 确保Y坐标有px单位
+        if (!yPos.endsWith('px')) {
+          yPos = yPos + 'px';
+        }
+        
+        // E-Hentai sprite sheet: 每张缩略图200x281px
+        // 我们缩放到50x70px (缩放因子 0.25)
+        const xOffset = parseInt(xPos);
+        const yOffset = parseInt(yPos);
+        
+        // 参数验证
+        if (isNaN(xOffset) || isNaN(yOffset)) {
+          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 位置参数无效`);
+          setDefaultThumbnail(placeholder);
+          return;
+        }
+
+        const scale = 0.25; // 缩放因子
+        const scaledX = Math.round(xOffset * scale);
+        const scaledY = Math.round(yOffset * scale);
+        
+        // 计算sprite sheet的总宽度
+        // E-Hentai通常一行20张图片: 20 * 200px = 4000px
+        // 缩放后: 4000 * 0.25 = 1000px
+        const spriteSheetWidth = 1000;
+        
+        // 添加加载错误处理
+        const testImg = new Image();
+        
+        testImg.onerror = () => {
+          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, url);
+          setDefaultThumbnail(placeholder);
+        };
+        
+        testImg.onload = () => {
+          // 移除 loading 状态
+          placeholder.classList.remove('loading');
+          
+          // 设置背景图和位置
+          placeholder.style.backgroundImage = `url("${url}")`;
+          placeholder.style.backgroundPosition = `${scaledX}px ${scaledY}px`;
+          placeholder.style.backgroundRepeat = 'no-repeat';
+          placeholder.style.backgroundSize = `${spriteSheetWidth}px auto`;
+          
+          // 隐藏页码数字(因为有真实缩略图了)
+          const pageNumSpan = placeholder.querySelector('span');
+          if (pageNumSpan) pageNumSpan.style.display = 'none';
+        };
+        
+        testImg.src = url;
+        
+      } catch (e) {
+        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 解析失败:`, e, imageData.t);
+        setDefaultThumbnail(placeholder);
+      }
+    }
+
+    // 设置默认缩略图
+    function setDefaultThumbnail(placeholder) {
+      if (!placeholder) return;
+      
+      // 移除 loading 状态
+      placeholder.classList.remove('loading');
+      
+      // 添加错误状态
+      placeholder.classList.add('error');
+      
+      // 使用渐变色作为默认背景
+      placeholder.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      placeholder.style.backgroundSize = 'cover';
+      
+      // 显示页码
+      const pageNumSpan = placeholder.querySelector('span');
+      if (pageNumSpan) {
+        pageNumSpan.style.display = 'block';
+        pageNumSpan.style.color = 'rgba(255, 255, 255, 0.9)';
+        pageNumSpan.style.fontSize = '16px';
+        pageNumSpan.style.fontWeight = 'bold';
       }
     }
 
@@ -898,23 +1037,35 @@
    * 初始化
    */
   function init() {
-    // 等待 DOM 加载完成
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
+    try {
+      // 等待 DOM 加载完成
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          try {
+            const pageData = extractPageData();
+            if (pageData.imagelist && pageData.imagelist.length > 0) {
+              injectModernReader(pageData);
+            } else {
+              console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+              alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+            }
+          } catch (e) {
+            console.error('[EH Modern Reader] 初始化失败:', e);
+            alert(`EH Modern Reader 初始化失败: ${e.message}\n\n请刷新页面重试或联系开发者。`);
+          }
+        });
+      } else {
         const pageData = extractPageData();
         if (pageData.imagelist && pageData.imagelist.length > 0) {
           injectModernReader(pageData);
         } else {
-          console.error('[EH Modern Reader] 无法提取页面数据');
+          console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+          alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
         }
-      });
-    } else {
-      const pageData = extractPageData();
-      if (pageData.imagelist && pageData.imagelist.length > 0) {
-        injectModernReader(pageData);
-      } else {
-        console.error('[EH Modern Reader] 无法提取页面数据');
       }
+    } catch (e) {
+      console.error('[EH Modern Reader] 初始化失败:', e);
+      alert(`EH Modern Reader 初始化失败: ${e.message}\n\n请刷新页面重试或联系开发者。`);
     }
   }
 
