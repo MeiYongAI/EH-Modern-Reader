@@ -47,3 +47,16 @@
 
 ## 致谢
 - 参考了 JHenTai 的交互体验进行布局与模式设计。
+
+## 本地更新一键同步到 GitHub
+
+在 `eh-reader-extension` 目录提供了脚本 `sync-changes.ps1`，用于把本地改动一键提交并推送到远端仓库（origin/main）。
+
+用法（在 PowerShell 中运行，推荐在该目录内执行）：
+
+```
+./sync-changes.ps1               # 无提交信息则自动生成时间戳信息
+./sync-changes.ps1 -Message "fix: 修复连续模式滚动卡顿"
+```
+
+提示：脚本会先检测是否有变更；若没有，则跳过 commit 直接 push（保持幂等）。
