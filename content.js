@@ -600,35 +600,31 @@
       };
     }
 
-    if (elements.toggleSidebarBtn) {
-      elements.toggleSidebarBtn.onclick = () => {
-        console.log('[EH Modern Reader] 切换侧边栏');
-        state.settings.sidebarVisible = !state.settings.sidebarVisible;
-        if (elements.sidebar) {
-          if (state.settings.sidebarVisible) {
-            elements.sidebar.classList.remove('eh-sidebar-hidden');
-            elements.sidebar.classList.add('eh-sidebar-visible');
+    // 点击图片中央区域切换底部菜单显示/隐藏
+    if (elements.viewer) {
+      elements.viewer.onclick = (e) => {
+        // 排除按钮点击
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+          return;
+        }
+        console.log('[EH Modern Reader] 切换底部菜单');
+        state.settings.menuVisible = !state.settings.menuVisible;
+        if (elements.bottomMenu) {
+          if (state.settings.menuVisible) {
+            elements.bottomMenu.classList.remove('eh-menu-hidden');
           } else {
-            elements.sidebar.classList.add('eh-sidebar-hidden');
-            elements.sidebar.classList.remove('eh-sidebar-visible');
+            elements.bottomMenu.classList.add('eh-menu-hidden');
           }
         }
       };
     }
 
-    // 浮动侧边栏切换按钮(主视图区)
-    if (elements.sidebarToggleFloat) {
-      elements.sidebarToggleFloat.onclick = () => {
-        console.log('[EH Modern Reader] 浮动按钮切换侧边栏');
-        state.settings.sidebarVisible = !state.settings.sidebarVisible;
-        if (elements.sidebar) {
-          if (state.settings.sidebarVisible) {
-            elements.sidebar.classList.remove('eh-sidebar-hidden');
-            elements.sidebar.classList.add('eh-sidebar-visible');
-          } else {
-            elements.sidebar.classList.add('eh-sidebar-hidden');
-            elements.sidebar.classList.remove('eh-sidebar-visible');
-          }
+    // 跳转按钮
+    if (elements.jumpPageBtn) {
+      elements.jumpPageBtn.onclick = () => {
+        const page = parseInt(elements.pageInput.value);
+        if (page >= 1 && page <= state.pageCount) {
+          showPage(page);
         }
       };
     }
@@ -694,9 +690,30 @@
       };
     }
 
+    // 进度条拖动事件
+    if (elements.progressBar) {
+      elements.progressBar.oninput = (e) => {
+        const page = parseInt(e.target.value);
+        // 实时更新填充轨道
+        if (elements.sliderFill) {
+          const progress = (page / state.pageCount) * 100;
+          elements.sliderFill.style.width = `${progress}%`;
+        }
+        // 实时更新页码显示
+        if (elements.sliderPageInfo) {
+          elements.sliderPageInfo.textContent = `${page} / ${state.pageCount}`;
+        }
+      };
+
+      elements.progressBar.onchange = (e) => {
+        const page = parseInt(e.target.value);
+        showPage(page);
+      };
+    }
+
     // 禁止缩略图滚动时切换图片
-    if (elements.sidebar) {
-      elements.sidebar.addEventListener('wheel', (e) => {
+    if (elements.bottomMenu) {
+      elements.bottomMenu.addEventListener('wheel', (e) => {
         // 阻止滚动事件冒泡,防止触发图片切换
         e.stopPropagation();
       }, { passive: true });
