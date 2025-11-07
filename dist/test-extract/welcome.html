@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>欢迎使用 EH Modern Reader</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      background: white;
+      border-radius: 20px;
+      padding: 48px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 32px;
+      color: #333;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #666;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin: 40px 0;
+    }
+
+    .feature {
+      padding: 24px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      transition: transform 0.2s;
+    }
+
+    .feature:hover {
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .feature h3 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .feature p {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .shortcuts {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 32px 0;
+    }
+
+    .shortcuts h2 {
+      font-size: 20px;
+      color: #333;
+      margin-bottom: 16px;
+    }
+
+    .shortcut-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .key {
+      background: white;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      color: #667eea;
+      border: 2px solid #667eea;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .cta {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">📖</div>
+      <h1>欢迎使用 EH Modern Reader</h1>
+      <p class="subtitle">现代化的 E-Hentai 阅读体验</p>
+    </div>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">🎨</div>
+        <h3>现代化设计</h3>
+        <p>简洁优雅的界面，告别传统布局，享受视觉盛宴</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">🌙</div>
+        <h3>深色模式</h3>
+        <p>护眼的夜间模式，长时间阅读更舒适</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>智能预加载</h3>
+        <p>提前加载下一页，无缝流畅的阅读体验</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">💾</div>
+        <h3>进度记忆</h3>
+        <p>自动保存阅读位置，随时继续上次阅读</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">⌨️</div>
+        <h3>快捷操作</h3>
+        <p>键盘、鼠标、滚轮全支持，操作随心所欲</p>
+      </div>
+
+      <div class="feature">
+        <div class="feature-icon">📱</div>
+        <h3>响应式布局</h3>
+        <p>完美适配各种屏幕尺寸，桌面移动都流畅</p>
+      </div>
+    </div>
+
+    <div class="shortcuts">
+      <h2>⌨️ 快捷键说明</h2>
+      <div class="shortcut-list">
+        <div class="shortcut-item">
+          <span class="key">← / →</span>
+          <span>翻页</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">Home</span>
+          <span>首页</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">End</span>
+          <span>末页</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">F</span>
+          <span>切换侧边栏</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">F11</span>
+          <span>全屏</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">Esc</span>
+          <span>退出</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a href="https://e-hentai.org" class="btn" target="_blank">
+        开始使用 ✨
+      </a>
+    </div>
+
+    <div class="footer">
+      <p>访问 E-Hentai MPV 页面时，阅读器将自动启用</p>
+      <p style="margin-top: 8px; font-size: 12px;">v1.0.0 | Made with ❤️</p>
+    </div>
+  </div>
+</body>
+</html>

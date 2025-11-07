@@ -438,10 +438,17 @@
       if (pageNum < 1 || pageNum > state.pageCount) return;
 
       state.currentPage = pageNum;
-      showLoading();
+      
+      // 只在当前没有图片时显示加载状态
+      if (!elements.currentImage || !elements.currentImage.src || elements.currentImage.style.display === 'none') {
+        showLoading();
+      }
 
       try {
         const img = await loadImage(pageNum - 1);
+        
+        // 隐藏加载状态
+        hideLoading();
         
         // 更新图片
         if (elements.currentImage) {
@@ -467,7 +474,6 @@
         updateThumbnailHighlight(pageNum);
 
         console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
-        hideLoading();
 
         // 预加载下一页
         if (pageNum < state.pageCount) {
@@ -644,7 +650,15 @@
       };
     }
 
-    // 键盘快捷键
+    // 禁止缩略图滚动时切换图片
+    if (elements.sidebar) {
+      elements.sidebar.addEventListener('wheel', (e) => {
+        // 阻止滚动事件冒泡,防止触发图片切换
+        e.stopPropagation();
+      }, { passive: true });
+    }
+
+    // 键盘导航
     document.addEventListener('keydown', (e) => {
       switch(e.key) {
         case 'ArrowLeft':
