@@ -287,31 +287,31 @@
       if (elements.loading) elements.loading.style.display = 'none';
     }
 
-    // 获取图片 URL
+    // 获取图片 URL - E-Hentai MPV 使用 API 动态加载
     function getImageUrl(pageIndex) {
       const imageData = state.imagelist[pageIndex];
       if (!imageData) return null;
       
-      console.log('[EH Modern Reader] 图片数据格式:', imageData);
+      // E-Hentai MPV 格式: {n: 'filename', k: 'key', t: 'thumbnail'}
+      // 我们需要使用 E-Hentai API 来获取完整图片
+      if (typeof imageData === 'object' && imageData.k) {
+        // 返回图片页面 URL，让浏览器处理加载
+        return `https://e-hentai.org/s/${imageData.k}/${pageData.gid}-${pageIndex + 1}`;
+      }
       
-      // E-Hentai MPV 的 imagelist 通常包含多种格式
-      // 1. 如果是数组: [key, xres, yres] 或 [url, ...]
+      // 兼容其他格式
       if (Array.isArray(imageData)) {
-        // 检查第一个元素是否是 URL
         if (typeof imageData[0] === 'string' && imageData[0].startsWith('http')) {
           return imageData[0];
         }
-        // 如果是 key，需要构造 URL（但这通常需要额外的 API 调用）
         const key = imageData[0];
         return `https://e-hentai.org/s/${key}/${pageData.gid}-${pageIndex + 1}`;
       }
       
-      // 2. 如果是对象
       if (typeof imageData === 'object') {
         return imageData.url || imageData.src || imageData.u || imageData.s;
       }
       
-      // 3. 如果直接是字符串 URL
       if (typeof imageData === 'string' && imageData.startsWith('http')) {
         return imageData;
       }
@@ -319,23 +319,65 @@
       console.error('[EH Modern Reader] 无法解析图片数据:', imageData);
       return null;
     }
+    
+    // 从 E-Hentai 图片页面提取真实图片 URL
+    async function fetchRealImageUrl(pageUrl) {
+      try {
+        const response = await fetch(pageUrl);
+        const html = await response.text();
+        
+        // 从页面中提取图片 URL
+        const match = html.match(/<img[^>]+id="img"[^>]+src="([^"]+)"/);
+        if (match && match[1]) {
+          return match[1];
+        }
+        
+        // 尝试另一种模式
+        const match2 = html.match(/https?:\/\/[^"'\s]+\.(?:jpg|jpeg|png|gif|webp)/i);
+        if (match2) {
+          return match2[0];
+        }
+        
+        throw new Error('无法从页面提取图片 URL');
+      } catch (error) {
+        console.error('[EH Modern Reader] 获取图片 URL 失败:', error);
+        throw error;
+      }
+    }
 
     // 加载图片
-    function loadImage(pageIndex) {
-      return new Promise((resolve, reject) => {
-        const imageUrl = getImageUrl(pageIndex);
-        if (!imageUrl) {
-          reject(new Error('图片 URL 不存在'));
-          return;
+    async function loadImage(pageIndex) {
+      try {
+        const pageUrl = getImageUrl(pageIndex);
+        if (!pageUrl) {
+          throw new Error('图片 URL 不存在');
         }
 
-        console.log('[EH Modern Reader] 加载图片:', imageUrl);
+        console.log('[EH Modern Reader] 获取图片页面:', pageUrl);
 
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error('图片加载失败'));
-        img.src = imageUrl;
-      });
+        // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
+        if (pageUrl.includes('/s/')) {
+          const realImageUrl = await fetchRealImageUrl(pageUrl);
+          console.log('[EH Modern Reader] 真实图片 URL:', realImageUrl);
+          
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error('图片加载失败'));
+            img.src = realImageUrl;
+          });
+        }
+        
+        // 如果已经是直接的图片 URL
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error('图片加载失败'));
+          img.src = pageUrl;
+        });
+      } catch (error) {
+        throw error;
+      }
     }
 
     // 显示指定页面
