@@ -762,16 +762,29 @@
             // 直接计算目标居中位置
             const offset = img.offsetLeft - Math.max(0, (container.clientWidth - img.clientWidth) / 2);
             container.scrollLeft = offset;
-            // 瞬时跳转后主动触发目标图片加载
-            if (!img.src && !img.getAttribute('data-loading')) {
-              img.setAttribute('data-loading', 'true');
-              loadImage(idx).then(loadedImg => {
-                if (loadedImg && loadedImg.src) img.src = loadedImg.src;
-                img.removeAttribute('data-loading');
-              }).catch(() => {
-                img.removeAttribute('data-loading');
+            
+            // 瞬时跳转后主动触发目标图片及附近图片加载
+            setTimeout(() => {
+              const indices = [idx];
+              // 加载前后各 1-2 张
+              if (idx > 0) indices.push(idx - 1);
+              if (idx < state.pageCount - 1) indices.push(idx + 1);
+              if (idx < state.pageCount - 2) indices.push(idx + 2);
+              
+              indices.forEach(i => {
+                const targetImg = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${i}"]`);
+                if (targetImg && !targetImg.src && !targetImg.getAttribute('data-loading')) {
+                  targetImg.setAttribute('data-loading', 'true');
+                  loadImage(i).then(loadedImg => {
+                    if (loadedImg && loadedImg.src) targetImg.src = loadedImg.src;
+                  }).catch(err => {
+                    console.warn('[EH Modern Reader] 瞬时跳转加载失败:', i, err);
+                  }).finally(() => {
+                    targetImg.removeAttribute('data-loading');
+                  });
+                }
               });
-            }
+            }, 50);
           } else {
             img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           }
@@ -1419,34 +1432,42 @@
               const img = entry.target;
               const idx = parseInt(img.getAttribute('data-page-index'));
               // 仅当未加载时触发
-              if (!img.getAttribute('src') && !img.getAttribute('data-loading')) {
+              if (!img.src && !img.getAttribute('data-loading')) {
                 img.setAttribute('data-loading', 'true');
-                // 先尝试直接从缓存获取
+                
+                // 检查缓存状态
                 const cached = state.imageCache.get(idx);
-                if (cached && cached.status === 'loaded' && cached.img) {
+                if (cached && cached.status === 'loaded' && cached.img && cached.img.src) {
+                  // 已加载完成，直接使用
                   img.src = cached.img.src;
                   img.removeAttribute('data-loading');
                 } else if (cached && cached.status === 'loading' && cached.promise) {
-                  // 复用正在加载的 Promise
+                  // 正在加载中，等待 Promise
                   cached.promise.then(loadedImg => {
-                    if (loadedImg && loadedImg.src) img.src = loadedImg.src;
-                    img.removeAttribute('data-loading');
-                  }).catch(() => {
+                    if (loadedImg && loadedImg.src) {
+                      img.src = loadedImg.src;
+                    }
+                  }).catch(err => {
+                    console.warn('[EH Modern Reader] 横向模式图片加载失败:', idx, err);
+                  }).finally(() => {
                     img.removeAttribute('data-loading');
                   });
                 } else {
-                  // 使用统一的 loadImage，避免与预取冲突
+                  // 未加载，启动加载
                   loadImage(idx).then(loadedImg => {
-                    if (loadedImg && loadedImg.src) img.src = loadedImg.src;
-                    img.removeAttribute('data-loading');
-                  }).catch(() => {
+                    if (loadedImg && loadedImg.src) {
+                      img.src = loadedImg.src;
+                    }
+                  }).catch(err => {
+                    console.warn('[EH Modern Reader] 横向模式图片加载失败:', idx, err);
+                  }).finally(() => {
                     img.removeAttribute('data-loading');
                   });
                 }
               }
             }
           });
-        }, { root: continuous.container, rootMargin: '400px', threshold: 0.01 });
+        }, { root: continuous.container, rootMargin: '600px', threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
