@@ -489,31 +489,94 @@ body.eh-dark-mode .eh-nav-btn:hover {
   right: 24px;
 }
 
+/* ==================== 浮动侧边栏切换按钮 ==================== */
+
+.eh-sidebar-toggle-float {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float {
+  background: rgba(45, 45, 45, 0.95);
+  color: #e0e0e0;
+}
+
+/* 当侧边栏隐藏时显示浮动按钮 */
+#eh-sidebar.eh-sidebar-hidden ~ #eh-viewer .eh-sidebar-toggle-float,
+.eh-sidebar-hidden ~ * .eh-sidebar-toggle-float {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.eh-sidebar-toggle-float:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float:hover {
+  background: rgba(60, 60, 60, 1);
+}
+
+.eh-sidebar-toggle-float:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.eh-sidebar-toggle-float svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
 /* ==================== 底部控制栏 ==================== */
 
 #eh-footer {
-  height: 64px;
+  height: 72px;
   background: #fff;
   border-top: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
-  padding: 8px 16px;
-  gap: 8px;
-  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  padding: 12px 20px;
+  gap: 10px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
   z-index: 100;
   flex-shrink: 0;
 }
 
+body.eh-dark-mode #eh-footer {
+  background: #2a2a2a;
+  border-top-color: #404040;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+}
+
 .eh-progress-container {
   position: relative;
-  height: 24px;
+  height: 28px;
   display: flex;
   align-items: center;
+  padding: 0 4px;
 }
 
 .eh-progress-bar {
   width: 100%;
-  height: 6px;
+  height: 8px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -521,32 +584,46 @@ body.eh-dark-mode .eh-nav-btn:hover {
   cursor: pointer;
   position: relative;
   z-index: 2;
+  border-radius: 4px;
 }
 
 .eh-progress-bar::-webkit-slider-track {
-  height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
+  height: 8px;
+  background: linear-gradient(to right, #FFE5EE 0%, #e0e0e0 0%);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 
 body.eh-dark-mode .eh-progress-bar::-webkit-slider-track {
-  background: #404040;
+  background: linear-gradient(to right, #4a2a3a 0%, #404040 0%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .eh-progress-bar::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #FF6B9D;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF8FAB 100%);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 3px solid #fff;
+}
+
+body.eh-dark-mode .eh-progress-bar::-webkit-slider-thumb {
+  border-color: #2a2a2a;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.6);
 }
 
 .eh-progress-bar::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.5);
+}
+
+.eh-progress-bar::-webkit-slider-thumb:active {
+  transform: scale(1.05);
 }
 
 .eh-progress-bar::-moz-range-track {
@@ -683,6 +760,13 @@ body.eh-dark-mode #eh-page-input {
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   animation: eh-slideIn 0.3s ease;
+  color: #333;
+}
+
+body.eh-dark-mode .eh-panel-content {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
 @keyframes eh-slideIn {
@@ -700,6 +784,11 @@ body.eh-dark-mode #eh-page-input {
   font-size: 20px;
   margin-bottom: 20px;
   font-weight: 600;
+  color: #222;
+}
+
+body.eh-dark-mode .eh-panel-content h3 {
+  color: #f0f0f0;
 }
 
 .eh-setting-item {
@@ -711,11 +800,11 @@ body.eh-dark-mode #eh-page-input {
   font-size: 14px;
   margin-bottom: 8px;
   font-weight: 500;
-  color: #666;
+  color: #555;
 }
 
 body.eh-dark-mode .eh-setting-item label {
-  color: #aaa;
+  color: #bbb;
 }
 
 .eh-setting-item select {

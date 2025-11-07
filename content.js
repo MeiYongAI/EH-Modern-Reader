@@ -122,6 +122,14 @@
 
           <!-- 图片显示区 -->
           <section id="eh-viewer">
+            <!-- 侧边栏切换按钮 -->
+            <button id="eh-sidebar-toggle-float" class="eh-sidebar-toggle-float" title="显示/隐藏缩略图">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="18" rx="1"/>
+                <rect x="14" y="3" width="7" height="18" rx="1"/>
+              </svg>
+            </button>
+            
             <div id="eh-image-container">
               <div id="eh-loading" class="eh-loading">
                 <div class="eh-spinner"></div>
@@ -262,7 +270,7 @@
       settings: {
         fitMode: 'contain',
         sidebarVisible: true,
-        darkMode: false
+        darkMode: true  // 默认启用深色模式
       }
     };
 
@@ -281,6 +289,7 @@
       lastPageBtn: document.getElementById('eh-last-page'),
       closeBtn: document.getElementById('eh-close-btn'),
       toggleSidebarBtn: document.getElementById('eh-toggle-sidebar'),
+      sidebarToggleFloat: document.getElementById('eh-sidebar-toggle-float'),
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
@@ -529,12 +538,14 @@
         elements.thumbnails.appendChild(thumb);
 
         // 使用 E-Hentai 的 t 字段作为缩略图背景
-        // t 字段格式: "(https://...webp) -200px 0"
+        // t 字段格式: "(https://...webp) -200px 0" 或 "(url) xPos yPos"
         if (imageData && imageData.t) {
           const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
           try {
-            // 提取 URL 和位置
-            const match = imageData.t.match(/\((https?:\/\/[^)]+)\)\s*(-?\d+px)\s+(-?\d+px)/);
+            // 提取 URL 和位置 - 支持两种格式
+            const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+px)/) || 
+                         imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+px)/);
+            
             if (match) {
               const [, url, xPos, yPos] = match;
               // 设置背景图和位置 (E-Hentai 使用 sprite sheet)
@@ -582,9 +593,33 @@
 
     if (elements.toggleSidebarBtn) {
       elements.toggleSidebarBtn.onclick = () => {
+        console.log('[EH Modern Reader] 切换侧边栏');
         state.settings.sidebarVisible = !state.settings.sidebarVisible;
         if (elements.sidebar) {
-          elements.sidebar.classList.toggle('eh-sidebar-hidden');
+          if (state.settings.sidebarVisible) {
+            elements.sidebar.classList.remove('eh-sidebar-hidden');
+            elements.sidebar.classList.add('eh-sidebar-visible');
+          } else {
+            elements.sidebar.classList.add('eh-sidebar-hidden');
+            elements.sidebar.classList.remove('eh-sidebar-visible');
+          }
+        }
+      };
+    }
+
+    // 浮动侧边栏切换按钮(主视图区)
+    if (elements.sidebarToggleFloat) {
+      elements.sidebarToggleFloat.onclick = () => {
+        console.log('[EH Modern Reader] 浮动按钮切换侧边栏');
+        state.settings.sidebarVisible = !state.settings.sidebarVisible;
+        if (elements.sidebar) {
+          if (state.settings.sidebarVisible) {
+            elements.sidebar.classList.remove('eh-sidebar-hidden');
+            elements.sidebar.classList.add('eh-sidebar-visible');
+          } else {
+            elements.sidebar.classList.add('eh-sidebar-hidden');
+            elements.sidebar.classList.remove('eh-sidebar-visible');
+          }
         }
       };
     }
@@ -706,6 +741,11 @@
     // 初始化
     generateThumbnails();
     showPage(1);
+    
+    // 应用默认深色模式
+    if (state.settings.darkMode) {
+      document.body.classList.add('eh-dark-mode');
+    }
 
     console.log('[EH Modern Reader] 阅读器初始化完成');
   }
