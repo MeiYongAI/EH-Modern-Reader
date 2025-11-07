@@ -69,7 +69,7 @@
     document.body.innerHTML = '';
     document.body.className = 'eh-modern-reader';
 
-    // 创建新的阅读器结构
+    // 创建新的阅读器结构(参考JHentai,缩略图在底部)
     const readerHTML = `
       <div id="eh-reader-container">
         <!-- 顶部工具栏 -->
@@ -105,31 +105,9 @@
           </div>
         </header>
 
-        <!-- 主内容区 -->
+        <!-- 主内容区:图片显示 -->
         <main id="eh-main">
-          <!-- 缩略图侧边栏 -->
-          <aside id="eh-sidebar" class="eh-sidebar-visible">
-            <div class="eh-sidebar-header">
-              <span>缩略图</span>
-              <button id="eh-toggle-sidebar" class="eh-icon-btn-small">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M15 18l-6-6 6-6"/>
-                </svg>
-              </button>
-            </div>
-            <div id="eh-thumbnails" class="eh-thumbnails"></div>
-          </aside>
-
-          <!-- 图片显示区 -->
           <section id="eh-viewer">
-            <!-- 侧边栏切换按钮 -->
-            <button id="eh-sidebar-toggle-float" class="eh-sidebar-toggle-float" title="显示/隐藏缩略图">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="18" rx="1"/>
-                <rect x="14" y="3" width="7" height="18" rx="1"/>
-              </svg>
-            </button>
-            
             <div id="eh-image-container">
               <div id="eh-loading" class="eh-loading">
                 <div class="eh-spinner"></div>
@@ -152,28 +130,42 @@
           </section>
         </main>
 
-        <!-- 底部进度条 -->
-        <footer id="eh-footer">
-          <div class="eh-progress-container">
-            <input 
-              type="range" 
-              id="eh-progress-bar" 
-              min="1" 
-              max="${pageData.pagecount}" 
-              value="1" 
-              class="eh-progress-bar"
-            />
-            <div class="eh-progress-fill" style="width: 0%"></div>
+        <!-- 底部菜单(缩略图+进度条+快捷按钮) -->
+        <footer id="eh-bottom-menu" class="eh-bottom-menu">
+          <!-- 缩略图横向滚动区 -->
+          <div id="eh-thumbnails-container" class="eh-thumbnails-container">
+            <div id="eh-thumbnails" class="eh-thumbnails-horizontal"></div>
           </div>
-          <div class="eh-footer-controls">
-            <button id="eh-first-page" class="eh-btn-small" title="第一页">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+          <!-- 进度条区 -->
+          <div class="eh-slider-container">
+            <div class="eh-slider-track" id="eh-slider-track">
+              <div class="eh-slider-fill" id="eh-slider-fill"></div>
+              <input 
+                type="range" 
+                id="eh-progress-bar" 
+                min="1" 
+                max="${pageData.pagecount}" 
+                value="1" 
+                class="eh-progress-slider"
+              />
+            </div>
+            <span id="eh-slider-page-info" class="eh-slider-page-info">1 / ${pageData.pagecount}</span>
+          </div>
+
+          <!-- 底部快捷按钮 -->
+          <div class="eh-bottom-actions">
+            <button id="eh-first-page" class="eh-action-btn" title="第一页">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
               </svg>
             </button>
-            <input type="number" id="eh-page-input" min="1" max="${pageData.pagecount}" value="1" />
-            <button id="eh-last-page" class="eh-btn-small" title="最后一页">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="eh-page-jump">
+              <input type="number" id="eh-page-input" min="1" max="${pageData.pagecount}" value="1" />
+              <button id="eh-jump-page" class="eh-action-btn" title="跳转">GO</button>
+            </div>
+            <button id="eh-last-page" class="eh-action-btn" title="最后一页">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
               </svg>
             </button>
@@ -269,7 +261,7 @@
       imagelist: pageData.imagelist,
       settings: {
         fitMode: 'contain',
-        sidebarVisible: true,
+        menuVisible: true,  // 底部菜单是否显示
         darkMode: true  // 默认启用深色模式
       }
     };
@@ -280,16 +272,19 @@
       loading: document.getElementById('eh-loading'),
       pageInfo: document.getElementById('eh-page-info'),
       progressBar: document.getElementById('eh-progress-bar'),
+      sliderTrack: document.getElementById('eh-slider-track'),
+      sliderFill: document.getElementById('eh-slider-fill'),
+      sliderPageInfo: document.getElementById('eh-slider-page-info'),
       pageInput: document.getElementById('eh-page-input'),
+      jumpPageBtn: document.getElementById('eh-jump-page'),
       thumbnails: document.getElementById('eh-thumbnails'),
-      sidebar: document.getElementById('eh-sidebar'),
+      bottomMenu: document.getElementById('eh-bottom-menu'),
+      viewer: document.getElementById('eh-viewer'),
       prevBtn: document.getElementById('eh-prev-btn'),
       nextBtn: document.getElementById('eh-next-btn'),
       firstPageBtn: document.getElementById('eh-first-page'),
       lastPageBtn: document.getElementById('eh-last-page'),
       closeBtn: document.getElementById('eh-close-btn'),
-      toggleSidebarBtn: document.getElementById('eh-toggle-sidebar'),
-      sidebarToggleFloat: document.getElementById('eh-sidebar-toggle-float'),
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
@@ -471,12 +466,22 @@
           elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
         }
 
+        if (elements.sliderPageInfo) {
+          elements.sliderPageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+        }
+
         if (elements.progressBar) {
           elements.progressBar.value = pageNum;
         }
 
         if (elements.pageInput) {
           elements.pageInput.value = pageNum;
+        }
+
+        // 更新进度条填充(已读进度轨道)
+        if (elements.sliderFill) {
+          const progress = (pageNum / state.pageCount) * 100;
+          elements.sliderFill.style.width = `${progress}%`;
         }
 
         // 更新缩略图高亮
@@ -538,16 +543,20 @@
         elements.thumbnails.appendChild(thumb);
 
         // 使用 E-Hentai 的 t 字段作为缩略图背景
-        // t 字段格式: "(https://...webp) -200px 0" 或 "(url) xPos yPos"
+        // t 字段格式: "(https://...webp) -200px 0" (注意:Y坐标没有px单位)
         if (imageData && imageData.t) {
           const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
           try {
-            // 提取 URL 和位置 - 支持两种格式
-            const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+px)/) || 
-                         imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+px)/);
+            // 提取 URL 和位置 - 修正: Y坐标可能没有px单位
+            const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/) || 
+                         imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/);
             
             if (match) {
-              const [, url, xPos, yPos] = match;
+              let [, url, xPos, yPos] = match;
+              // 确保Y坐标有px单位
+              if (!yPos.endsWith('px')) {
+                yPos = yPos + 'px';
+              }
               // 设置背景图和位置 (E-Hentai 使用 sprite sheet)
               placeholder.style.backgroundImage = `url("${url}")`;
               placeholder.style.backgroundPosition = `${xPos} ${yPos}`;
