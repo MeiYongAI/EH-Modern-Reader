@@ -560,7 +560,7 @@
     }
 
     // 预取队列（限制并发、可取消）
-    const prefetch = { queue: [], running: 0, max: 3, controllers: new Map() };
+    const prefetch = { queue: [], running: 0, max: 2, controllers: new Map() }; // 降低并发从3到2
     function cancelPrefetchExcept(targetIndex) {
       prefetch.controllers.forEach((ctl, idx) => {
         if (idx !== targetIndex && ctl) { try { ctl.abort('prefetch-cancel'); } catch {}
@@ -572,7 +572,8 @@
       while (prefetch.running < prefetch.max && prefetch.queue.length > 0) {
         const item = prefetch.queue.shift();
         const idx = item.pageIndex;
-        if (state.imageCache.get(idx)?.status === 'loaded') continue;
+        const cached = state.imageCache.get(idx);
+        if (cached && (cached.status === 'loaded' || cached.status === 'loading')) continue; // 跳过正在加载的
         prefetch.running++;
         const ctl = new AbortController();
         prefetch.controllers.set(idx, ctl);
@@ -761,6 +762,16 @@
             // 直接计算目标居中位置
             const offset = img.offsetLeft - Math.max(0, (container.clientWidth - img.clientWidth) / 2);
             container.scrollLeft = offset;
+            // 瞬时跳转后主动触发目标图片加载
+            if (!img.src && !img.getAttribute('data-loading')) {
+              img.setAttribute('data-loading', 'true');
+              loadImage(idx).then(loadedImg => {
+                if (loadedImg && loadedImg.src) img.src = loadedImg.src;
+                img.removeAttribute('data-loading');
+              }).catch(() => {
+                img.removeAttribute('data-loading');
+              });
+            }
           } else {
             img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           }
@@ -1401,27 +1412,41 @@
           if (singleViewer) singleViewer.style.display = 'none';
         }
 
-        // 观察器懒加载
+        // 观察器懒加载 - 统一使用 loadImage 避免重复请求
         continuous.observer = new IntersectionObserver((entries) => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
               const img = entry.target;
               const idx = parseInt(img.getAttribute('data-page-index'));
               // 仅当未加载时触发
-              if (!img.getAttribute('src')) {
+              if (!img.getAttribute('src') && !img.getAttribute('data-loading')) {
+                img.setAttribute('data-loading', 'true');
                 // 先尝试直接从缓存获取
                 const cached = state.imageCache.get(idx);
                 if (cached && cached.status === 'loaded' && cached.img) {
                   img.src = cached.img.src;
+                  img.removeAttribute('data-loading');
+                } else if (cached && cached.status === 'loading' && cached.promise) {
+                  // 复用正在加载的 Promise
+                  cached.promise.then(loadedImg => {
+                    if (loadedImg && loadedImg.src) img.src = loadedImg.src;
+                    img.removeAttribute('data-loading');
+                  }).catch(() => {
+                    img.removeAttribute('data-loading');
+                  });
                 } else {
-                  ensureRealImageUrl(idx).then(({ url }) => {
-                    img.src = url;
-                  }).catch(()=>{});
+                  // 使用统一的 loadImage，避免与预取冲突
+                  loadImage(idx).then(loadedImg => {
+                    if (loadedImg && loadedImg.src) img.src = loadedImg.src;
+                    img.removeAttribute('data-loading');
+                  }).catch(() => {
+                    img.removeAttribute('data-loading');
+                  });
                 }
               }
             }
           });
-        }, { root: continuous.container, rootMargin: '200px', threshold: 0.01 });
+        }, { root: continuous.container, rootMargin: '400px', threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
