@@ -152,24 +152,6 @@
             </div>
             <span id="eh-slider-page-info" class="eh-slider-page-info">1 / ${pageData.pagecount}</span>
           </div>
-
-          <!-- 底部快捷按钮 -->
-          <div class="eh-bottom-actions">
-            <button id="eh-first-page" class="eh-action-btn" title="第一页">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
-              </svg>
-            </button>
-            <div class="eh-page-jump">
-              <input type="number" id="eh-page-input" min="1" max="${pageData.pagecount}" value="1" />
-              <button id="eh-jump-page" class="eh-action-btn" title="跳转">GO</button>
-            </div>
-            <button id="eh-last-page" class="eh-action-btn" title="最后一页">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
-              </svg>
-            </button>
-          </div>
         </footer>
 
         <!-- 设置面板 -->
@@ -306,15 +288,11 @@
       sliderTrack: document.getElementById('eh-slider-track'),
       sliderFill: document.getElementById('eh-slider-fill'),
       sliderPageInfo: document.getElementById('eh-slider-page-info'),
-      pageInput: document.getElementById('eh-page-input'),
-      jumpPageBtn: document.getElementById('eh-jump-page'),
       thumbnails: document.getElementById('eh-thumbnails'),
       bottomMenu: document.getElementById('eh-bottom-menu'),
       viewer: document.getElementById('eh-viewer'),
       prevBtn: document.getElementById('eh-prev-btn'),
       nextBtn: document.getElementById('eh-next-btn'),
-      firstPageBtn: document.getElementById('eh-first-page'),
-      lastPageBtn: document.getElementById('eh-last-page'),
       closeBtn: document.getElementById('eh-close-btn'),
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
@@ -594,12 +572,24 @@
               if (!yPos.endsWith('px')) {
                 yPos = yPos + 'px';
               }
+              
+              // 将位置从200x281比例转换到71x100比例 (缩放因子 0.355)
+              const xOffset = parseInt(xPos);
+              const yOffset = parseInt(yPos);
+              const scaledX = Math.round(xOffset * 0.355);
+              const scaledY = Math.round(yOffset * 0.355);
+              
               // 设置背景图和位置 (E-Hentai 使用 sprite sheet)
               placeholder.style.backgroundImage = `url("${url}")`;
-              placeholder.style.backgroundPosition = `${xPos} ${yPos}`;
+              placeholder.style.backgroundPosition = `${scaledX}px ${scaledY}px`;
               placeholder.style.backgroundRepeat = 'no-repeat';
-              placeholder.style.backgroundSize = 'auto';
-              console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, xPos, yPos);
+              placeholder.style.backgroundSize = 'auto 100px'; // sprite sheet高度缩放到100px
+              
+              // 隐藏页码数字(因为有真实缩略图了)
+              const pageNumSpan = placeholder.querySelector('span');
+              if (pageNumSpan) pageNumSpan.style.display = 'none';
+              
+              console.log(`[EH Modern Reader] 缩略图 ${pageNum}:`, url, `${scaledX}px ${scaledY}px`);
             } else {
               console.warn(`[EH Modern Reader] 缩略图格式错误:`, imageData.t);
             }
@@ -617,14 +607,6 @@
 
     if (elements.nextBtn) {
       elements.nextBtn.onclick = () => showPage(state.currentPage + 1);
-    }
-
-    if (elements.firstPageBtn) {
-      elements.firstPageBtn.onclick = () => showPage(1);
-    }
-
-    if (elements.lastPageBtn) {
-      elements.lastPageBtn.onclick = () => showPage(state.pageCount);
     }
 
     if (elements.closeBtn) {
@@ -652,16 +634,6 @@
           } else {
             elements.bottomMenu.classList.add('eh-menu-hidden');
           }
-        }
-      };
-    }
-
-    // 跳转按钮
-    if (elements.jumpPageBtn) {
-      elements.jumpPageBtn.onclick = () => {
-        const page = parseInt(elements.pageInput.value);
-        if (page >= 1 && page <= state.pageCount) {
-          showPage(page);
         }
       };
     }

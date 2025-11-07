@@ -215,8 +215,8 @@ body.eh-dark-mode #eh-bottom-menu {
 /* 缩略图容器 */
 
 .eh-thumbnails-container {
-  height: 90px;
-  padding: 4px 0 4px 0;
+  height: 120px;  /* 100px thumbnail + 20px padding */
+  padding: 6px 0 6px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -252,10 +252,9 @@ body.eh-dark-mode #eh-bottom-menu {
 
 /* ==================== 缩略图 ==================== */
 
-
 .eh-thumbnail {
   flex-shrink: 0;
-  width: 60px;
+  width: 71px;  /* 200 * 0.355 = 71px */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -274,18 +273,26 @@ body.eh-dark-mode #eh-bottom-menu {
 }
 
 .eh-thumbnail-placeholder {
-  width: 60px;
-  height: 80px;
+  width: 71px;   /* 200 * 0.355 */
+  height: 100px; /* 281 * 0.355 */
   background: #2a2a2a;
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
   border: 2px solid transparent;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-size: auto;
   background-repeat: no-repeat;
+  background-size: auto 100px !important; /* 保持sprite sheet高度为100px */
+}
+
+.eh-thumbnail-placeholder span {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  font-weight: 500;
+  position: absolute;
+  pointer-events: none;
 }
 
 .eh-thumbnail-placeholder span {
@@ -376,66 +383,6 @@ body.eh-dark-mode #eh-bottom-menu {
   text-align: center;
   font-weight: 500;
   letter-spacing: 0.5px;
-}
-
-/* ==================== 底部快捷按钮 ==================== */
-
-.eh-bottom-actions {
-  padding: 8px 20px 12px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-}
-
-.eh-action-btn {
-  min-width: 44px;
-  height: 36px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.eh-action-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
-  transform: scale(1.05);
-}
-
-.eh-action-btn:active {
-  transform: scale(0.95);
-}
-
-.eh-page-jump {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.eh-page-jump input {
-  width: 60px;
-  height: 36px;
-  padding: 0 8px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
-  text-align: center;
-  font-size: 14px;
-  outline: none;
-}
-
-.eh-page-jump input:focus {
-  border-color: #FF6B9D;
-  background: rgba(255, 255, 255, 0.15);
 }
 
 .eh-thumb-number {
