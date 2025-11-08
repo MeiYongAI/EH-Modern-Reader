@@ -240,10 +240,7 @@
               <span style="font-size: 20px; font-weight: bold;">⇄</span>
             </button>
             <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>
-              </svg>
+              <span style="font-size: 20px;">📖</span>
             </button>
             <button id="eh-auto-btn" class="eh-icon-btn" title="定时翻页 (单击开关, Alt+单击设置间隔)">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -327,7 +324,6 @@
             
             <div class="eh-setting-group">
               <div class="eh-setting-item">
-                <label>阅读模式</label>
                 <div class="eh-radio-group">
                   <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="single" checked>
@@ -350,17 +346,14 @@
               </div>
             </div>
 
-            <div class="eh-setting-group">
-              <div class="eh-setting-label-group">自动播放</div>
-              <div class="eh-setting-row-inline">
-                <div class="eh-setting-item eh-setting-inline">
-                  <label for="eh-auto-interval">翻页间隔（秒）</label>
-                  <input type="number" id="eh-auto-interval" min="0.1" max="120" step="0.1" value="3">
-                </div>
-                <div class="eh-setting-item eh-setting-inline">
-                  <label for="eh-scroll-speed">滚动速度（px/帧）</label>
-                  <input type="number" id="eh-scroll-speed" min="0.1" max="100" step="0.1" value="0.5">
-                </div>
+            <div class="eh-setting-group" style="display: flex; gap: 12px;">
+              <div class="eh-setting-item eh-setting-inline" style="flex: 1;">
+                <label for="eh-auto-interval">翻页间隔（秒）</label>
+                <input type="number" id="eh-auto-interval" min="0.1" max="120" step="0.1" value="3">
+              </div>
+              <div class="eh-setting-item eh-setting-inline" style="flex: 1;">
+                <label for="eh-scroll-speed">滚动速度（px/帧）</label>
+                <input type="number" id="eh-scroll-speed" min="0.1" max="100" step="0.1" value="0.5">
               </div>
             </div>
           </div>
@@ -1423,8 +1416,29 @@
         const clickX = e.clientX - rect.left;
         const viewerWidth = rect.width;
         
-        // 左侧 40% 区域：向左翻（考虑反向阅读）
-        // 右侧 40% 区域：向右翻（考虑反向阅读）
+        // 横向连续模式：左侧1/3向左滚动，右侧1/3向右滚动
+        if (state.settings.readMode === 'continuous-horizontal') {
+          const container = document.getElementById('eh-continuous-horizontal');
+          if (container) {
+            const leftThreshold = viewerWidth / 3;
+            const rightThreshold = viewerWidth * 2 / 3;
+            
+            if (clickX < leftThreshold) {
+              // 左侧1/3：向左滚动一个视口宽度
+              const scrollAmount = container.clientWidth * 0.8;
+              container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+            } else if (clickX > rightThreshold) {
+              // 右侧1/3：向右滚动一个视口宽度
+              const scrollAmount = container.clientWidth * 0.8;
+              container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+            }
+            // 中间1/3不响应
+            e.stopPropagation();
+            return;
+          }
+        }
+        
+        // 单页/双页模式：左侧 40% 区域向左翻，右侧 40% 区域向右翻
         // 中间 20% 区域：不响应
         const leftThreshold = viewerWidth * 0.4;
         const rightThreshold = viewerWidth * 0.6;
@@ -1585,22 +1599,15 @@
     }
 
     // 顶栏中间区域点击切换显示/隐藏
-    const headerCenter = document.querySelector('.eh-header-center');
+    const header = document.getElementById('eh-header');
+    const headerCenter = header?.querySelector('.eh-header-center');
     if (headerCenter) {
       headerCenter.style.cursor = 'pointer';
       headerCenter.onclick = (e) => {
-        e.stopPropagation(); // 防止事件冒泡
-        const header = document.getElementById('eh-header');
-        const bottomMenu = document.getElementById('eh-bottom-menu');
-        if (header && bottomMenu) {
-          const isHidden = header.classList.contains('eh-hide-ui');
-          if (isHidden) {
-            header.classList.remove('eh-hide-ui');
-            bottomMenu.classList.remove('eh-hide-ui');
-          } else {
-            header.classList.add('eh-hide-ui');
-            bottomMenu.classList.add('eh-hide-ui');
-          }
+        // 确保不是点击按钮
+        if (!e.target.closest('button')) {
+          header.classList.toggle('eh-hidden');
+          console.log('[EH Modern Reader] 顶栏显示状态:', !header.classList.contains('eh-hidden'));
         }
       };
     }
@@ -1681,24 +1688,43 @@
       elements.readModeRadios.forEach(radio => {
         radio.onchange = () => {
           if (radio.checked) {
+            const newMode = radio.value;
             const oldMode = state.settings.readMode;
-            state.settings.readMode = radio.value;
-            console.log('[EH Modern Reader] 阅读模式切换为:', state.settings.readMode);
             
-            // 先退出所有模式
+            // 如果模式没变，不做处理
+            if (newMode === oldMode) return;
+            
+            state.settings.readMode = newMode;
+            console.log('[EH Modern Reader] 阅读模式切换:', oldMode, '→', newMode);
+            
+            // 先退出当前模式
             if (oldMode === 'continuous-horizontal') {
-              exitContinuousMode();
+              // 退出横向连续模式
+              const singleViewer = document.getElementById('eh-viewer');
+              if (singleViewer) singleViewer.style.display = '';
+              if (continuous.observer) { continuous.observer.disconnect(); continuous.observer = null; }
+              if (continuous.container && continuous.container.parentElement) {
+                continuous.container.parentElement.removeChild(continuous.container);
+              }
+              continuous.container = null;
             } else if (oldMode === 'double') {
+              // 退出双页模式
               exitDoublePageMode();
             }
             
-            // 再进入新模式
-            if (state.settings.readMode === 'continuous-horizontal') {
+            // 进入新模式
+            if (newMode === 'continuous-horizontal') {
+              exitDoublePageMode(); // 确保双页模式已退出
               enterContinuousHorizontalMode();
-            } else if (state.settings.readMode === 'double') {
+            } else if (newMode === 'double') {
               enterDoublePageMode();
+            } else {
+              // 单页模式：确保单页viewer可见
+              const singleViewer = document.getElementById('eh-viewer');
+              if (singleViewer) singleViewer.style.display = '';
+              // 显示当前页
+              scheduleShowPage(state.currentPage, { instant: true });
             }
-            // 单页模式不需要特殊处理，已经在退出其他模式时显示了单页viewer
           }
         };
       });
@@ -2109,31 +2135,6 @@
           }
         }, { passive: false });
 
-        // 点击左右两侧滚动一段距离
-        continuous.container.addEventListener('click', (e) => {
-          // 如果点击的是图片或其父元素，不触发翻页
-          if (e.target.tagName === 'IMG' || e.target.closest('.eh-ch-wrapper')) {
-            const containerRect = continuous.container.getBoundingClientRect();
-            const clickX = e.clientX - containerRect.left;
-            const containerWidth = continuous.container.clientWidth;
-            
-            // 点击左侧1/3区域向左滚动，点击右侧1/3区域向右滚动
-            if (clickX < containerWidth / 3) {
-              // 左侧点击 - 向左滚动一个视口的宽度
-              continuous.container.scrollBy({
-                left: -containerWidth * 0.8,
-                behavior: 'smooth'
-              });
-            } else if (clickX > containerWidth * 2 / 3) {
-              // 右侧点击 - 向右滚动一个视口的宽度
-              continuous.container.scrollBy({
-                left: containerWidth * 0.8,
-                behavior: 'smooth'
-              });
-            }
-          }
-        });
-
         // 滚动时根据居中元素更新当前页与进度条/高亮
         let scrollUpdating = false;
         const onScroll = () => {
@@ -2226,6 +2227,9 @@
     }
 
     function exitContinuousMode() {
+      // 退出双页模式
+      exitDoublePageMode();
+      
       // 显示单页 viewer，移除连续容器
       const singleViewer = document.getElementById('eh-viewer');
       if (singleViewer) singleViewer.style.display = '';
