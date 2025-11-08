@@ -937,11 +937,23 @@
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
           console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, 'img元素:', img, 'wrapper:', img.parentElement);
-          const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
           if (options.instant) {
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
-            wrapper.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
-
+            const container = document.getElementById('eh-continuous-horizontal');
+            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
+            // 使用 offsetLeft/offsetWidth 计算，不受 transform 镜像影响，适配反向模式
+            const basisWidth = wrapper?.offsetWidth || img.offsetWidth || 0;
+            const basisOffsetLeft = wrapper ? wrapper.offsetLeft : img.offsetLeft;
+            const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
+            console.log('[EH Modern Reader] 计算居中偏移:', {
+              basisWidth,
+              basisOffsetLeft,
+              offset,
+              containerWidth: container.clientWidth,
+              currentScrollLeft: container.scrollLeft
+            });
+            container.scrollLeft = offset;
+            
             // 立即更新当前页状态（不依赖 scroll 事件）
             const newPageNum = pageNum; // 保持逻辑页号
             state.currentPage = newPageNum;
@@ -950,13 +962,15 @@
             updateThumbnailHighlight(newPageNum);
             preloadAdjacentPages(newPageNum);
             saveProgress(newPageNum);
-
+            
             // 瞬时跳转后主动触发目标图片及附近图片加载
             setTimeout(() => {
               const indices = [idx];
+              // 加载前后各 1-2 张
               if (idx > 0) indices.push(idx - 1);
               if (idx < state.pageCount - 1) indices.push(idx + 1);
               if (idx < state.pageCount - 2) indices.push(idx + 2);
+              
               indices.forEach(i => {
                 const targetImg = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${i}"]`);
                 if (targetImg && !targetImg.src && !targetImg.getAttribute('data-loading')) {
@@ -965,6 +979,7 @@
                   loadImage(i).then(loadedImg => {
                     console.log('[EH Modern Reader] 图片加载成功:', i, 'src:', loadedImg.src);
                     if (loadedImg && loadedImg.src) targetImg.src = loadedImg.src;
+                    // 设置真实占位比例并移除骨架
                     try {
                       const wrap = targetImg.parentElement;
                       const w = loadedImg?.naturalWidth || loadedImg?.width;
@@ -985,9 +1000,11 @@
                   });
                 }
               });
+              // 延迟复位跳转标记，避免 scroll 回调干扰
               setTimeout(() => { scrollJumping = false; }, 200);
             }, 50);
           } else {
+            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
             wrapper.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           }
         }
@@ -2078,8 +2095,12 @@
         if (targetImg) {
           // 等待一次 frame 保证布局完成
           requestAnimationFrame(() => {
-            const wrapper = targetImg.closest('.eh-ch-wrapper') || targetImg.parentElement || targetImg;
-            wrapper.scrollIntoView({ behavior: 'auto', inline: 'center', block: 'nearest' });
+            const c = continuous.container;
+            const wrapper = targetImg.closest('.eh-ch-wrapper') || targetImg.parentElement;
+            const basisWidth = wrapper?.clientWidth || targetImg.clientWidth || 0;
+            const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : targetImg.offsetLeft);
+            const offset = basisOffsetLeft - Math.max(0, (c.clientWidth - basisWidth) / 2);
+            c.scrollLeft = offset;
           });
         }
       }
