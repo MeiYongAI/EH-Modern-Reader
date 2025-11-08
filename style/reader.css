@@ -67,6 +67,11 @@ body.eh-dark-mode .eh-loading {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 100;
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+#eh-header.eh-hide-ui {
+  transform: translateY(-100%);
 }
 
 .eh-header-left,
@@ -236,7 +241,7 @@ body.eh-dark-mode #eh-viewer {
   background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.9) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s ease, bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -245,6 +250,10 @@ body.eh-dark-mode #eh-viewer {
 
 body.eh-dark-mode #eh-bottom-menu {
   background: linear-gradient(to top, rgba(20, 20, 20, 0.98) 0%, rgba(30, 30, 30, 0.95) 100%);
+}
+
+#eh-bottom-menu.eh-hide-ui {
+  transform: translateY(100%);
 }
 
 #eh-bottom-menu.eh-menu-hidden {
@@ -1017,6 +1026,18 @@ body.eh-dark-mode .eh-setting-group {
 
 body.eh-dark-mode .eh-setting-label-group {
   color: #777;
+}
+
+/* 横向排列多个设置项 */
+.eh-setting-row-inline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.eh-setting-row-inline .eh-setting-item {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 /* 内联设置项（label 和 input 同行） */
