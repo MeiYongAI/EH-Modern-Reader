@@ -1308,14 +1308,39 @@
         };
         state.autoPage.timer = { rafId: requestAnimationFrame(step) };
       } else {
-        // 单页模式：按间隔翻页
+        // 单页/双页模式：按间隔翻页，考虑反向和双页步进
         state.autoPage.timer = setInterval(() => {
-          const next = Math.min(state.pageCount, state.currentPage + 1);
-          if (next === state.currentPage) {
-            stopAutoPaging();
+          let next;
+          const reversed = !!state.settings.reverse;
+          const isDouble = state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none';
+          
+          if (reversed) {
+            // 反向模式：向前翻
+            if (isDouble) {
+              const isOddTotal = state.pageCount % 2 === 1;
+              next = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+            } else {
+              next = state.currentPage - 1;
+            }
+            if (next < 1) {
+              stopAutoPaging();
+              return;
+            }
           } else {
-            scheduleShowPage(next);
+            // 正向模式：向后翻
+            if (isDouble) {
+              const isOddTotal = state.pageCount % 2 === 1;
+              next = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+            } else {
+              next = state.currentPage + 1;
+            }
+            if (next > state.pageCount) {
+              stopAutoPaging();
+              return;
+            }
           }
+          
+          scheduleShowPage(next);
         }, state.autoPage.intervalMs);
       }
       updateAutoButtonVisual();
