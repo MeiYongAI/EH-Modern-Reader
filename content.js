@@ -958,15 +958,11 @@
             const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
             // 正常坐标系下使目标居中的滚动位置
             let target = cumulativeLeft - centerOffset;
-            // 若容器做了镜像(scaleX(-1))，scrollLeft 也被镜像了：
-            // 反向时应该定位到从右侧数的对应位置
-            if (state.settings.reverse) {
-              const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
-              // target 是正常坐标下元素左边距离起点的位置，居中后
-              // 反向时要让元素右边距离容器右边 = target + basisWidth
-              // 所以 scrollLeft = maxScroll - (target + basisWidth)
-              target = maxScroll - target - basisWidth;
-            }
+            // scaleX(-1) 镜像模式：scrollLeft 坐标系也被镜像
+            // scrollLeft=0 对应视觉最右侧，scrollLeft=max 对应视觉最左侧
+            // 因此 DOM 左侧的元素(小页码)需要小 scrollLeft，右侧元素(大页码)需要大 scrollLeft
+            // 直接使用计算出的 target 即可，无需转换
+            
             // 夹取到有效范围
             const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
             target = Math.max(0, Math.min(maxScrollNow, target));
@@ -1051,10 +1047,8 @@
             
             const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
             let target = cumulativeLeft - centerOffset;
-            if (state.settings.reverse) {
-              const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
-              target = maxScroll - target - basisWidth;
-            }
+            // scaleX(-1) 镜像模式：scrollLeft 坐标系也被镜像，无需转换
+            
             const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
             target = Math.max(0, Math.min(maxScrollNow, target));
             container.scrollTo({ left: target, behavior: 'smooth' });
@@ -2164,10 +2158,8 @@
             
             const centerOffset = Math.max(0, (c.clientWidth - basisWidth) / 2);
             let target = cumulativeLeft - centerOffset;
-            if (state.settings.reverse) {
-              const maxScroll = Math.max(0, c.scrollWidth - c.clientWidth);
-              target = maxScroll - target - basisWidth;
-            }
+            // scaleX(-1) 镜像模式：scrollLeft 坐标系也被镜像，无需转换
+            
             const maxScrollNow = Math.max(0, c.scrollWidth - c.clientWidth);
             target = Math.max(0, Math.min(maxScrollNow, target));
             c.scrollLeft = target;
