@@ -1485,13 +1485,12 @@
         };
         state.autoPage.timer = { rafId: requestAnimationFrame(step) };
       } else {
-        // 单页/双页模式：按间隔翻页，遵循反向阅读方向
+        // 单页/双页模式：逻辑页序永远递增（1→N），反向阅读只影响左右键和左右区域的交互含义，不改变自动播放顺序
         state.autoPage.timer = setInterval(() => {
-          const direction = state.settings.reverse ? -1 : 1;
-          const next = state.currentPage + direction;
-          if (next < 1 || next > state.pageCount) {
+          const next = state.currentPage + 1;
+          if (next > state.pageCount) {
             stopAutoPaging();
-          } else {
+          } else if (next >= 1) {
             scheduleShowPage(next);
           }
         }, state.autoPage.intervalMs);
