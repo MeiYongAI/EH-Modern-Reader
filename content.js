@@ -237,11 +237,7 @@
           </div>
           <div class="eh-header-right">
             <button id="eh-reverse-btn" class="eh-icon-btn" title="反向阅读 (左右方向切换)">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 5l-5 5 5 5" />
-                <path d="M16 5l5 5-5 5" />
-                <path d="M11 12h2" />
-              </svg>
+              <span style="font-size: 20px; font-weight: bold;">⇄</span>
             </button>
             <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -801,17 +797,11 @@
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
-      // 双页模式下，调用双页显示逻辑
+      // 双页模式：pageNum 始终视为“逻辑图片页码”，展示包含该页的双页，不再转换
       if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-        showDoublePages(pageNum);
-        state.currentPage = pageNum;
-        elements.progressBar.value = pageNum;
-        // 更新页面信息显示
-        const isOddTotal = state.pageCount % 2 === 1;
-        const maxDoublePage = isOddTotal ? Math.ceil(state.pageCount / 2) : Math.floor(state.pageCount / 2);
-        if (elements.pageInfo) {
-          elements.pageInfo.textContent = `${pageNum} / ${maxDoublePage}`;
-        }
+        state.currentPage = pageNum; // 保持逻辑页索引
+        showDoublePages(pageNum);    // 传入逻辑页
+        if (elements.progressBar) elements.progressBar.value = pageNum;
         updateThumbnailHighlight(pageNum);
         return;
       }
@@ -1068,7 +1058,10 @@
           <div class="eh-thumbnail-number">${displayNum}</div>
         `;
 
-  thumb.onclick = () => scheduleShowPage(logicalPage, { instant: true });
+        thumb.onclick = () => {
+          // 统一逻辑页跳转，双页模式内部处理配对
+            scheduleShowPage(logicalPage, { instant: true });
+        };
         elements.thumbnails.appendChild(thumb);
 
         // 缩略图加载逻辑
@@ -1194,29 +1187,28 @@
 
     // 事件监听
     if (elements.prevBtn) {
-  elements.prevBtn.onclick = () => {
-    if (state.settings.readMode === 'double') {
-      // 双页模式翻页
-      if (state.currentPage <= 1) return; // 已经是第一页
-      scheduleShowPage(state.currentPage - 1);
-    } else {
-      scheduleShowPage(state.currentPage - 1);
-    }
-  };
+      elements.prevBtn.onclick = () => {
+        if (state.currentPage <= 1) return;
+        let target = state.currentPage - 1;
+        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+          const isOddTotal = state.pageCount % 2 === 1;
+          target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+        }
+        if (target < 1) target = 1;
+        scheduleShowPage(target);
+      };
     }
 
     if (elements.nextBtn) {
-  elements.nextBtn.onclick = () => {
-    if (state.settings.readMode === 'double') {
-      // 双页模式翻页
-      const isOddTotal = state.pageCount % 2 === 1;
-      const maxPage = isOddTotal ? Math.ceil(state.pageCount / 2) : Math.ceil(state.pageCount / 2);
-      if (state.currentPage >= maxPage) return; // 已经是最后一页
-      scheduleShowPage(state.currentPage + 1);
-    } else {
-      scheduleShowPage(state.currentPage + 1);
-    }
-  };
+      elements.nextBtn.onclick = () => {
+        let target = state.currentPage + 1;
+        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+          const isOddTotal = state.pageCount % 2 === 1;
+          target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+        }
+        if (target > state.pageCount) return;
+        scheduleShowPage(target);
+      };
     }
 
     if (elements.closeBtn) {
@@ -1504,7 +1496,7 @@
       });
     }
 
-    // 进度条拖动事件
+    // 进度条拖动/改变事件
     if (elements.progressBar) {
       let preheatTimer = null;
       elements.progressBar.oninput = () => {
@@ -1517,8 +1509,9 @@
         }, 120);
       };
       elements.progressBar.onchange = (e) => {
-        const page = parseInt(e.target.value);
-        scheduleShowPage(page, { instant: true });
+        // 统一为逻辑页索引，双页模式内部负责配对显示
+        const imageNum = parseInt(e.target.value);
+        scheduleShowPage(imageNum, { instant: true });
       };
     }
 
@@ -1623,6 +1616,9 @@
 
     // 双页阅读模式
     let doublePage = { container: null, leftPage: null, rightPage: null };
+    
+    // 已弃用的双页转换函数已移除，统一使用逻辑单页索引
+
     function enterDoublePageMode() {
       console.log('[EH Modern Reader] 进入双页阅读模式');
       // 隐藏单页viewer
@@ -1654,89 +1650,44 @@
         doublePage.container.style.display = 'flex';
       }
 
-      // 更新进度条最大值为双页模式的页数
-      const isOddTotal = state.pageCount % 2 === 1;
-      const maxDoublePage = isOddTotal ? Math.ceil(state.pageCount / 2) : Math.floor(state.pageCount / 2);
-      if (elements.progressBar) {
-        elements.progressBar.max = maxDoublePage;
-      }
-      if (elements.pageInfo) {
-        elements.pageInfo.textContent = `${state.currentPage} / ${maxDoublePage}`;
-      }
-
       // 显示当前页对应的双页
       showDoublePages(state.currentPage);
     }
 
-    function showDoublePages(pageNum) {
-      console.log('[EH Modern Reader] 显示双页:', pageNum, '总页数:', state.pageCount);
-      
-      const isOddTotal = state.pageCount % 2 === 1;
-      
-      // 奇数总页数：第1页单独显示封面
-      if (isOddTotal && pageNum === 1) {
-        const physicalIdx = state.settings.reverse ? (state.pageCount - 1) : 0;
-        ensureRealImageUrl(physicalIdx).then(url => {
-          doublePage.leftPage.style.display = 'none';
-          doublePage.rightPage.src = url;
-          doublePage.rightPage.style.display = 'block';
-          doublePage.rightPage.style.maxWidth = '100%';
-        });
-        return;
-      }
-
-      // 计算当前页应该显示的图片编号
-      let leftImageNum, rightImageNum;
-      
+    function showDoublePages(logicalPage) {
+      const total = state.pageCount;
+      const isOddTotal = total % 2 === 1;
+      let leftNum, rightNum;
       if (isOddTotal) {
-        // 奇数总页数：pageNum=1显示图1，pageNum=2显示图2-3，pageNum=3显示图4-5...
-        // 图片编号 = (pageNum - 1) * 2 和 (pageNum - 1) * 2 + 1
-        leftImageNum = (pageNum - 1) * 2;
-        rightImageNum = leftImageNum + 1;
+        if (logicalPage === 1) { leftNum = 1; rightNum = null; } else {
+          leftNum = (logicalPage % 2 === 0) ? logicalPage : logicalPage - 1;
+          rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
+        }
       } else {
-        // 偶数总页数：pageNum=1显示图1-2，pageNum=2显示图3-4...
-        // 图片编号 = (pageNum - 1) * 2 + 1 和 (pageNum - 1) * 2 + 2
-        leftImageNum = (pageNum - 1) * 2 + 1;
-        rightImageNum = leftImageNum + 1;
+        leftNum = (logicalPage % 2 === 1) ? logicalPage : logicalPage - 1;
+        rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
       }
-
-      console.log('[EH Modern Reader] 双页显示图片:', leftImageNum, '-', rightImageNum);
-
-      // 物理索引映射
-      const getPhysicalIndex = (imageNum) => {
-        const physicalPage = state.settings.reverse ? (state.pageCount - imageNum + 1) : imageNum;
-        return physicalPage - 1;
-      };
-
-      // 反向模式下左右页交换
-      if (state.settings.reverse) {
-        [leftImageNum, rightImageNum] = [rightImageNum, leftImageNum];
-      }
-
-      const leftIdx = getPhysicalIndex(leftImageNum);
-      const rightIdx = getPhysicalIndex(rightImageNum);
-
-      // 加载左页
-      if (leftImageNum > 0 && leftImageNum <= state.pageCount) {
-        ensureRealImageUrl(leftIdx).then(url => {
+      console.log('[EH Modern Reader] 显示双页(逻辑页):', logicalPage, '=>', leftNum, rightNum);
+      if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${total}`;
+      const mapIndex = (num) => { if (!num) return null; const physical = state.settings.reverse ? (total - num + 1) : num; return physical - 1; };
+      let finalLeft = leftNum, finalRight = rightNum;
+      if (state.settings.reverse) { [finalLeft, finalRight] = [rightNum, leftNum]; }
+      const leftIdx = mapIndex(finalLeft);
+      const rightIdx = mapIndex(finalRight);
+      if (leftNum && leftIdx != null) {
+        ensureRealImageUrl(leftIdx).then(({ url }) => {
           doublePage.leftPage.src = url;
           doublePage.leftPage.style.display = 'block';
-          doublePage.leftPage.style.maxWidth = '50%';
+          doublePage.leftPage.style.maxWidth = rightNum ? '50%' : '100%';
         });
-      } else {
-        doublePage.leftPage.style.display = 'none';
-      }
-
-      // 加载右页
-      if (rightImageNum > 0 && rightImageNum <= state.pageCount) {
-        ensureRealImageUrl(rightIdx).then(url => {
+      } else { doublePage.leftPage.style.display = 'none'; }
+      if (rightNum && rightIdx != null) {
+        ensureRealImageUrl(rightIdx).then(({ url }) => {
           doublePage.rightPage.src = url;
           doublePage.rightPage.style.display = 'block';
           doublePage.rightPage.style.maxWidth = '50%';
         });
-      } else {
-        doublePage.rightPage.style.display = 'none';
-      }
+      } else { doublePage.rightPage.style.display = 'none'; }
     }
 
     function exitDoublePageMode() {
@@ -1744,13 +1695,6 @@
       if (singleViewer) singleViewer.style.display = '';
       if (doublePage.container) {
         doublePage.container.style.display = 'none';
-      }
-      // 恢复进度条最大值为总页数
-      if (elements.progressBar) {
-        elements.progressBar.max = state.pageCount;
-      }
-      if (elements.pageInfo) {
-        elements.pageInfo.textContent = `${state.currentPage} / ${state.pageCount}`;
       }
     }
 
@@ -2060,17 +2004,41 @@
           break;
         case 'ArrowLeft':
         case 'a':
-        case 'A':
-          scheduleShowPage(state.currentPage - 1);
+        case 'A': {
+          if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+            const isOddTotal = state.pageCount % 2 === 1;
+            let prev;
+            if (isOddTotal) {
+              if (state.currentPage === 2) prev = 1; else prev = state.currentPage - 2;
+            } else {
+              prev = state.currentPage - 2;
+            }
+            if (prev < 1) prev = 1;
+            scheduleShowPage(prev);
+          } else {
+            scheduleShowPage(state.currentPage - 1);
+          }
           e.preventDefault();
-          break;
+          break; }
         case 'ArrowRight':
         case 'd':
         case 'D':
-        case ' ':
-          scheduleShowPage(state.currentPage + 1);
+        case ' ': {
+          if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+            const isOddTotal = state.pageCount % 2 === 1;
+            let next;
+            if (isOddTotal) {
+              if (state.currentPage === 1) next = 2; else next = state.currentPage + 2;
+            } else {
+              next = state.currentPage + 2;
+            }
+            if (next > state.pageCount) next = state.pageCount;
+            scheduleShowPage(next);
+          } else {
+            scheduleShowPage(state.currentPage + 1);
+          }
           e.preventDefault();
-          break;
+          break; }
         case 'p':
         case 'P':
           // 切换定时翻页
