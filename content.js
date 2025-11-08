@@ -758,12 +758,21 @@
           if (options.instant) {
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
-            // 使用包装元素宽度进行居中，避免未加载图片宽度为 0 导致定位失效
+            // 使用 getBoundingClientRect 获取真实位置,避免 offsetLeft 在 flex 布局中失效
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
-            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
-            const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft);
-            const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
-            console.log('[EH Modern Reader] 计算居中偏移:', { basisWidth, basisOffsetLeft, offset, containerWidth: container.clientWidth });
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            // 计算 wrapper 相对于容器滚动起点的偏移
+            const wrapperOffsetInScroll = wrapperRect.left - containerRect.left + container.scrollLeft;
+            // 居中偏移 = wrapper 起点 - (容器宽度 - wrapper 宽度) / 2
+            const offset = wrapperOffsetInScroll - Math.max(0, (container.clientWidth - wrapperRect.width) / 2);
+            console.log('[EH Modern Reader] 计算居中偏移:', { 
+              wrapperWidth: wrapperRect.width, 
+              wrapperOffsetInScroll, 
+              offset, 
+              containerWidth: container.clientWidth,
+              currentScrollLeft: container.scrollLeft
+            });
             container.scrollLeft = offset;
             
             // 立即更新当前页状态（不依赖 scroll 事件）

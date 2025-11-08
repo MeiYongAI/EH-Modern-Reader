@@ -982,32 +982,33 @@ body.eh-dark-mode .eh-setting-item label {
 
 /* 设置分组 */
 .eh-setting-group {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e8;
 }
 
 .eh-setting-group:last-of-type {
   border-bottom: none;
-  margin-bottom: 8px;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 body.eh-dark-mode .eh-setting-group {
-  border-bottom-color: #404040;
+  border-bottom-color: #3a3a3a;
 }
 
 /* 分组标签 */
 .eh-setting-label-group {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #888;
+  color: #999;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 12px;
+  letter-spacing: 0.8px;
+  margin-bottom: 9px;
 }
 
 body.eh-dark-mode .eh-setting-label-group {
-  color: #999;
+  color: #777;
 }
 
 /* 内联设置项（label 和 input 同行） */
@@ -1015,11 +1016,19 @@ body.eh-dark-mode .eh-setting-label-group {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 9px;
+  min-height: 34px;
 }
 
 .eh-setting-inline label {
   margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+body.eh-dark-mode .eh-setting-inline label {
+  color: #e0e0e0;
   flex: 1;
 }
 
@@ -1028,13 +1037,23 @@ body.eh-dark-mode .eh-setting-label-group {
   height: 32px;
   padding: 0 10px;
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.eh-setting-inline input[type="number"]:focus {
+  outline: none;
+  border-color: #FF6B9D;
   font-size: 13px;
   text-align: center;
   background: #fff;
 }
 
 body.eh-dark-mode .eh-setting-inline input[type="number"] {
+
+body.eh-dark-mode .eh-setting-inline input[type="number"]:focus {
+  border-color: #FF6B9D;
+}
   background: #3a3a3a;
   border-color: #505050;
   color: #e0e0e0;
@@ -1068,31 +1087,63 @@ body.eh-dark-mode .eh-setting-item select {
 /* 单选按钮组样式 */
 .eh-radio-group {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .eh-radio-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: 8px;
+  padding: 9px 18px;
   border: 2px solid #e0e0e0;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
-  background: #fff;
+  font-weight: 500;
+  background: #fafafa;
   color: #555;
   user-select: none;
 }
 
 .eh-radio-label:hover {
-  border-color: #FF6B9D;
-  background: rgba(255, 107, 157, 0.05);
+  border-color: #ffb3d1;
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 .eh-radio-label input[type="radio"] {
+
+.eh-radio-label input[type="radio"]:checked + span {
+  color: #e91e63;
+  font-weight: 600;
+}
+
+.eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.25);
+}
+
+body.eh-dark-mode .eh-radio-label {
+  border-color: #484848;
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode .eh-radio-label:hover {
+  border-color: #ffb3d1;
+  background: #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+body.eh-dark-mode .eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #333;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.3);
+}
   width: 16px;
   height: 16px;
   margin: 0;
