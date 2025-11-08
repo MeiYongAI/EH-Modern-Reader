@@ -323,14 +323,28 @@
             <h3>阅读设置</h3>
             <div class="eh-setting-item">
               <label>阅读模式</label>
-              <select id="eh-read-mode">
-                <option value="single">单页（默认）</option>
-                <option value="continuous-horizontal">横向连续</option>
-              </select>
+              <div class="eh-radio-group">
+                <label class="eh-radio-label">
+                  <input type="radio" name="eh-read-mode-radio" value="single" checked>
+                  <span>单页</span>
+                </label>
+                <label class="eh-radio-label">
+                  <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
+                  <span>横向连续</span>
+                </label>
+              </div>
             </div>
             <div class="eh-setting-item">
               <label for="eh-preload-count">预加载页数（向后）</label>
               <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2" style="width: 64px;">
+            </div>
+            <div class="eh-setting-item">
+              <label for="eh-auto-interval">定时翻页间隔（秒）</label>
+              <input type="number" id="eh-auto-interval" min="0.5" max="60" step="0.5" value="3" style="width: 64px;">
+            </div>
+            <div class="eh-setting-item">
+              <label for="eh-scroll-speed">自动滚动速度（px/帧）</label>
+              <input type="number" id="eh-scroll-speed" min="1" max="50" step="0.5" value="3" style="width: 64px;">
             </div>
             <button id="eh-close-settings" class="eh-btn">关闭</button>
           </div>
@@ -432,8 +446,10 @@
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
       closeSettingsBtn: document.getElementById('eh-close-settings'),
-  readModeSelect: document.getElementById('eh-read-mode'),
-  preloadCountInput: document.getElementById('eh-preload-count')
+  readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
+  preloadCountInput: document.getElementById('eh-preload-count'),
+  autoIntervalInput: document.getElementById('eh-auto-interval'),
+  scrollSpeedInput: document.getElementById('eh-scroll-speed')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -442,11 +458,21 @@
       throw new Error(`缺少必要的 DOM 元素: ${missingElements.join(', ')}`);
     }
 
-    // 同步 UI 的阅读模式选择器到状态（确保切换可靠）
-    if (elements.readModeSelect) {
+    // 同步 UI 的阅读模式单选按钮到状态
+    if (elements.readModeRadios && elements.readModeRadios.length > 0) {
       try {
-        elements.readModeSelect.value = state.settings.readMode || 'single';
+        elements.readModeRadios.forEach(radio => {
+          if (radio.value === state.settings.readMode) radio.checked = true;
+        });
       } catch {}
+    }
+
+    // 同步定时翻页和滚动速度输入框到状态
+    if (elements.autoIntervalInput) {
+      elements.autoIntervalInput.value = (state.autoPage.intervalMs || 3000) / 1000;
+    }
+    if (elements.scrollSpeedInput) {
+      elements.scrollSpeedInput.value = state.autoPage.scrollSpeed || 3;
     }
 
     // 显示加载状态
@@ -855,6 +881,9 @@
 
   console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
 
+  // 更新缩略图高亮（单页模式必须）
+  updateThumbnailHighlight(pageNum);
+
   // 保存阅读进度
   saveProgress(pageNum);
 
@@ -1187,6 +1216,8 @@
               const spd = Math.max(1, Math.min(50, parseFloat(val)));
               if (!isNaN(spd)) {
                 state.autoPage.scrollSpeed = spd;
+                // 同步到设置面板
+                if (elements.scrollSpeedInput) elements.scrollSpeedInput.value = spd;
                 if (state.autoPage.running) startAutoPaging(); else updateAutoButtonVisual();
               }
             }
@@ -1196,6 +1227,8 @@
               const sec = Math.max(0.5, Math.min(60, parseFloat(val)));
               if (!isNaN(sec)) {
                 state.autoPage.intervalMs = Math.round(sec * 1000);
+                // 同步到设置面板
+                if (elements.autoIntervalInput) elements.autoIntervalInput.value = sec;
                 if (state.autoPage.running) startAutoPaging(); else updateAutoButtonVisual();
               }
             }
@@ -1243,16 +1276,21 @@
       };
     }
 
-    if (elements.readModeSelect) {
-      elements.readModeSelect.onchange = () => {
-        state.settings.readMode = elements.readModeSelect.value;
-        console.log('[EH Modern Reader] 阅读模式切换为:', state.settings.readMode);
-        if (state.settings.readMode === 'continuous-horizontal') {
-          enterContinuousHorizontalMode();
-        } else {
-          exitContinuousMode();
-        }
-      };
+    // 阅读模式单选按钮监听
+    if (elements.readModeRadios && elements.readModeRadios.length > 0) {
+      elements.readModeRadios.forEach(radio => {
+        radio.onchange = () => {
+          if (radio.checked) {
+            state.settings.readMode = radio.value;
+            console.log('[EH Modern Reader] 阅读模式切换为:', state.settings.readMode);
+            if (state.settings.readMode === 'continuous-horizontal') {
+              enterContinuousHorizontalMode();
+            } else {
+              exitContinuousMode();
+            }
+          }
+        };
+      });
     }
 
     if (elements.preloadCountInput) {
@@ -1262,6 +1300,36 @@
           state.settings.prefetchAhead = v;
           // 立即触发一次基于当前页的预取刷新
           preloadAdjacentPages(state.currentPage);
+        }
+      });
+    }
+
+    // 定时翻页间隔输入框监听（与 Alt+点击同步）
+    if (elements.autoIntervalInput) {
+      elements.autoIntervalInput.addEventListener('change', () => {
+        const v = parseFloat(elements.autoIntervalInput.value);
+        if (!isNaN(v) && v >= 0.5 && v <= 60) {
+          state.autoPage.intervalMs = Math.round(v * 1000);
+          if (state.autoPage.running) {
+            startAutoPaging(); // 重启定时器以应用新间隔
+          } else {
+            updateAutoButtonVisual();
+          }
+        }
+      });
+    }
+
+    // 自动滚动速度输入框监听（与 Alt+点击同步）
+    if (elements.scrollSpeedInput) {
+      elements.scrollSpeedInput.addEventListener('change', () => {
+        const v = parseFloat(elements.scrollSpeedInput.value);
+        if (!isNaN(v) && v >= 1 && v <= 50) {
+          state.autoPage.scrollSpeed = v;
+          if (state.autoPage.running) {
+            startAutoPaging(); // 重启滚动以应用新速度
+          } else {
+            updateAutoButtonVisual();
+          }
         }
       });
     }
@@ -1628,7 +1696,12 @@
         case 'H':
           // 切到横向连续
           state.settings.readMode = 'continuous-horizontal';
-          if (elements.readModeSelect) elements.readModeSelect.value = 'continuous-horizontal';
+          // 同步单选按钮状态
+          if (elements.readModeRadios && elements.readModeRadios.length > 0) {
+            elements.readModeRadios.forEach(radio => {
+              if (radio.value === 'continuous-horizontal') radio.checked = true;
+            });
+          }
           enterContinuousHorizontalMode();
           e.preventDefault();
           break;
@@ -1636,7 +1709,12 @@
         case 'S':
           // 切到单页
           state.settings.readMode = 'single';
-          if (elements.readModeSelect) elements.readModeSelect.value = 'single';
+          // 同步单选按钮状态
+          if (elements.readModeRadios && elements.readModeRadios.length > 0) {
+            elements.readModeRadios.forEach(radio => {
+              if (radio.value === 'single') radio.checked = true;
+            });
+          }
           exitContinuousMode();
           e.preventDefault();
           break;
