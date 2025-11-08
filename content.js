@@ -718,9 +718,14 @@
         if (img) {
           if (options.instant) {
             const container = document.getElementById('eh-continuous-horizontal');
-            // 直接计算目标居中位置
-            const offset = img.offsetLeft - Math.max(0, (container.clientWidth - img.clientWidth) / 2);
+            // 使用包装元素宽度进行居中，避免未加载图片宽度为 0 导致定位失效
+            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
+            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
+            const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft);
+            const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
             container.scrollLeft = offset;
+            // 强制触发一次滚动状态同步（某些浏览器对编程式设置 scrollLeft 不触发 scroll 回调）
+            try { container.dispatchEvent(new Event('scroll')); } catch {}
             
             // 瞬时跳转后主动触发目标图片及附近图片加载
             setTimeout(() => {
@@ -755,7 +760,8 @@
               });
             }, 50);
           } else {
-            img.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
+            wrapper.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           }
           // 横向模式下手动跳转时立即更新当前页相关状态（之前只依赖滚动事件，导致瞬移后状态滞后）
           const newPageNum = idx + 1;
@@ -1269,6 +1275,10 @@
         preheatTimer = setTimeout(() => {
           enqueuePrefetch([idx], true); // 高优先级仅预热目标页
         }, 120);
+        // 横向模式下拖动或点击进度条时即刻跳转，提升交互反馈
+        if (state.settings.readMode === 'continuous-horizontal') {
+          scheduleShowPage(page, { instant: true });
+        }
       };
       elements.progressBar.onchange = (e) => {
         const page = parseInt(e.target.value);
@@ -1384,6 +1394,12 @@
         continuous.container.id = 'eh-continuous-horizontal';
         continuous.container.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:16px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 16px;';
 
+        // 初始估算比例：若当前单页已加载则用其真实比例，否则用默认 0.7
+        let baseRatio = 0.7;
+        if (elements.currentImage && elements.currentImage.naturalWidth && elements.currentImage.naturalHeight) {
+          const r = elements.currentImage.naturalWidth / elements.currentImage.naturalHeight;
+          if (r && isFinite(r)) baseRatio = Math.max(0.2, Math.min(5, r));
+        }
         // 生成占位卡片（带骨架与比例占位）
         for (let i = 0; i < state.pageCount; i++) {
           const card = document.createElement('div');
@@ -1392,7 +1408,9 @@
 
           const wrapper = document.createElement('div');
           wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
-          wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative;';
+          wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative; min-width:120px;';
+          // 设置初始估算比例，图片加载后会覆盖 --eh-aspect
+          wrapper.style.setProperty('--eh-aspect', String(baseRatio));
 
           const img = document.createElement('img');
           img.style.cssText = 'max-height:100%; max-width:100%; display:block; object-fit:contain;';
@@ -1546,7 +1564,10 @@
           // 等待一次 frame 保证布局完成
           requestAnimationFrame(() => {
             const c = continuous.container;
-            const offset = targetImg.offsetLeft - Math.max(0, (c.clientWidth - targetImg.clientWidth) / 2);
+            const wrapper = targetImg.closest('.eh-ch-wrapper') || targetImg.parentElement;
+            const basisWidth = wrapper?.clientWidth || targetImg.clientWidth || 0;
+            const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : targetImg.offsetLeft);
+            const offset = basisOffsetLeft - Math.max(0, (c.clientWidth - basisWidth) / 2);
             c.scrollLeft = offset;
           });
         }
