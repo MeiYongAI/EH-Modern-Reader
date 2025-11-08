@@ -359,8 +359,6 @@
               <div class="eh-setting-item eh-setting-inline">
                 <label for="eh-scroll-speed">滚动速度（px/帧）</label>
                 <input type="number" id="eh-scroll-speed" min="0.1" max="100" step="0.1" value="3">
-
-            
               </div>
             </div>
           </div>
@@ -613,8 +611,6 @@
     function hideErrorMessage() {
       const errorContainer = document.getElementById('eh-reader-error-container');
       if (errorContainer) {
-
-    // （实时监控面板功能已移除）
         errorContainer.style.display = 'none';
       }
     }
@@ -936,12 +932,11 @@
       }
       // 在横向连续模式下，转为滚动定位而不是替换单图
       if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
-  // 横向连续模式：DOM顺序始终是物理顺序，容器翻转是视觉效果
-  // 逻辑页号直接对应物理索引，无需反向映射
-  const idx = pageNum - 1;
+        // 逻辑页号直接映射到物理索引（0-based），反向阅读仅为视觉镜像，不反转索引
+        const idx = pageNum - 1;
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
-          console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, '物理索引:', idx, 'img元素:', img);
+          console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, 'img元素:', img, 'wrapper:', img.parentElement);
           if (options.instant) {
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
@@ -2326,8 +2321,6 @@
     // 应用默认深色模式
     if (state.settings.darkMode) {
       document.body.classList.add('eh-dark-mode');
-
-  // （调试面板已移除，改用 VS Code 调试器实时查看日志）
     }
 
     console.log('[EH Modern Reader] 阅读器初始化完成，从第', savedPage, '页继续阅读');
