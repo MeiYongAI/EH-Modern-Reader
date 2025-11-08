@@ -529,6 +529,92 @@
       if (elements.loading) elements.loading.style.display = 'none';
     }
 
+    // 显示错误信息和重试按钮
+    function showErrorMessage(pageNum, errorMsg) {
+      hideLoading();
+      
+      // 如果图片容器存在，隐藏它
+      if (elements.currentImage) {
+        elements.currentImage.style.display = 'none';
+      }
+      
+      // 创建或获取错误提示容器
+      let errorContainer = document.getElementById('eh-reader-error-container');
+      if (!errorContainer) {
+        errorContainer = document.createElement('div');
+        errorContainer.id = 'eh-reader-error-container';
+        errorContainer.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(0, 0, 0, 0.9);
+          color: #fff;
+          padding: 30px;
+          border-radius: 8px;
+          text-align: center;
+          z-index: 10001;
+          max-width: 500px;
+        `;
+        document.body.appendChild(errorContainer);
+      }
+      
+      // 设置错误信息
+      errorContainer.innerHTML = `
+        <div style="font-size: 18px; margin-bottom: 10px;">⚠️ 图片加载失败</div>
+        <div style="font-size: 14px; margin-bottom: 5px;">第 ${pageNum} 页</div>
+        <div style="font-size: 12px; color: #aaa; margin-bottom: 20px;">${errorMsg}</div>
+        <button id="eh-reader-retry-btn" style="
+          background: #007bff;
+          color: #fff;
+          border: none;
+          padding: 10px 30px;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+          margin-right: 10px;
+        ">重试</button>
+        <button id="eh-reader-close-error-btn" style="
+          background: #6c757d;
+          color: #fff;
+          border: none;
+          padding: 10px 30px;
+          border-radius: 5px;
+          cursor: pointer;
+          font-size: 14px;
+        ">关闭</button>
+      `;
+      
+      errorContainer.style.display = 'block';
+      
+      // 绑定重试按钮
+      const retryBtn = document.getElementById('eh-reader-retry-btn');
+      if (retryBtn) {
+        retryBtn.onclick = () => {
+          errorContainer.style.display = 'none';
+          // 清除缓存并重新加载
+          state.imageCache.delete(pageNum - 1);
+          scheduleShowPage(pageNum, { force: true });
+        };
+      }
+      
+      // 绑定关闭按钮
+      const closeBtn = document.getElementById('eh-reader-close-error-btn');
+      if (closeBtn) {
+        closeBtn.onclick = () => {
+          errorContainer.style.display = 'none';
+        };
+      }
+    }
+
+    // 隐藏错误信息
+    function hideErrorMessage() {
+      const errorContainer = document.getElementById('eh-reader-error-container');
+      if (errorContainer) {
+        errorContainer.style.display = 'none';
+      }
+    }
+
     // 获取图片 URL - E-Hentai MPV 使用 API 动态加载
     function getImageUrl(pageIndex) {
       const imageData = state.imagelist[pageIndex];
@@ -709,14 +795,21 @@
       }
     }
 
-    // 加载图片
-    async function loadImage(pageIndex) {
+    // 加载图片（带重试机制）
+    async function loadImage(pageIndex, retryCount = 0) {
+      const MAX_RETRIES = 3;
+      const TIMEOUT = 60000; // 增加到60秒
+      
       try {
         // 缓存命中：直接返回
         if (state.imageCache.has(pageIndex)) {
           const cached = state.imageCache.get(pageIndex);
           if (cached.status === 'loaded' && cached.img) return cached.img;
           if (cached.status === 'loading' && cached.promise) return cached.promise;
+          // 如果之前失败，清理缓存重新加载
+          if (cached.status === 'error') {
+            state.imageCache.delete(pageIndex);
+          }
         }
 
         const pageUrl = getImageUrl(pageIndex);
@@ -724,7 +817,8 @@
           throw new Error('图片 URL 不存在');
         }
 
-        console.log('[EH Modern Reader] 获取图片页面:', pageUrl);
+        const retryMsg = retryCount > 0 ? ` (重试 ${retryCount}/${MAX_RETRIES})` : '';
+        console.log('[EH Modern Reader] 获取图片页面:', pageUrl, retryMsg);
 
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
@@ -744,28 +838,31 @@
           // 建立加载中的 Promise 并写入缓存，避免重复并发
           const pending = new Promise((resolve, reject) => {
             const img = new Image();
+            let timeoutId;
 
             img.onload = () => {
+              clearTimeout(timeoutId);
               console.log('[EH Modern Reader] 图片加载成功:', realImageUrl);
               state.imageCache.set(pageIndex, { status: 'loaded', img });
               resolve(img);
             };
 
             img.onerror = (e) => {
+              clearTimeout(timeoutId);
               console.error('[EH Modern Reader] 图片加载失败:', realImageUrl, e);
-              state.imageCache.set(pageIndex, { status: 'error' });
+              state.imageCache.delete(pageIndex); // 清除缓存以便重试
               reject(new Error(`图片加载失败: ${realImageUrl}`));
             };
 
             img.src = realImageUrl;
 
-            // 超时处理 (30秒)
-            setTimeout(() => {
+            // 超时处理 (60秒)
+            timeoutId = setTimeout(() => {
               if (!img.complete) {
-                state.imageCache.set(pageIndex, { status: 'error' });
+                state.imageCache.delete(pageIndex); // 清除缓存以便重试
                 reject(new Error('图片加载超时'));
               }
-            }, 30000);
+            }, TIMEOUT);
           });
 
           state.imageCache.set(pageIndex, { status: 'loading', promise: pending });
@@ -775,21 +872,43 @@
   // 如果已经是直接的图片 URL
         const pending = new Promise((resolve, reject) => {
           const img = new Image();
+          let timeoutId;
+          
           img.onload = () => {
+            clearTimeout(timeoutId);
             state.imageCache.set(pageIndex, { status: 'loaded', img });
             resolve(img);
           };
+          
           img.onerror = (e) => {
+            clearTimeout(timeoutId);
             console.error('[EH Modern Reader] 图片加载失败:', pageUrl, e);
-            state.imageCache.set(pageIndex, { status: 'error' });
+            state.imageCache.delete(pageIndex); // 清除缓存以便重试
             reject(new Error(`图片加载失败: ${pageUrl}`));
           };
+          
           img.src = pageUrl;
+          
+          // 超时处理
+          timeoutId = setTimeout(() => {
+            if (!img.complete) {
+              state.imageCache.delete(pageIndex);
+              reject(new Error('图片加载超时'));
+            }
+          }, TIMEOUT);
         });
         state.imageCache.set(pageIndex, { status: 'loading', promise: pending });
         return pending;
       } catch (error) {
         console.error('[EH Modern Reader] loadImage 错误:', error);
+        
+        // 自动重试机制
+        if (retryCount < MAX_RETRIES) {
+          console.log(`[EH Modern Reader] 将在2秒后重试... (${retryCount + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return loadImage(pageIndex, retryCount + 1);
+        }
+        
         throw error;
       }
     }
@@ -950,6 +1069,9 @@
         // 隐藏加载状态
         hideLoading();
         
+        // 隐藏错误提示（如果有）
+        hideErrorMessage();
+        
         // 更新图片
         if (elements.currentImage) {
           elements.currentImage.src = img.src;
@@ -984,14 +1106,9 @@
 
       } catch (error) {
         console.error('[EH Modern Reader] 加载图片失败:', error);
-        hideLoading();
         
-        // 显示错误信息
-        if (elements.currentImage) {
-          elements.currentImage.style.display = 'none';
-        }
-        
-        alert(`图片加载失败 (第 ${pageNum} 页): ${error.message}\n\n请刷新页面重试。`);
+        // 显示友好的错误信息和重试按钮
+        showErrorMessage(pageNum, error.message);
       }
     }
 
@@ -1743,6 +1860,9 @@
           doublePage.leftPage.src = url;
           doublePage.leftPage.style.display = 'block';
           doublePage.leftPage.style.maxWidth = rightNum ? '50%' : '100%';
+        }).catch(error => {
+          console.error('[EH Modern Reader] 双页左侧加载失败:', error);
+          showErrorMessage(leftNum, `左侧图片加载失败: ${error.message}`);
         });
       } else { doublePage.leftPage.style.display = 'none'; }
       if (rightNum && rightIdx != null) {
@@ -1750,6 +1870,9 @@
           doublePage.rightPage.src = url;
           doublePage.rightPage.style.display = 'block';
           doublePage.rightPage.style.maxWidth = '50%';
+        }).catch(error => {
+          console.error('[EH Modern Reader] 双页右侧加载失败:', error);
+          showErrorMessage(rightNum, `右侧图片加载失败: ${error.message}`);
         });
       } else { doublePage.rightPage.style.display = 'none'; }
     }
