@@ -1295,6 +1295,7 @@
         state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
+          // 实时读取反向状态，支持运行时切换方向
           const dir = state.settings.reverse ? -1 : 1;
           horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
           const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
@@ -1308,39 +1309,15 @@
         };
         state.autoPage.timer = { rafId: requestAnimationFrame(step) };
       } else {
-        // 单页/双页模式：按间隔翻页，考虑反向和双页步进
+        // 单页/双页模式：按间隔翻页，支持反向
         state.autoPage.timer = setInterval(() => {
-          let next;
-          const reversed = !!state.settings.reverse;
-          const isDouble = state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none';
-          
-          if (reversed) {
-            // 反向模式：向前翻
-            if (isDouble) {
-              const isOddTotal = state.pageCount % 2 === 1;
-              next = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-            } else {
-              next = state.currentPage - 1;
-            }
-            if (next < 1) {
-              stopAutoPaging();
-              return;
-            }
+          const step = state.settings.reverse ? -1 : 1;
+          const next = state.currentPage + step;
+          if (next < 1 || next > state.pageCount) {
+            stopAutoPaging();
           } else {
-            // 正向模式：向后翻
-            if (isDouble) {
-              const isOddTotal = state.pageCount % 2 === 1;
-              next = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-            } else {
-              next = state.currentPage + 1;
-            }
-            if (next > state.pageCount) {
-              stopAutoPaging();
-              return;
-            }
+            scheduleShowPage(next);
           }
-          
-          scheduleShowPage(next);
         }, state.autoPage.intervalMs);
       }
       updateAutoButtonVisual();
@@ -1434,6 +1411,11 @@
         }
         // 更新按钮状态
         updateReverseBtn();
+        
+        // 如果自动播放正在运行，重启以应用新方向
+        if (state.autoPage.running) {
+          startAutoPaging();
+        }
       } catch {}
     }
     
