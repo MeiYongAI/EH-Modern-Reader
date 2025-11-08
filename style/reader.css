@@ -191,6 +191,31 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   display: none;            /* Chrome/Safari/Edge (Blink/WebKit) */
 }
 
+/* 横向模式的占位包装与骨架 */
+.eh-ch-wrapper {
+  height: 100%;
+  aspect-ratio: var(--eh-aspect, 0.7); /* 默认2:3纵向图 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.eh-ch-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(60,60,60,0.2) 0%, rgba(90,90,90,0.35) 50%, rgba(60,60,60,0.2) 100%);
+  animation: eh-ch-skel 1.2s ease-in-out infinite;
+}
+
+@keyframes eh-ch-skel {
+  0% { transform: translateX(-20%); }
+  50% { transform: translateX(20%); }
+  100% { transform: translateX(-20%); }
+}
+
 /* ==================== 图片查看区 ==================== */
 
 #eh-viewer {

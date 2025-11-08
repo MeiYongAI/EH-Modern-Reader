@@ -736,6 +736,16 @@
                   targetImg.setAttribute('data-loading', 'true');
                   loadImage(i).then(loadedImg => {
                     if (loadedImg && loadedImg.src) targetImg.src = loadedImg.src;
+                    // 设置真实占位比例并移除骨架
+                    try {
+                      const wrap = targetImg.parentElement;
+                      const w = loadedImg?.naturalWidth || loadedImg?.width;
+                      const h = loadedImg?.naturalHeight || loadedImg?.height;
+                      if (wrap && w && h && h > 0) {
+                        wrap.style.setProperty('--eh-aspect', String(Math.max(0.2, Math.min(5, w / h))));
+                        wrap.classList.remove('eh-ch-skeleton');
+                      }
+                    } catch {}
                   }).catch(err => {
                     console.warn('[EH Modern Reader] 瞬时跳转加载失败:', i, err);
                   }).finally(() => {
@@ -1374,15 +1384,22 @@
         continuous.container.id = 'eh-continuous-horizontal';
         continuous.container.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:16px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 16px;';
 
-        // 生成占位卡片
+        // 生成占位卡片（带骨架与比例占位）
         for (let i = 0; i < state.pageCount; i++) {
           const card = document.createElement('div');
           card.className = 'eh-ch-card';
           card.style.cssText = 'flex:0 0 auto; height:100%; position:relative; display:flex; align-items:center; justify-content:center;';
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
+          wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative;';
+
           const img = document.createElement('img');
-          img.style.cssText = 'max-height:100%; max-width:100%; display:block;';
+          img.style.cssText = 'max-height:100%; max-width:100%; display:block; object-fit:contain;';
           img.setAttribute('data-page-index', String(i));
-          card.appendChild(img);
+
+          wrapper.appendChild(img);
+          card.appendChild(wrapper);
           continuous.container.appendChild(card);
         }
 
@@ -1392,6 +1409,21 @@
           main.appendChild(continuous.container);
           const singleViewer = document.getElementById('eh-viewer');
           if (singleViewer) singleViewer.style.display = 'none';
+        }
+
+        // 工具：根据已加载图片设置占位宽高比并移除骨架
+        function applyAspectFor(imgEl, loadedImg) {
+          try {
+            if (!imgEl) return;
+            const wrap = imgEl.parentElement;
+            const w = loadedImg?.naturalWidth || loadedImg?.width;
+            const h = loadedImg?.naturalHeight || loadedImg?.height;
+            if (wrap && w && h && h > 0) {
+              const ratio = Math.max(0.2, Math.min(5, w / h));
+              wrap.style.setProperty('--eh-aspect', String(ratio));
+              wrap.classList.remove('eh-ch-skeleton');
+            }
+          } catch {}
         }
 
         // 观察器懒加载 - 统一使用 loadImage 避免重复请求
@@ -1409,6 +1441,7 @@
                 if (cached && cached.status === 'loaded' && cached.img && cached.img.src) {
                   // 已加载完成，直接使用
                   img.src = cached.img.src;
+                  applyAspectFor(img, cached.img);
                   img.removeAttribute('data-loading');
                 } else if (cached && cached.status === 'loading' && cached.promise) {
                   // 正在加载中，等待 Promise
@@ -1416,6 +1449,7 @@
                     if (loadedImg && loadedImg.src) {
                       img.src = loadedImg.src;
                     }
+                    applyAspectFor(img, loadedImg);
                   }).catch(err => {
                     console.warn('[EH Modern Reader] 横向模式图片加载失败:', idx, err);
                   }).finally(() => {
@@ -1427,6 +1461,7 @@
                     if (loadedImg && loadedImg.src) {
                       img.src = loadedImg.src;
                     }
+                    applyAspectFor(img, loadedImg);
                   }).catch(err => {
                     console.warn('[EH Modern Reader] 横向模式图片加载失败:', idx, err);
                   }).finally(() => {
