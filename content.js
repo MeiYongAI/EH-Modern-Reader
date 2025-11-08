@@ -336,6 +336,10 @@
                   </label>
                 </div>
               </div>
+                <div class="eh-setting-item eh-setting-inline">
+                  <label for="eh-reverse-toggle">反向阅读</label>
+                  <input type="checkbox" id="eh-reverse-toggle" />
+                </div>
             </div>
 
             <div class="eh-setting-group">
@@ -349,11 +353,11 @@
               <div class="eh-setting-label-group">自动播放</div>
               <div class="eh-setting-item eh-setting-inline">
                 <label for="eh-auto-interval">翻页间隔（秒）</label>
-                <input type="number" id="eh-auto-interval" min="0.5" max="60" step="0.5" value="3">
+                <input type="number" id="eh-auto-interval" min="0.1" max="120" step="0.1" value="3">
               </div>
               <div class="eh-setting-item eh-setting-inline">
                 <label for="eh-scroll-speed">滚动速度（px/帧）</label>
-                <input type="number" id="eh-scroll-speed" min="1" max="50" step="0.5" value="3">
+                <input type="number" id="eh-scroll-speed" min="0.1" max="100" step="0.1" value="3">
               </div>
             </div>
 
@@ -423,14 +427,18 @@
         imageOffsetY: 0,   // 图片Y偏移
         thumbnailsHover: false, // 顶部开关：鼠标靠近底部时显示缩略图
         readMode: 'single', // 阅读模式：single | continuous-horizontal
-        prefetchAhead: 2    // 向后预加载页数
+        prefetchAhead: 2,   // 向后预加载页数
+        reverse: false      // 反向阅读（翻页/缩略图/进度条方向）
       },
       autoPage: {
         running: false,
         intervalMs: 3000,
-        timer: null
+        timer: null,
+        scrollSpeed: 3 // 横向模式滚动速度（可为小数）
       }
     };
+    // 比例缓存：pageIndex -> ratio （从真实 URL 中解析或已加载图）
+    const ratioCache = new Map();
 
     // 读取/保存进度（关闭阅读记忆：总是从第1页开始，且不写入存储）
     function loadProgress() { return 1; }
@@ -461,6 +469,7 @@
   preloadCountInput: document.getElementById('eh-preload-count'),
   autoIntervalInput: document.getElementById('eh-auto-interval'),
   scrollSpeedInput: document.getElementById('eh-scroll-speed')
+  , reverseToggle: document.getElementById('eh-reverse-toggle')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -484,6 +493,9 @@
     }
     if (elements.scrollSpeedInput) {
       elements.scrollSpeedInput.value = state.autoPage.scrollSpeed || 3;
+    }
+    if (elements.reverseToggle) {
+      elements.reverseToggle.checked = !!state.settings.reverse;
     }
 
     // 显示加载状态
@@ -544,6 +556,26 @@
       const promise = fetchRealImageUrl(pageUrl, controller.signal)
         .then(url => {
           realUrlCache.set(pageIndex, url);
+          // 解析 URL 中可能的宽高信息, 形如 ...-1280-1523-xxx 或 -3000-3000-png
+          try {
+            const sizeMatch = url.match(/-(\d{2,5})-(\d{2,5})-(?:jpg|jpeg|png|gif|webp)/i) || url.match(/-(\d{2,5})-(\d{2,5})-(?:png|jpg|webp|gif)/i);
+            if (sizeMatch) {
+              const w = parseInt(sizeMatch[1]);
+              const h = parseInt(sizeMatch[2]);
+              if (w > 0 && h > 0) {
+                const r = Math.max(0.2, Math.min(5, w / h));
+                ratioCache.set(pageIndex, r);
+                // 若已进入横向模式且该 wrapper 仍是骨架, 立即更新占位比
+                const imgEl = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${pageIndex}"]`);
+                if (imgEl) {
+                  const wrap = imgEl.closest('.eh-ch-wrapper');
+                  if (wrap && wrap.classList.contains('eh-ch-skeleton')) {
+                    wrap.style.setProperty('--eh-aspect', String(r));
+                  }
+                }
+              }
+            }
+          } catch {}
           realUrlRequests.delete(pageIndex);
           return { url, controller };
         })
@@ -749,6 +781,10 @@
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
+      // 若启用反向阅读，则将外部页号映射为内部实际页号
+      if (state.settings && state.settings.reverse) {
+        pageNum = state.pageCount - pageNum + 1;
+      }
       // 在横向连续模式下，转为滚动定位而不是替换单图
       if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
         const idx = pageNum - 1;
@@ -900,7 +936,8 @@
 
         // 更新进度条位置
         if (elements.progressBar) {
-          elements.progressBar.value = pageNum;
+          const showVal = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
+          elements.progressBar.value = showVal;
         }
 
         if (elements.pageInput) {
@@ -949,8 +986,9 @@
     function updateThumbnailHighlight(pageNum) {
       const thumbnails = document.querySelectorAll('.eh-thumbnail');
       if (!thumbnails || thumbnails.length === 0) return;
-
-      const currentThumb = thumbnails[pageNum - 1];
+      const logicalIndex = pageNum - 1;
+      const physIndex = state.settings.reverse ? (state.pageCount - pageNum) : logicalIndex;
+      const currentThumb = thumbnails[physIndex];
       const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
       
       // 移除旧的高亮
@@ -961,8 +999,16 @@
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
-        // 平滑滚动到当前缩略图
-        currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        // 自定义居中滚动（支持反向 row-reverse）
+        const container = document.getElementById('eh-thumbnails');
+        if (container) {
+          const rect = currentThumb.getBoundingClientRect();
+          const contRect = container.getBoundingClientRect();
+          const delta = (rect.left - contRect.left) - (contRect.width / 2 - rect.width / 2);
+          const dir = state.settings.reverse ? -1 : 1; // row-reverse 时方向相反
+          const target = container.scrollLeft + delta * dir;
+          container.scrollTo({ left: target, behavior: 'smooth' });
+        }
       }
     }
 
@@ -983,7 +1029,9 @@
         return;
       }
       
-      state.imagelist.forEach((imageData, index) => {
+      const list = state.settings.reverse ? [...state.imagelist].slice().reverse() : state.imagelist;
+      list.forEach((imageData, iterIndex) => {
+        const index = state.settings.reverse ? (state.pageCount - iterIndex - 1) : iterIndex;
         const thumb = document.createElement('div');
         thumb.className = 'eh-thumbnail';
         if (index === 0) thumb.classList.add('active');
@@ -1122,11 +1170,17 @@
 
     // 事件监听
     if (elements.prevBtn) {
-  elements.prevBtn.onclick = () => scheduleShowPage(state.currentPage - 1);
+  elements.prevBtn.onclick = () => {
+    const logicalCurrent = state.settings.reverse ? (state.pageCount - state.currentPage + 1) : state.currentPage;
+    scheduleShowPage(logicalCurrent - 1);
+  };
     }
 
     if (elements.nextBtn) {
-  elements.nextBtn.onclick = () => scheduleShowPage(state.currentPage + 1);
+  elements.nextBtn.onclick = () => {
+    const logicalCurrent = state.settings.reverse ? (state.pageCount - state.currentPage + 1) : state.currentPage;
+    scheduleShowPage(logicalCurrent + 1);
+  };
     }
 
     if (elements.closeBtn) {
@@ -1210,11 +1264,14 @@
         ? document.getElementById('eh-continuous-horizontal')
         : null;
       if (horizontalContainer) {
-        state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，建议 2~10
+        state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
-          horizontalContainer.scrollLeft += state.autoPage.scrollSpeed;
-          if (horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2) {
+          const dir = state.settings.reverse ? -1 : 1;
+          horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
+          const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
+          const atBegin = horizontalContainer.scrollLeft <= 0;
+          if ((!state.settings.reverse && atEnd) || (state.settings.reverse && atBegin)) {
             // 到末尾自动停止
             stopAutoPaging();
             return;
@@ -1239,9 +1296,9 @@
       elements.autoBtn.onclick = (e) => {
         if (e.altKey) {
           if (state.settings && state.settings.readMode === 'continuous-horizontal') {
-            const val = prompt('设置自动滚动速度(px/帧，建议2~10)', String(state.autoPage.scrollSpeed || 3));
+            const val = prompt('设置自动滚动速度(px/帧，支持小数，建议2~10)', String(state.autoPage.scrollSpeed || 3));
             if (val) {
-              const spd = Math.max(1, Math.min(50, parseFloat(val)));
+              const spd = Math.max(0.1, Math.min(100, parseFloat(val)));
               if (!isNaN(spd)) {
                 state.autoPage.scrollSpeed = spd;
                 // 同步到设置面板
@@ -1250,9 +1307,9 @@
               }
             }
           } else {
-            const val = prompt('设置翻页间隔(秒)', String(Math.round(state.autoPage.intervalMs/1000)));
+            const val = prompt('设置翻页间隔(秒，可小数)', String((state.autoPage.intervalMs/1000).toFixed(2)));
             if (val) {
-              const sec = Math.max(0.5, Math.min(60, parseFloat(val)));
+              const sec = Math.max(0.1, Math.min(120, parseFloat(val)));
               if (!isNaN(sec)) {
                 state.autoPage.intervalMs = Math.round(sec * 1000);
                 // 同步到设置面板
@@ -1288,9 +1345,38 @@
       };
     }
 
+    // 反向开关
+    function applyReverseState() {
+      try {
+        const reversed = !!state.settings.reverse;
+        // 缩略图方向
+        if (elements.thumbnails) {
+          elements.thumbnails.style.flexDirection = reversed ? 'row-reverse' : 'row';
+        }
+        // 滚动条视觉：轨道填充从右侧开始
+        const track = elements.sliderTrack;
+        if (track) {
+          track.classList.toggle('eh-reverse', reversed);
+        }
+        // 进度条数值映射：显示值要与视觉方向一致
+        if (elements.progressBar) {
+          const logical = state.currentPage;
+          const showVal = reversed ? (state.pageCount - logical + 1) : logical;
+          elements.progressBar.value = String(showVal);
+        }
+      } catch {}
+    }
+    if (elements.reverseToggle) {
+      elements.reverseToggle.addEventListener('change', () => {
+        state.settings.reverse = !!elements.reverseToggle.checked;
+        applyReverseState();
+      });
+    }
+
     if (elements.progressBar) {
       elements.progressBar.onchange = () => {
-        const page = parseInt(elements.progressBar.value);
+        let page = parseInt(elements.progressBar.value);
+        if (state.settings.reverse) page = state.pageCount - page + 1;
         scheduleShowPage(page, { instant: true });
       };
     }
@@ -1367,14 +1453,16 @@
       let preheatTimer = null;
       elements.progressBar.oninput = () => {
         if (preheatTimer) clearTimeout(preheatTimer);
-        const page = parseInt(elements.progressBar.value);
+        let page = parseInt(elements.progressBar.value);
+        if (state.settings.reverse) page = state.pageCount - page + 1;
         const idx = page - 1;
         preheatTimer = setTimeout(() => {
           enqueuePrefetch([idx], true); // 高优先级仅预热目标页
         }, 120);
       };
       elements.progressBar.onchange = (e) => {
-        const page = parseInt(e.target.value);
+        let page = parseInt(e.target.value);
+        if (state.settings.reverse) page = state.pageCount - page + 1;
         scheduleShowPage(page, { instant: true });
       };
     }
@@ -1502,8 +1590,9 @@
           const wrapper = document.createElement('div');
           wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
           wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative; min-width:120px;';
-          // 设置初始估算比例，图片加载后会覆盖 --eh-aspect
-          wrapper.style.setProperty('--eh-aspect', String(baseRatio));
+          // 设置初始估算比例：若已有缓存比例则使用，否则用 baseRatio
+          const cachedR = ratioCache.get(i);
+          wrapper.style.setProperty('--eh-aspect', String(cachedR || baseRatio));
 
           const img = document.createElement('img');
           img.style.cssText = 'max-height:100%; max-width:100%; display:block; object-fit:contain;';
@@ -1514,6 +1603,22 @@
           continuous.container.appendChild(card);
         }
 
+        // 进入后根据已解析的 URL 比例实时刷新一次所有骨架
+        requestAnimationFrame(() => {
+          try {
+            continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
+              const idx = parseInt(img.getAttribute('data-page-index'));
+              const r = ratioCache.get(idx);
+              if (r) {
+                const wrap = img.closest('.eh-ch-wrapper');
+                if (wrap && wrap.classList.contains('eh-ch-skeleton')) {
+                  wrap.style.setProperty('--eh-aspect', String(r));
+                }
+              }
+            });
+          } catch {}
+        });
+
         // 放入主区域并隐藏单页 viewer
         const main = document.getElementById('eh-main');
         if (main) {
@@ -1521,6 +1626,9 @@
           const singleViewer = document.getElementById('eh-viewer');
           if (singleViewer) singleViewer.style.display = 'none';
         }
+
+        // 应用一次反向状态（方向、进度条值）
+        try { if (typeof applyReverseState === 'function') applyReverseState(); } catch {}
 
         // 工具：根据已加载图片设置占位宽高比并移除骨架
         function applyAspectFor(imgEl, loadedImg) {
@@ -1592,7 +1700,8 @@
         // 映射垂直滚轮为水平滚动
         continuous.container.addEventListener('wheel', (e) => {
           if (e.deltaY !== 0) {
-            continuous.container.scrollLeft += e.deltaY;
+            const dir = state.settings.reverse ? -1 : 1;
+            continuous.container.scrollLeft += e.deltaY * dir;
             e.preventDefault();
           }
         }, { passive: false });
@@ -1616,7 +1725,11 @@
                 const idx = parseInt(img.getAttribute('data-page-index'));
                 if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
               });
-              const pageNum = bestIdx + 1;
+              let pageNum = bestIdx + 1;
+              if (state.settings.reverse) {
+                // 物理索引 bestIdx -> 逻辑页号
+                pageNum = state.pageCount - bestIdx;
+              }
 
               // 确保视口中心页优先加载（做到“看哪里就加载哪里”）
               const centerImg = continuous.container.querySelector(`img[data-page-index="${bestIdx}"]`);
@@ -1639,7 +1752,10 @@
               if (pageNum !== state.currentPage) {
                 state.currentPage = pageNum;
                 if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
-                if (elements.progressBar) elements.progressBar.value = pageNum;
+                if (elements.progressBar) {
+                  const showVal = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
+                  elements.progressBar.value = showVal;
+                }
                 updateThumbnailHighlight(pageNum);
                 preloadAdjacentPages(pageNum);
                 saveProgress(pageNum);
