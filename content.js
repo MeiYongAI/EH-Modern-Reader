@@ -941,12 +941,23 @@
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
-            // 使用 offsetLeft 获取未变换坐标，避免 scaleX(-1) 下 getBoundingClientRect 值被镜像
             const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
-            const offsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft) || 0;
+            
+            // flex 布局中 offsetLeft 不可靠，改用累计前面所有元素宽度 + gap
+            const allWrappers = Array.from(container.querySelectorAll('.eh-ch-wrapper'));
+            const targetIndex = allWrappers.indexOf(wrapper);
+            let cumulativeLeft = 0;
+            const gap = 16; // 容器 gap: 16px
+            for (let i = 0; i < targetIndex; i++) {
+              cumulativeLeft += allWrappers[i].clientWidth + gap;
+            }
+            // 加上左侧 padding
+            const leftPadding = 16;
+            cumulativeLeft += leftPadding;
+            
             const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
             // 正常坐标系下使目标居中的滚动位置
-            let target = offsetLeft - centerOffset;
+            let target = cumulativeLeft - centerOffset;
             // 若容器做了镜像(scaleX(-1))，需要将正常坐标映射为镜像下的 scrollLeft
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
@@ -957,7 +968,8 @@
             target = Math.max(0, Math.min(maxScrollNow, target));
             console.log('[EH Modern Reader] 计算居中偏移:', {
               basisWidth,
-              offsetLeft,
+              targetIndex,
+              cumulativeLeft,
               centerOffset,
               target,
               reverse: !!state.settings.reverse,
@@ -1021,9 +1033,20 @@
             const container = document.getElementById('eh-continuous-horizontal');
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
             const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
-            const offsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft) || 0;
+            
+            // flex 布局中 offsetLeft 不可靠，改用累计前面所有元素宽度 + gap
+            const allWrappers = Array.from(container.querySelectorAll('.eh-ch-wrapper'));
+            const targetIndex = allWrappers.indexOf(wrapper);
+            let cumulativeLeft = 0;
+            const gap = 16;
+            for (let i = 0; i < targetIndex; i++) {
+              cumulativeLeft += allWrappers[i].clientWidth + gap;
+            }
+            const leftPadding = 16;
+            cumulativeLeft += leftPadding;
+            
             const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
-            let target = offsetLeft - centerOffset;
+            let target = cumulativeLeft - centerOffset;
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
               target = maxScroll - target;
@@ -2123,9 +2146,20 @@
             const c = continuous.container;
             const wrapper = targetImg.closest('.eh-ch-wrapper') || targetImg.parentElement;
             const basisWidth = wrapper?.clientWidth || targetImg.clientWidth || 0;
-            const offsetLeft = (wrapper ? wrapper.offsetLeft : targetImg.offsetLeft) || 0;
+            
+            // flex 布局中 offsetLeft 不可靠，改用累计前面所有元素宽度 + gap
+            const allWrappers = Array.from(c.querySelectorAll('.eh-ch-wrapper'));
+            const targetIndex = allWrappers.indexOf(wrapper);
+            let cumulativeLeft = 0;
+            const gap = 16;
+            for (let i = 0; i < targetIndex; i++) {
+              cumulativeLeft += allWrappers[i].clientWidth + gap;
+            }
+            const leftPadding = 16;
+            cumulativeLeft += leftPadding;
+            
             const centerOffset = Math.max(0, (c.clientWidth - basisWidth) / 2);
-            let target = offsetLeft - centerOffset;
+            let target = cumulativeLeft - centerOffset;
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, c.scrollWidth - c.clientWidth);
               target = maxScroll - target;
