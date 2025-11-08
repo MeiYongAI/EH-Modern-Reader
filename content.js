@@ -1295,7 +1295,6 @@
         state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
-          // 实时读取反向状态，支持运行时切换方向
           const dir = state.settings.reverse ? -1 : 1;
           horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
           const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
@@ -1309,10 +1308,10 @@
         };
         state.autoPage.timer = { rafId: requestAnimationFrame(step) };
       } else {
-        // 单页/双页模式：按间隔翻页，支持反向
+        // 单页/双页模式：按间隔翻页，遵循反向阅读方向
         state.autoPage.timer = setInterval(() => {
-          const step = state.settings.reverse ? -1 : 1;
-          const next = state.currentPage + step;
+          const direction = state.settings.reverse ? -1 : 1;
+          const next = state.currentPage + direction;
           if (next < 1 || next > state.pageCount) {
             stopAutoPaging();
           } else {
@@ -1409,13 +1408,12 @@
             track.style.transform = '';
           }
         }
-        // 更新按钮状态
-        updateReverseBtn();
-        
         // 如果自动播放正在运行，重启以应用新方向
-        if (state.autoPage.running) {
+        if (state.autoPage && state.autoPage.running) {
           startAutoPaging();
         }
+        // 更新按钮状态
+        updateReverseBtn();
       } catch {}
     }
     
