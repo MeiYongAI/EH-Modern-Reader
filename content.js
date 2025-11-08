@@ -724,8 +724,7 @@
             const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft);
             const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
             container.scrollLeft = offset;
-            // 强制触发一次滚动状态同步（某些浏览器对编程式设置 scrollLeft 不触发 scroll 回调）
-            try { container.dispatchEvent(new Event('scroll')); } catch {}
+            // 不主动派发 scroll 事件，避免在布局尚未稳定时误判为第1页
             
             // 瞬时跳转后主动触发目标图片及附近图片加载
             setTimeout(() => {
@@ -1275,10 +1274,6 @@
         preheatTimer = setTimeout(() => {
           enqueuePrefetch([idx], true); // 高优先级仅预热目标页
         }, 120);
-        // 横向模式下拖动或点击进度条时即刻跳转，提升交互反馈
-        if (state.settings.readMode === 'continuous-horizontal') {
-          scheduleShowPage(page, { instant: true });
-        }
       };
       elements.progressBar.onchange = (e) => {
         const page = parseInt(e.target.value);
@@ -1515,7 +1510,8 @@
               let bestIdx = 0; let bestDist = Infinity;
               const imgs = continuous.container.querySelectorAll('img[data-page-index]');
               imgs.forEach((img) => {
-                const rect = img.getBoundingClientRect();
+                const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
+                const rect = wrapper.getBoundingClientRect();
                 const parentRect = continuous.container.getBoundingClientRect();
                 const mid = rect.left - parentRect.left + rect.width / 2;
                 const dist = Math.abs(mid - viewportMid);
