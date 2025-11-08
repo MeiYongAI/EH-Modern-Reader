@@ -482,6 +482,12 @@
       throw new Error(`缺少必要的 DOM 元素: ${missingElements.join(', ')}`);
     }
 
+    // 隐藏旧的左右小圆翻页按钮，改用左右区域点击
+    try {
+      if (elements.prevBtn) { elements.prevBtn.style.display = 'none'; elements.prevBtn.setAttribute('aria-hidden', 'true'); }
+      if (elements.nextBtn) { elements.nextBtn.style.display = 'none'; elements.nextBtn.setAttribute('aria-hidden', 'true'); }
+    } catch {}
+
     // 同步 UI 的阅读模式单选按钮到状态
     if (elements.readModeRadios && elements.readModeRadios.length > 0) {
       try {
@@ -1479,12 +1485,7 @@
       };
     }
 
-    if (elements.progressBar) {
-      elements.progressBar.onchange = () => {
-        const page = parseInt(elements.progressBar.value);
-        scheduleShowPage(page, { instant: true });
-      };
-    }
+    // 进度条的 onchange 统一在后文的“进度条拖动/改变事件”中处理，避免重复绑定
 
     if (elements.pageInput) {
       elements.pageInput.onchange = () => {
