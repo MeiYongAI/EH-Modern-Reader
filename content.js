@@ -331,18 +331,23 @@
                     <span>单页</span>
                   </label>
                   <label class="eh-radio-label">
+                    <input type="radio" name="eh-read-mode-radio" value="double">
+                    <span>双页</span>
+                  </label>
+                  <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
                     <span>横向连续</span>
                   </label>
                 </div>
-              </div>
-                <div class="eh-setting-item eh-setting-inline">
-                  <label for="eh-reverse-toggle">反向阅读</label>
-                  <input type="checkbox" id="eh-reverse-toggle" />
-                </div>
             </div>
-
-            <div class="eh-setting-group">
+              <div class="eh-setting-item eh-setting-inline">
+                <label for="eh-reverse-toggle">反向阅读</label>
+                <label class="eh-toggle-switch">
+                  <input type="checkbox" id="eh-reverse-toggle" />
+                  <span class="eh-toggle-slider"></span>
+                </label>
+              </div>
+            </div>            <div class="eh-setting-group">
               <div class="eh-setting-item eh-setting-inline">
                 <label for="eh-preload-count">预加载页数</label>
                 <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2">
@@ -781,13 +786,19 @@
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
-      // 若启用反向阅读，则将外部页号映射为内部实际页号
-      if (state.settings && state.settings.reverse) {
-        pageNum = state.pageCount - pageNum + 1;
+      // 双页模式下，调用双页显示逻辑
+      if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+        showDoublePages(pageNum);
+        state.currentPage = pageNum;
+        elements.progressBar.value = pageNum;
+        updateThumbnailHighlight(pageNum);
+        return;
       }
       // 在横向连续模式下，转为滚动定位而不是替换单图
       if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
-        const idx = pageNum - 1;
+        // 反向模式：逻辑页号 -> 物理索引需反转
+        const physicalPage = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
+        const idx = physicalPage - 1;
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
           console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, 'img元素:', img, 'wrapper:', img.parentElement);
@@ -812,7 +823,7 @@
             container.scrollLeft = offset;
             
             // 立即更新当前页状态（不依赖 scroll 事件）
-            const newPageNum = idx + 1;
+            const newPageNum = pageNum; // 保持逻辑页号
             state.currentPage = newPageNum;
             if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
             if (elements.progressBar) elements.progressBar.value = newPageNum;
@@ -936,8 +947,7 @@
 
         // 更新进度条位置
         if (elements.progressBar) {
-          const showVal = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
-          elements.progressBar.value = showVal;
+          elements.progressBar.value = pageNum;
         }
 
         if (elements.pageInput) {
@@ -986,8 +996,9 @@
     function updateThumbnailHighlight(pageNum) {
       const thumbnails = document.querySelectorAll('.eh-thumbnail');
       if (!thumbnails || thumbnails.length === 0) return;
-      const logicalIndex = pageNum - 1;
-      const physIndex = state.settings.reverse ? (state.pageCount - pageNum) : logicalIndex;
+      // 逻辑页号 -> 物理索引（反向时映射）
+      const physicalPage = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
+      const physIndex = physicalPage - 1;
       const currentThumb = thumbnails[physIndex];
       const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
       
@@ -999,16 +1010,8 @@
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
-        // 自定义居中滚动（支持反向 row-reverse）
-        const container = document.getElementById('eh-thumbnails');
-        if (container) {
-          const rect = currentThumb.getBoundingClientRect();
-          const contRect = container.getBoundingClientRect();
-          const delta = (rect.left - contRect.left) - (contRect.width / 2 - rect.width / 2);
-          const dir = state.settings.reverse ? -1 : 1; // row-reverse 时方向相反
-          const target = container.scrollLeft + delta * dir;
-          container.scrollTo({ left: target, behavior: 'smooth' });
-        }
+        // 平滑滚动到当前缩略图（原生方法自动适配 flex-direction）
+        currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     }
 
@@ -1031,24 +1034,25 @@
       
       const list = state.settings.reverse ? [...state.imagelist].slice().reverse() : state.imagelist;
       list.forEach((imageData, iterIndex) => {
-        const index = state.settings.reverse ? (state.pageCount - iterIndex - 1) : iterIndex;
+        const physicalIndex = state.settings.reverse ? (state.pageCount - iterIndex - 1) : iterIndex;
         const thumb = document.createElement('div');
         thumb.className = 'eh-thumbnail';
-        if (index === 0) thumb.classList.add('active');
+        if (physicalIndex === 0) thumb.classList.add('active');
         
-        const pageNum = index + 1;
+        const displayNum = physicalIndex + 1; // 显示的页码
+        const logicalPage = state.settings.reverse ? (state.pageCount - physicalIndex) : displayNum;
         thumb.innerHTML = `
-          <div class="eh-thumbnail-placeholder" title="第 ${pageNum} 页" role="img" aria-label="缩略图 ${pageNum}">
-            <span style="display: none;">${pageNum}</span>
+          <div class="eh-thumbnail-placeholder" title="第 ${displayNum} 页" role="img" aria-label="缩略图 ${displayNum}">
+            <span style="display: none;">${displayNum}</span>
           </div>
-          <div class="eh-thumbnail-number">${pageNum}</div>
+          <div class="eh-thumbnail-number">${displayNum}</div>
         `;
 
-  thumb.onclick = () => scheduleShowPage(pageNum, { instant: true });
+  thumb.onclick = () => scheduleShowPage(logicalPage, { instant: true });
         elements.thumbnails.appendChild(thumb);
 
         // 缩略图加载逻辑
-        loadThumbnail(thumb, imageData, pageNum);
+        loadThumbnail(thumb, imageData, displayNum);
       });
     }
 
@@ -1171,15 +1175,35 @@
     // 事件监听
     if (elements.prevBtn) {
   elements.prevBtn.onclick = () => {
-    const logicalCurrent = state.settings.reverse ? (state.pageCount - state.currentPage + 1) : state.currentPage;
-    scheduleShowPage(logicalCurrent - 1);
+    // 双页模式：封面(1)单独翻，其他按对翻
+    if (state.settings.readMode === 'double') {
+      if (state.currentPage === 1) {
+        // 不做任何操作，已经是第一页
+        return;
+      } else if (state.currentPage === 2) {
+        scheduleShowPage(1); // 从第2页返回封面
+      } else {
+        // 其他页按对翻：往前跳2页
+        scheduleShowPage(Math.max(2, state.currentPage - 2));
+      }
+    } else {
+      scheduleShowPage(state.currentPage - 1);
+    }
   };
     }
 
     if (elements.nextBtn) {
   elements.nextBtn.onclick = () => {
-    const logicalCurrent = state.settings.reverse ? (state.pageCount - state.currentPage + 1) : state.currentPage;
-    scheduleShowPage(logicalCurrent + 1);
+    // 双页模式：封面(1)跳到2，其他按对翻
+    if (state.settings.readMode === 'double') {
+      if (state.currentPage === 1) {
+        scheduleShowPage(2); // 从封面到第一对
+      } else {
+        scheduleShowPage(Math.min(state.pageCount, state.currentPage + 2));
+      }
+    } else {
+      scheduleShowPage(state.currentPage + 1);
+    }
   };
     }
 
@@ -1353,16 +1377,14 @@
         if (elements.thumbnails) {
           elements.thumbnails.style.flexDirection = reversed ? 'row-reverse' : 'row';
         }
-        // 滚动条视觉：轨道填充从右侧开始
+        // 进度条视觉翻转：使用 transform scaleX(-1)
         const track = elements.sliderTrack;
         if (track) {
-          track.classList.toggle('eh-reverse', reversed);
-        }
-        // 进度条数值映射：显示值要与视觉方向一致
-        if (elements.progressBar) {
-          const logical = state.currentPage;
-          const showVal = reversed ? (state.pageCount - logical + 1) : logical;
-          elements.progressBar.value = String(showVal);
+          if (reversed) {
+            track.style.transform = 'scaleX(-1)';
+          } else {
+            track.style.transform = '';
+          }
         }
       } catch {}
     }
@@ -1375,8 +1397,7 @@
 
     if (elements.progressBar) {
       elements.progressBar.onchange = () => {
-        let page = parseInt(elements.progressBar.value);
-        if (state.settings.reverse) page = state.pageCount - page + 1;
+        const page = parseInt(elements.progressBar.value);
         scheduleShowPage(page, { instant: true });
       };
     }
@@ -1399,6 +1420,8 @@
             console.log('[EH Modern Reader] 阅读模式切换为:', state.settings.readMode);
             if (state.settings.readMode === 'continuous-horizontal') {
               enterContinuousHorizontalMode();
+            } else if (state.settings.readMode === 'double') {
+              enterDoublePageMode();
             } else {
               exitContinuousMode();
             }
@@ -1453,16 +1476,15 @@
       let preheatTimer = null;
       elements.progressBar.oninput = () => {
         if (preheatTimer) clearTimeout(preheatTimer);
-        let page = parseInt(elements.progressBar.value);
-        if (state.settings.reverse) page = state.pageCount - page + 1;
-        const idx = page - 1;
+        const page = parseInt(elements.progressBar.value);
+        const physicalPage = state.settings.reverse ? (state.pageCount - page + 1) : page;
+        const idx = physicalPage - 1;
         preheatTimer = setTimeout(() => {
           enqueuePrefetch([idx], true); // 高优先级仅预热目标页
         }, 120);
       };
       elements.progressBar.onchange = (e) => {
-        let page = parseInt(e.target.value);
-        if (state.settings.reverse) page = state.pageCount - page + 1;
+        const page = parseInt(e.target.value);
         scheduleShowPage(page, { instant: true });
       };
     }
@@ -1564,6 +1586,101 @@
           }
         }
       });
+    }
+
+    // 双页阅读模式
+    let doublePage = { container: null, leftPage: null, rightPage: null };
+    function enterDoublePageMode() {
+      console.log('[EH Modern Reader] 进入双页阅读模式');
+      // 隐藏单页viewer
+      const singleViewer = document.getElementById('eh-viewer');
+      if (singleViewer) singleViewer.style.display = 'none';
+
+      // 创建双页容器
+      if (!doublePage.container) {
+        doublePage.container = document.createElement('div');
+        doublePage.container.id = 'eh-double-page-container';
+        doublePage.container.style.cssText = 'display:flex; justify-content:center; align-items:center; gap:8px; width:100%; height:100%; padding:16px; box-sizing:border-box;';
+
+        doublePage.leftPage = document.createElement('img');
+        doublePage.leftPage.id = 'eh-double-left';
+        doublePage.leftPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; display:none;';
+
+        doublePage.rightPage = document.createElement('img');
+        doublePage.rightPage.id = 'eh-double-right';
+        doublePage.rightPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; display:none;';
+
+        doublePage.container.appendChild(doublePage.leftPage);
+        doublePage.container.appendChild(doublePage.rightPage);
+
+        const viewerContainer = document.getElementById('eh-viewer-container');
+        if (viewerContainer) {
+          viewerContainer.appendChild(doublePage.container);
+        }
+      } else {
+        doublePage.container.style.display = 'flex';
+      }
+
+      // 显示当前页对应的双页
+      showDoublePages(state.currentPage);
+    }
+
+    function showDoublePages(pageNum) {
+      // 第一页（封面）单独显示居中
+      if (pageNum === 1) {
+        ensureRealImageUrl(0).then(url => {
+          doublePage.leftPage.style.display = 'none';
+          doublePage.rightPage.src = url;
+          doublePage.rightPage.style.display = 'block';
+          doublePage.rightPage.style.maxWidth = '100%'; // 封面占满
+        });
+        return;
+      }
+
+      // 其他页：双页模式 (2-3, 4-5, 6-7...)
+      // 计算左页和右页的索引
+      const pairStart = Math.floor((pageNum - 1) / 2) * 2 + 1; // 奇数页为左页起点
+      const leftPageNum = pairStart;
+      const rightPageNum = pairStart + 1;
+
+      // 物理索引映射
+      const getPhysicalIndex = (logical) => {
+        const physicalPage = state.settings.reverse ? (state.pageCount - logical + 1) : logical;
+        return physicalPage - 1;
+      };
+
+      const leftIdx = getPhysicalIndex(leftPageNum);
+      const rightIdx = getPhysicalIndex(rightPageNum);
+
+      // 加载左页
+      if (leftPageNum <= state.pageCount) {
+        ensureRealImageUrl(leftIdx).then(url => {
+          doublePage.leftPage.src = url;
+          doublePage.leftPage.style.display = 'block';
+          doublePage.leftPage.style.maxWidth = '50%';
+        });
+      } else {
+        doublePage.leftPage.style.display = 'none';
+      }
+
+      // 加载右页
+      if (rightPageNum <= state.pageCount) {
+        ensureRealImageUrl(rightIdx).then(url => {
+          doublePage.rightPage.src = url;
+          doublePage.rightPage.style.display = 'block';
+          doublePage.rightPage.style.maxWidth = '50%';
+        });
+      } else {
+        doublePage.rightPage.style.display = 'none';
+      }
+    }
+
+    function exitDoublePageMode() {
+      const singleViewer = document.getElementById('eh-viewer');
+      if (singleViewer) singleViewer.style.display = '';
+      if (doublePage.container) {
+        doublePage.container.style.display = 'none';
+      }
     }
 
     // 连续模式：横向 MVP（懒加载 + 观察器）
@@ -1725,11 +1842,8 @@
                 const idx = parseInt(img.getAttribute('data-page-index'));
                 if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
               });
-              let pageNum = bestIdx + 1;
-              if (state.settings.reverse) {
-                // 物理索引 bestIdx -> 逻辑页号
-                pageNum = state.pageCount - bestIdx;
-              }
+              // 物理索引 -> 逻辑页号（反向时倒数）
+              const pageNum = state.settings.reverse ? (state.pageCount - bestIdx) : (bestIdx + 1);
 
               // 确保视口中心页优先加载（做到“看哪里就加载哪里”）
               const centerImg = continuous.container.querySelector(`img[data-page-index="${bestIdx}"]`);
@@ -1753,8 +1867,7 @@
                 state.currentPage = pageNum;
                 if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
                 if (elements.progressBar) {
-                  const showVal = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
-                  elements.progressBar.value = showVal;
+                  elements.progressBar.value = pageNum;
                 }
                 updateThumbnailHighlight(pageNum);
                 preloadAdjacentPages(pageNum);
@@ -1785,6 +1898,9 @@
     }
 
     function exitContinuousMode() {
+      // 退出双页模式
+      exitDoublePageMode();
+      
       // 显示单页 viewer，移除连续容器
       const singleViewer = document.getElementById('eh-viewer');
       if (singleViewer) singleViewer.style.display = '';
