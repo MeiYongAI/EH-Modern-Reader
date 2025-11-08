@@ -1013,7 +1013,8 @@
     function updateThumbnailHighlight(pageNum) {
       const thumbnails = document.querySelectorAll('.eh-thumbnail');
       if (!thumbnails || thumbnails.length === 0) return;
-      // 使用逻辑页号直接索引到 DOM 顺序（不随反向改变）
+      // 缩略图 DOM 顺序始终是 1,2,3...，反向阅读时用 flex-direction: row-reverse 视觉翻转
+      // 因此高亮索引始终是 pageNum - 1（物理索引）
       const idx = Math.max(0, Math.min(thumbnails.length - 1, pageNum - 1));
       const currentThumb = thumbnails[idx];
       const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
@@ -1026,7 +1027,7 @@
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
-        // 平滑滚动到当前缩略图（原生方法自动适配 flex-direction）
+        // 平滑滚动到当前缩略图（scrollIntoView 自动适配 flex-direction）
         currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
     }
@@ -1562,8 +1563,8 @@
       elements.progressBar.oninput = () => {
         if (preheatTimer) clearTimeout(preheatTimer);
         const page = parseInt(elements.progressBar.value);
-        const physicalPage = state.settings.reverse ? (state.pageCount - page + 1) : page;
-        const idx = physicalPage - 1;
+        // 进度条 value 就是逻辑页号，直接用于预热，无需反向映射
+        const idx = page - 1;
         preheatTimer = setTimeout(() => {
           enqueuePrefetch([idx], true); // 高优先级仅预热目标页
         }, 120);
@@ -1933,8 +1934,9 @@
                 const idx = parseInt(img.getAttribute('data-page-index'));
                 if (dist < bestDist) { bestDist = dist; bestIdx = idx; }
               });
-              // 物理索引 -> 逻辑页号（反向时倒数）
-              const pageNum = state.settings.reverse ? (state.pageCount - bestIdx) : (bestIdx + 1);
+              // 物理索引 bestIdx (0-based) -> 逻辑页号 (1-based)
+              // 反向阅读时容器 scaleX(-1) 镜像但 data-page-index 不变，直接 +1
+              const pageNum = bestIdx + 1;
 
               // 确保视口中心页优先加载（做到“看哪里就加载哪里”）
               const centerImg = continuous.container.querySelector(`img[data-page-index="${bestIdx}"]`);
