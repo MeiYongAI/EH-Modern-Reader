@@ -1348,13 +1348,13 @@
         state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
-          // 注意：容器已经 scaleX(-1) 翻转，所以滚动方向需要相反
-          const dir = state.settings.reverse ? 1 : 1;  // 正常从左往右滚动增加 scrollLeft
+          // 容器使用 scaleX(-1) 镜像，为保持视觉方向一致，滚动方向取决于 reverse
+          const dir = state.settings.reverse ? -1 : 1;
           horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
           const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
           const atBegin = horizontalContainer.scrollLeft <= 0;
-          // 正常模式：到右边结束；反向模式：容器已翻转，视觉上到左边实际是 scrollLeft 最大值
-          if (atEnd) {
+          // 正向：到右端停止；反向：到左端停止
+          if ((!state.settings.reverse && atEnd) || (state.settings.reverse && atBegin)) {
             stopAutoPaging();
             return;
           }
@@ -1730,7 +1730,8 @@
       }
       console.log('[EH Modern Reader] 显示双页(逻辑页):', logicalPage, '=>', leftNum, rightNum);
       if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${total}`;
-      const mapIndex = (num) => { if (!num) return null; const physical = state.settings.reverse ? (total - num + 1) : num; return physical - 1; };
+      // 双页模式下：仅做左右交换，不反转物理索引，防止跳到末尾图片
+      const mapIndex = (num) => { if (!num) return null; return num - 1; };
       let finalLeft = leftNum, finalRight = rightNum;
       if (state.settings.reverse) { [finalLeft, finalRight] = [rightNum, leftNum]; }
       const leftIdx = mapIndex(finalLeft);
@@ -2013,6 +2014,10 @@
 
     // 键盘导航和缩放
     document.addEventListener('keydown', (e) => {
+      // 忽略长按重复与输入控件聚焦状态
+      if (e.repeat) return;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag && ['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
       // 图片缩放快捷键（+ / - / 0）
       if (e.key === '+' || e.key === '=') {
         // 放大
