@@ -1701,6 +1701,10 @@
     // 连续模式：横向 MVP（懒加载 + 观察器）
     let continuous = { container: null, observer: null };
     function enterContinuousHorizontalMode() {
+      // 进入横向模式时，若双页容器可见则先隐藏，避免界面叠加
+      if (doublePage && doublePage.container) {
+        doublePage.container.style.display = 'none';
+      }
       // 若已存在则直接显示
       if (!continuous.container) {
         continuous.container = document.createElement('div');
