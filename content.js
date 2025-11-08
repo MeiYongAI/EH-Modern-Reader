@@ -1188,25 +1188,44 @@
     // 事件监听
     if (elements.prevBtn) {
       elements.prevBtn.onclick = () => {
-        if (state.currentPage <= 1) return;
-        let target = state.currentPage - 1;
+        // 反向阅读：prev按钮视觉上在右边，应该向逻辑后翻（数字增大）
+        const direction = state.settings.reverse ? 1 : -1;
+        let target = state.currentPage + direction;
+        
         if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
           const isOddTotal = state.pageCount % 2 === 1;
-          target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          if (direction === -1) {
+            // 正常模式向前
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          } else {
+            // 反向模式向后
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          }
         }
-        if (target < 1) target = 1;
+        
+        if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
       };
     }
 
     if (elements.nextBtn) {
       elements.nextBtn.onclick = () => {
-        let target = state.currentPage + 1;
+        // 反向阅读：next按钮视觉上在左边，应该向逻辑前翻（数字减小）
+        const direction = state.settings.reverse ? -1 : 1;
+        let target = state.currentPage + direction;
+        
         if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
           const isOddTotal = state.pageCount % 2 === 1;
-          target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          if (direction === 1) {
+            // 正常模式向后
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          } else {
+            // 反向模式向前
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          }
         }
-        if (target > state.pageCount) return;
+        
+        if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
       };
     }
@@ -1221,20 +1240,54 @@
       };
     }
 
-    // 点击图片中央区域不再切换底部菜单（统一由顶部开关+悬停控制）
+    // 点击图片左右区域翻页（适用所有模式）
     if (elements.viewer) {
       elements.viewer.onclick = (e) => {
-        // 排除按钮、缩略图、进度条、图片本身的点击
+        // 排除按钮、缩略图、进度条的点击
         if (e.target.tagName === 'BUTTON' || 
             e.target.closest('button') || 
-            e.target.closest('#eh-bottom-menu') ||
-            e.target.tagName === 'IMG') {
+            e.target.closest('#eh-bottom-menu')) {
           return;
         }
         
-        // 阻止事件冒泡
+        // 获取点击位置
+        const rect = elements.viewer.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const viewerWidth = rect.width;
+        
+        // 左侧 40% 区域：向左翻（考虑反向阅读）
+        // 右侧 40% 区域：向右翻（考虑反向阅读）
+        // 中间 20% 区域：不响应
+        const leftThreshold = viewerWidth * 0.4;
+        const rightThreshold = viewerWidth * 0.6;
+        
+        let direction = 0;
+        if (clickX < leftThreshold) {
+          // 点击左侧：反向时向后翻（+1），正常时向前翻（-1）
+          direction = state.settings.reverse ? 1 : -1;
+        } else if (clickX > rightThreshold) {
+          // 点击右侧：反向时向前翻（-1），正常时向后翻（+1）
+          direction = state.settings.reverse ? -1 : 1;
+        } else {
+          // 中间区域不响应
+          return;
+        }
+        
+        let target = state.currentPage + direction;
+        
+        // 双页模式特殊处理
+        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+          const isOddTotal = state.pageCount % 2 === 1;
+          if (direction === -1) {
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          } else if (direction === 1) {
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          }
+        }
+        
+        if (target < 1 || target > state.pageCount) return;
+        scheduleShowPage(target);
         e.stopPropagation();
-        return;
       };
     }
 
@@ -1295,12 +1348,13 @@
         state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
-          const dir = state.settings.reverse ? -1 : 1;
+          // 注意：容器已经 scaleX(-1) 翻转，所以滚动方向需要相反
+          const dir = state.settings.reverse ? 1 : 1;  // 正常从左往右滚动增加 scrollLeft
           horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
           const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
           const atBegin = horizontalContainer.scrollLeft <= 0;
-          if ((!state.settings.reverse && atEnd) || (state.settings.reverse && atBegin)) {
-            // 到末尾自动停止
+          // 正常模式：到右边结束；反向模式：容器已翻转，视觉上到左边实际是 scrollLeft 最大值
+          if (atEnd) {
             stopAutoPaging();
             return;
           }
@@ -1576,10 +1630,12 @@
       elements.viewer.addEventListener('wheel', (e) => {
         if (state.settings.readMode !== 'single') return; // 仅单页模式翻页
         const delta = e.deltaY;
+        // 反向阅读：滚轮向下（delta > 0）应该向前翻（-1），正常时向后翻（+1）
+        const direction = state.settings.reverse ? -1 : 1;
         if (delta > 0) {
-          scheduleShowPage(state.currentPage + 1);
+          scheduleShowPage(state.currentPage + direction);
         } else if (delta < 0) {
-          scheduleShowPage(state.currentPage - 1);
+          scheduleShowPage(state.currentPage - direction);
         }
         e.preventDefault();
       }, { passive: false });
@@ -2014,38 +2070,42 @@
         case 'ArrowLeft':
         case 'a':
         case 'A': {
+          // 反向阅读：左箭头应该向逻辑后翻（+1），正常时向前翻（-1）
+          const direction = state.settings.reverse ? 1 : -1;
+          let target = state.currentPage + direction;
+          
           if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
             const isOddTotal = state.pageCount % 2 === 1;
-            let prev;
-            if (isOddTotal) {
-              if (state.currentPage === 2) prev = 1; else prev = state.currentPage - 2;
+            if (direction === -1) {
+              target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
             } else {
-              prev = state.currentPage - 2;
+              target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
             }
-            if (prev < 1) prev = 1;
-            scheduleShowPage(prev);
-          } else {
-            scheduleShowPage(state.currentPage - 1);
           }
+          
+          if (target < 1 || target > state.pageCount) target = state.currentPage;
+          if (target !== state.currentPage) scheduleShowPage(target);
           e.preventDefault();
           break; }
         case 'ArrowRight':
         case 'd':
         case 'D':
         case ' ': {
+          // 反向阅读：右箭头应该向逻辑前翻（-1），正常时向后翻（+1）
+          const direction = state.settings.reverse ? -1 : 1;
+          let target = state.currentPage + direction;
+          
           if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
             const isOddTotal = state.pageCount % 2 === 1;
-            let next;
-            if (isOddTotal) {
-              if (state.currentPage === 1) next = 2; else next = state.currentPage + 2;
+            if (direction === 1) {
+              target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
             } else {
-              next = state.currentPage + 2;
+              target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
             }
-            if (next > state.pageCount) next = state.pageCount;
-            scheduleShowPage(next);
-          } else {
-            scheduleShowPage(state.currentPage + 1);
           }
+          
+          if (target < 1 || target > state.pageCount) target = state.currentPage;
+          if (target !== state.currentPage) scheduleShowPage(target);
           e.preventDefault();
           break; }
         case 'p':
