@@ -1100,6 +1100,17 @@
     }
 
     async function internalShowPage(pageNum) {
+      // 双页模式：直接调用showDoublePages
+      if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
+        state.currentPage = pageNum;
+        showDoublePages(pageNum);
+        updateThumbnailHighlight(pageNum);
+        preloadAdjacentPages(pageNum);
+        saveProgress(pageNum);
+        return;
+      }
+      
+      // 单页模式：使用原有逻辑
       const token = ++loadToken;
       await showPage(pageNum, token);
     }
@@ -1970,33 +1981,52 @@
         rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
       }
       console.log('[EH Modern Reader] 显示双页(逻辑页):', logicalPage, '=>', leftNum, rightNum);
-      if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${total}`;
+      
+      // 更新进度显示
+      updateProgressDisplay(logicalPage);
+      
       // 双页模式下：仅做左右交换，不反转物理索引，防止跳到末尾图片
       const mapIndex = (num) => { if (!num) return null; return num - 1; };
       let finalLeft = leftNum, finalRight = rightNum;
       if (state.settings.reverse) { [finalLeft, finalRight] = [rightNum, leftNum]; }
       const leftIdx = mapIndex(finalLeft);
       const rightIdx = mapIndex(finalRight);
-      if (leftNum && leftIdx != null) {
+      
+      // 确保双页容器存在且可见
+      if (!doublePage.leftPage || !doublePage.rightPage) {
+        console.error('[EH Modern Reader] 双页元素不存在');
+        return;
+      }
+      
+      // 加载左侧图片
+      if (finalLeft && leftIdx != null) {
         ensureRealImageUrl(leftIdx).then(({ url }) => {
           doublePage.leftPage.src = url;
           doublePage.leftPage.style.display = 'block';
-          doublePage.leftPage.style.maxWidth = rightNum ? '50%' : '100%';
+          doublePage.leftPage.style.maxWidth = finalRight ? '50%' : '100%';
         }).catch(error => {
           console.error('[EH Modern Reader] 双页左侧加载失败:', error);
-          showErrorMessage(leftNum, `左侧图片加载失败: ${error.message}`);
+          doublePage.leftPage.style.display = 'none';
         });
-      } else { doublePage.leftPage.style.display = 'none'; }
-      if (rightNum && rightIdx != null) {
+      } else { 
+        doublePage.leftPage.style.display = 'none'; 
+        doublePage.leftPage.src = '';
+      }
+      
+      // 加载右侧图片
+      if (finalRight && rightIdx != null) {
         ensureRealImageUrl(rightIdx).then(({ url }) => {
           doublePage.rightPage.src = url;
           doublePage.rightPage.style.display = 'block';
           doublePage.rightPage.style.maxWidth = '50%';
         }).catch(error => {
           console.error('[EH Modern Reader] 双页右侧加载失败:', error);
-          showErrorMessage(rightNum, `右侧图片加载失败: ${error.message}`);
+          doublePage.rightPage.style.display = 'none';
         });
-      } else { doublePage.rightPage.style.display = 'none'; }
+      } else { 
+        doublePage.rightPage.style.display = 'none';
+        doublePage.rightPage.src = '';
+      }
     }
 
     function exitDoublePageMode() {
