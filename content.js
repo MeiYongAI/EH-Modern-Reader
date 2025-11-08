@@ -958,10 +958,14 @@
             const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
             // 正常坐标系下使目标居中的滚动位置
             let target = cumulativeLeft - centerOffset;
-            // 若容器做了镜像(scaleX(-1))，需要将正常坐标映射为镜像下的 scrollLeft
+            // 若容器做了镜像(scaleX(-1))，scrollLeft 也被镜像了：
+            // 反向时应该定位到从右侧数的对应位置
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
-              target = maxScroll - target;
+              // target 是正常坐标下元素左边距离起点的位置，居中后
+              // 反向时要让元素右边距离容器右边 = target + basisWidth
+              // 所以 scrollLeft = maxScroll - (target + basisWidth)
+              target = maxScroll - target - basisWidth;
             }
             // 夹取到有效范围
             const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
@@ -1049,7 +1053,7 @@
             let target = cumulativeLeft - centerOffset;
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
-              target = maxScroll - target;
+              target = maxScroll - target - basisWidth;
             }
             const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
             target = Math.max(0, Math.min(maxScrollNow, target));
@@ -2162,7 +2166,7 @@
             let target = cumulativeLeft - centerOffset;
             if (state.settings.reverse) {
               const maxScroll = Math.max(0, c.scrollWidth - c.clientWidth);
-              target = maxScroll - target;
+              target = maxScroll - target - basisWidth;
             }
             const maxScrollNow = Math.max(0, c.scrollWidth - c.clientWidth);
             target = Math.max(0, Math.min(maxScrollNow, target));
