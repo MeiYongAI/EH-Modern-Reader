@@ -5,10 +5,24 @@
 
 (function() {
   'use strict';
-  // 早期脚本拦截与变量捕获包装在 try 中，避免异常阻断后续初始化
+
+  // 防止重复注入
+  if (window.ehModernReaderInjected) {
+    return;
+  }
+  window.ehModernReaderInjected = true;
+
+  // 早期脚本拦截：阻止原站 MPV 脚本注入与执行
   try {
-    // 全局捕获对象（与后续 extractPageData 中使用保持一致）
-    const captured = window.__ehCaptured || (window.__ehCaptured = {});
+    // 提前捕获页面变量（imagelist / pagecount / gid / mpvkey / gallery_url）
+    const captured = (window.__ehCaptured = window.__ehCaptured || {
+      imagelist: null,
+      pagecount: null,
+      gid: null,
+      mpvkey: null,
+      gallery_url: null,
+      title: null
+    });
 
     function captureFromScriptText(text) {
       if (!text || typeof text !== 'string') return;
@@ -926,40 +940,41 @@
           if (options.instant) {
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
-            // 使用 offsetLeft/offsetWidth（不受 scaleX 镜像影响）计算目标 scrollLeft
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
-            const wLeft = wrapper.offsetLeft;
-            const wWidth = wrapper.offsetWidth;
-            const centerShift = Math.max(0, (container.clientWidth - wWidth) / 2);
-            let targetScroll;
-            if (!state.settings.reverse) {
-              targetScroll = wLeft - centerShift;
-            } else {
-              const rightBase = container.scrollWidth - (wLeft + wWidth);
-              targetScroll = rightBase - centerShift;
+            // 使用 offsetLeft 获取未变换坐标，避免 scaleX(-1) 下 getBoundingClientRect 值被镜像
+            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
+            const offsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft) || 0;
+            const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
+            // 正常坐标系下使目标居中的滚动位置
+            let target = offsetLeft - centerOffset;
+            // 若容器做了镜像(scaleX(-1))，需要将正常坐标映射为镜像下的 scrollLeft
+            if (state.settings.reverse) {
+              const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+              target = maxScroll - target;
             }
-            if (targetScroll < 0) targetScroll = 0;
-            if (targetScroll > container.scrollWidth - container.clientWidth) targetScroll = container.scrollWidth - container.clientWidth;
+            // 夹取到有效范围
+            const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
+            target = Math.max(0, Math.min(maxScrollNow, target));
             console.log('[EH Modern Reader] 计算居中偏移:', {
-              wrapperWidth: wWidth,
-              wrapperOffsetLeft: wLeft,
-              targetScroll,
+              basisWidth,
+              offsetLeft,
+              centerOffset,
+              target,
+              reverse: !!state.settings.reverse,
               containerWidth: container.clientWidth,
               scrollWidth: container.scrollWidth,
-              reversed: !!state.settings.reverse
+              currentScrollLeft: container.scrollLeft
             });
-            container.scrollLeft = targetScroll;
+            container.scrollLeft = target;
             
             // 立即更新当前页状态（不依赖 scroll 事件）
-              if (state.currentPage !== pageNum) {
-                const newPageNum = pageNum; // 保持逻辑页号
-                state.currentPage = newPageNum;
-                if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
-                if (elements.progressBar) elements.progressBar.value = newPageNum;
-                updateThumbnailHighlight(newPageNum);
-                preloadAdjacentPages(newPageNum);
-                saveProgress(newPageNum);
-              }
+            const newPageNum = pageNum; // 保持逻辑页号
+            state.currentPage = newPageNum;
+            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
+            if (elements.progressBar) elements.progressBar.value = newPageNum;
+            updateThumbnailHighlight(newPageNum);
+            preloadAdjacentPages(newPageNum);
+            saveProgress(newPageNum);
             
             // 瞬时跳转后主动触发目标图片及附近图片加载
             setTimeout(() => {
@@ -1002,23 +1017,20 @@
               setTimeout(() => { scrollJumping = false; }, 200);
             }, 50);
           } else {
+            // 平滑滚动同样改为手动计算，避免在镜像下 scrollIntoView 行为不一致
             const container = document.getElementById('eh-continuous-horizontal');
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
-            const wLeft = wrapper.offsetLeft;
-            const wWidth = wrapper.offsetWidth;
-            const centerShift = Math.max(0, (container.clientWidth - wWidth) / 2);
-            let targetScroll;
-            if (!state.settings.reverse) {
-              targetScroll = wLeft - centerShift;
-            } else {
-              const rightBase = container.scrollWidth - (wLeft + wWidth);
-              targetScroll = rightBase - centerShift;
+            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
+            const offsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft) || 0;
+            const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
+            let target = offsetLeft - centerOffset;
+            if (state.settings.reverse) {
+              const maxScroll = Math.max(0, container.scrollWidth - container.clientWidth);
+              target = maxScroll - target;
             }
-            if (targetScroll < 0) targetScroll = 0;
-            if (targetScroll > container.scrollWidth - container.clientWidth) targetScroll = container.scrollWidth - container.clientWidth;
-            scrollJumping = true; // 平滑滚动进入跳转状态
-            container.scrollTo({ left: targetScroll, behavior: 'smooth' });
-            setTimeout(() => { scrollJumping = false; }, 400);
+            const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
+            target = Math.max(0, Math.min(maxScrollNow, target));
+            container.scrollTo({ left: target, behavior: 'smooth' });
           }
         }
         return;
@@ -2110,28 +2122,17 @@
           requestAnimationFrame(() => {
             const c = continuous.container;
             const wrapper = targetImg.closest('.eh-ch-wrapper') || targetImg.parentElement;
-            const basisWidth = wrapper?.offsetWidth || targetImg.offsetWidth || 0;
-            const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : targetImg.offsetLeft);
-            const centerShift = Math.max(0, (c.clientWidth - basisWidth) / 2);
-            let targetScroll;
-            if (!state.settings.reverse) {
-              targetScroll = basisOffsetLeft - centerShift;
-            } else {
-              const rightBase = c.scrollWidth - (basisOffsetLeft + basisWidth);
-              targetScroll = rightBase - centerShift;
+            const basisWidth = wrapper?.clientWidth || targetImg.clientWidth || 0;
+            const offsetLeft = (wrapper ? wrapper.offsetLeft : targetImg.offsetLeft) || 0;
+            const centerOffset = Math.max(0, (c.clientWidth - basisWidth) / 2);
+            let target = offsetLeft - centerOffset;
+            if (state.settings.reverse) {
+              const maxScroll = Math.max(0, c.scrollWidth - c.clientWidth);
+              target = maxScroll - target;
             }
-            if (targetScroll < 0) targetScroll = 0;
-            if (targetScroll > c.scrollWidth - c.clientWidth) targetScroll = c.scrollWidth - c.clientWidth;
-            c.scrollLeft = targetScroll;
-            // 初始进入时直接更新当前页（避免等待 scroll 事件）
-            const logicalPage = targetIdx + 1;
-            if (state.currentPage !== logicalPage) {
-              state.currentPage = logicalPage;
-              if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${state.pageCount}`;
-              if (elements.progressBar) elements.progressBar.value = logicalPage;
-              updateThumbnailHighlight(logicalPage);
-              preloadAdjacentPages(logicalPage);
-            }
+            const maxScrollNow = Math.max(0, c.scrollWidth - c.clientWidth);
+            target = Math.max(0, Math.min(maxScrollNow, target));
+            c.scrollLeft = target;
           });
         }
       }
