@@ -239,8 +239,12 @@
             <button id="eh-reverse-btn" class="eh-icon-btn" title="反向阅读 (左右方向切换)">
               <span style="font-size: 20px; font-weight: bold;">⇄</span>
             </button>
-            <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
-              <span style="font-size: 20px;">📖</span>
+            <button id="eh-settings-btn" class="eh-icon-btn" title="阅读设置">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                <path d="M8 7h8M8 11h8M8 15h5"/>
+              </svg>
             </button>
             <button id="eh-auto-btn" class="eh-icon-btn" title="定时翻页 (单击开关, Alt+单击设置间隔)">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -302,8 +306,9 @@
           </div>
 
           <!-- 进度条区 -->
-          <div class="eh-slider-container">
-            <div class="eh-slider-track" id="eh-slider-track">
+          <div class="eh-slider-container" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px;">
+            <span id="eh-progress-current" class="eh-progress-text" style="min-width: 40px; text-align: right; font-size: 14px; color: rgba(255,255,255,0.9);">1</span>
+            <div class="eh-slider-track" id="eh-slider-track" style="flex: 1;">
               <div class="eh-slider-fill" id="eh-slider-fill"></div>
               <input 
                 type="range" 
@@ -314,6 +319,7 @@
                 class="eh-progress-slider"
               />
             </div>
+            <span id="eh-progress-total" class="eh-progress-text" style="min-width: 40px; text-align: left; font-size: 14px; color: rgba(255,255,255,0.9);">${pageData.pagecount}</span>
           </div>
         </footer>
 
@@ -324,7 +330,7 @@
             
             <div class="eh-setting-group">
               <div class="eh-setting-item">
-                <div class="eh-radio-group">
+                <div class="eh-radio-group" style="flex-direction: column; align-items: center; gap: 8px;">
                   <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="single" checked>
                     <span>单页</span>
@@ -460,15 +466,17 @@
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
-  autoBtn: document.getElementById('eh-auto-btn'),
+      autoBtn: document.getElementById('eh-auto-btn'),
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
       reverseBtn: document.getElementById('eh-reverse-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
+      progressCurrent: document.getElementById('eh-progress-current'),
+      progressTotal: document.getElementById('eh-progress-total'),
       
-  readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
-  preloadCountInput: document.getElementById('eh-preload-count'),
-  autoIntervalInput: document.getElementById('eh-auto-interval'),
-  scrollSpeedInput: document.getElementById('eh-scroll-speed')
+      readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
+      preloadCountInput: document.getElementById('eh-preload-count'),
+      autoIntervalInput: document.getElementById('eh-auto-interval'),
+      scrollSpeedInput: document.getElementById('eh-scroll-speed')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -492,6 +500,29 @@
       } catch {}
     }
 
+    // 更新进度条和页码显示（支持反向模式）
+    function updateProgressDisplay(pageNum) {
+      if (elements.progressBar) {
+        elements.progressBar.value = pageNum;
+      }
+      if (elements.pageInfo) {
+        elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+      }
+      
+      // 更新进度条两侧的页码显示（支持反向）
+      if (elements.progressCurrent && elements.progressTotal) {
+        if (state.settings.reverse) {
+          // 反向模式：左侧显示总页数，右侧显示当前页
+          elements.progressCurrent.textContent = state.pageCount;
+          elements.progressTotal.textContent = pageNum;
+        } else {
+          // 正常模式：左侧显示当前页，右侧显示总页数
+          elements.progressCurrent.textContent = pageNum;
+          elements.progressTotal.textContent = state.pageCount;
+        }
+      }
+    }
+
     // 同步反向按钮的状态
     function updateReverseBtn() {
       if (elements.reverseBtn) {
@@ -501,6 +532,8 @@
           elements.reverseBtn.classList.remove('eh-active');
         }
       }
+      // 反向切换时更新进度条显示
+      updateProgressDisplay(state.currentPage);
     }
     updateReverseBtn();
 
@@ -977,8 +1010,7 @@
             // 立即更新当前页状态（不依赖 scroll 事件）
             const newPageNum = pageNum; // 保持逻辑页号
             state.currentPage = newPageNum;
-            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
-            if (elements.progressBar) elements.progressBar.value = newPageNum;
+            updateProgressDisplay(newPageNum);
             updateThumbnailHighlight(newPageNum);
             preloadAdjacentPages(newPageNum);
             saveProgress(newPageNum);
@@ -1416,13 +1448,25 @@
         const clickX = e.clientX - rect.left;
         const viewerWidth = rect.width;
         
+        // 左中右三等分
+        const leftThreshold = viewerWidth / 3;
+        const rightThreshold = viewerWidth * 2 / 3;
+        
+        // 中间1/3：切换顶栏显示/隐藏（所有模式通用）
+        if (clickX >= leftThreshold && clickX <= rightThreshold) {
+          const header = document.getElementById('eh-header');
+          if (header) {
+            header.classList.toggle('eh-hidden');
+            console.log('[EH Modern Reader] 顶栏显示状态:', !header.classList.contains('eh-hidden'));
+          }
+          e.stopPropagation();
+          return;
+        }
+        
         // 横向连续模式：左侧1/3向左滚动，右侧1/3向右滚动
         if (state.settings.readMode === 'continuous-horizontal') {
           const container = document.getElementById('eh-continuous-horizontal');
           if (container) {
-            const leftThreshold = viewerWidth / 3;
-            const rightThreshold = viewerWidth * 2 / 3;
-            
             if (clickX < leftThreshold) {
               // 左侧1/3：向左滚动一个视口宽度
               const scrollAmount = container.clientWidth * 0.8;
@@ -1432,17 +1476,12 @@
               const scrollAmount = container.clientWidth * 0.8;
               container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
             }
-            // 中间1/3不响应
             e.stopPropagation();
             return;
           }
         }
         
-        // 单页/双页模式：左侧 40% 区域向左翻，右侧 40% 区域向右翻
-        // 中间 20% 区域：不响应
-        const leftThreshold = viewerWidth * 0.4;
-        const rightThreshold = viewerWidth * 0.6;
-        
+        // 单页/双页模式：左侧1/3向左翻，右侧1/3向右翻
         let direction = 0;
         if (clickX < leftThreshold) {
           // 点击左侧：反向时向后翻（+1），正常时向前翻（-1）
@@ -1451,7 +1490,7 @@
           // 点击右侧：反向时向前翻（-1），正常时向后翻（+1）
           direction = state.settings.reverse ? -1 : 1;
         } else {
-          // 中间区域不响应
+          // 理论上不会到这里（中间已处理）
           return;
         }
         
@@ -1594,20 +1633,6 @@
         if (elements.settingsPanel) {
           elements.settingsPanel.classList.toggle('eh-hidden');
           console.log('[EH Modern Reader] 设置面板显示状态:', !elements.settingsPanel.classList.contains('eh-hidden'));
-        }
-      };
-    }
-
-    // 顶栏中间区域点击切换显示/隐藏
-    const header = document.getElementById('eh-header');
-    const headerCenter = header?.querySelector('.eh-header-center');
-    if (headerCenter) {
-      headerCenter.style.cursor = 'pointer';
-      headerCenter.onclick = (e) => {
-        // 确保不是点击按钮
-        if (!e.target.closest('button')) {
-          header.classList.toggle('eh-hidden');
-          console.log('[EH Modern Reader] 顶栏显示状态:', !header.classList.contains('eh-hidden'));
         }
       };
     }
@@ -2389,48 +2414,33 @@
       elements.bottomMenu.classList.add('eh-menu-hidden');
     }
 
-    // 顶部缩略图悬停开关按钮
+    // 缩略图和进度条始终显示（移除hover条件）
+    if (elements.bottomMenu) {
+      if (state.settings.menuVisible) {
+        elements.bottomMenu.classList.remove('eh-menu-hidden');
+      } else {
+        elements.bottomMenu.classList.add('eh-menu-hidden');
+      }
+    }
+
+    // 顶部缩略图切换按钮（现在只切换菜单显示/隐藏）
     if (elements.thumbnailsToggleBtn) {
-      const updateToggleVisual = () => {
-        if (state.settings.thumbnailsHover) {
+      elements.thumbnailsToggleBtn.onclick = () => {
+        state.settings.menuVisible = !state.settings.menuVisible;
+        if (elements.bottomMenu) {
+          if (state.settings.menuVisible) {
+            elements.bottomMenu.classList.remove('eh-menu-hidden');
+          } else {
+            elements.bottomMenu.classList.add('eh-menu-hidden');
+          }
+        }
+        if (state.settings.menuVisible) {
           elements.thumbnailsToggleBtn.classList.add('eh-active');
         } else {
           elements.thumbnailsToggleBtn.classList.remove('eh-active');
         }
       };
-      updateToggleVisual();
-      elements.thumbnailsToggleBtn.onclick = () => {
-        state.settings.thumbnailsHover = !state.settings.thumbnailsHover;
-        updateToggleVisual();
-        if (elements.bottomMenu) {
-          if (state.settings.thumbnailsHover) {
-            // 开启悬停模式时默认隐藏，鼠标靠近底部再显示
-            elements.bottomMenu.classList.add('eh-menu-hidden');
-          } else {
-            // 关闭悬停模式时按菜单显隐状态显示
-            if (state.settings.menuVisible) {
-              elements.bottomMenu.classList.remove('eh-menu-hidden');
-            } else {
-              elements.bottomMenu.classList.add('eh-menu-hidden');
-            }
-          }
-        }
-      };
     }
-
-    // 根据鼠标位置动态显示/隐藏底部菜单（仅在开启悬停模式时）
-    document.addEventListener('mousemove', (e) => {
-      if (!state.settings.thumbnailsHover || !elements.bottomMenu) return;
-      const viewportHeight = window.innerHeight;
-      const threshold = 140; // 距离底部阈值
-      const distanceFromBottom = viewportHeight - e.clientY;
-      if (distanceFromBottom < threshold) {
-        // 显示
-        elements.bottomMenu.classList.remove('eh-menu-hidden');
-      } else {
-        elements.bottomMenu.classList.add('eh-menu-hidden');
-      }
-    });
     
     // 应用默认深色模式
     if (state.settings.darkMode) {
