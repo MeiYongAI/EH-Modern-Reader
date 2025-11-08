@@ -1471,13 +1471,11 @@
         state.autoPage.scrollSpeed = state.autoPage.scrollSpeed || 3; // px/帧，支持小数
         const step = () => {
           if (!state.autoPage.running) return;
-          // 容器使用 scaleX(-1) 镜像，为保持视觉方向一致，滚动方向取决于 reverse
-          const dir = state.settings.reverse ? -1 : 1;
+          // 逻辑一致性：无论是否反向阅读，自动滚动始终沿 DOM 正方向推进（scrollLeft 递增），以确保页码递增
+          const dir = 1;
           horizontalContainer.scrollLeft += state.autoPage.scrollSpeed * dir;
           const atEnd = horizontalContainer.scrollLeft + horizontalContainer.clientWidth >= horizontalContainer.scrollWidth - 2;
-          const atBegin = horizontalContainer.scrollLeft <= 0;
-          // 正向：到右端停止；反向：到左端停止
-          if ((!state.settings.reverse && atEnd) || (state.settings.reverse && atBegin)) {
+          if (atEnd) {
             stopAutoPaging();
             return;
           }
