@@ -965,12 +965,12 @@ body.eh-dark-mode .eh-panel-content h3 {
 }
 
 .eh-setting-item {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .eh-setting-item label {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   margin-bottom: 8px;
   font-weight: 500;
   color: #555;
@@ -978,6 +978,66 @@ body.eh-dark-mode .eh-panel-content h3 {
 
 body.eh-dark-mode .eh-setting-item label {
   color: #bbb;
+}
+
+/* 设置分组 */
+.eh-setting-group {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.eh-setting-group:last-of-type {
+  border-bottom: none;
+  margin-bottom: 8px;
+}
+
+body.eh-dark-mode .eh-setting-group {
+  border-bottom-color: #404040;
+}
+
+/* 分组标签 */
+.eh-setting-label-group {
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+body.eh-dark-mode .eh-setting-label-group {
+  color: #999;
+}
+
+/* 内联设置项（label 和 input 同行） */
+.eh-setting-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.eh-setting-inline label {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.eh-setting-inline input[type="number"] {
+  width: 80px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  background: #fff;
+}
+
+body.eh-dark-mode .eh-setting-inline input[type="number"] {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #e0e0e0;
 }
 
 .eh-setting-item select {

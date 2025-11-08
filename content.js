@@ -321,31 +321,42 @@
         <div id="eh-settings-panel" class="eh-panel eh-hidden">
           <div class="eh-panel-content">
             <h3>阅读设置</h3>
-            <div class="eh-setting-item">
-              <label>阅读模式</label>
-              <div class="eh-radio-group">
-                <label class="eh-radio-label">
-                  <input type="radio" name="eh-read-mode-radio" value="single" checked>
-                  <span>单页</span>
-                </label>
-                <label class="eh-radio-label">
-                  <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
-                  <span>横向连续</span>
-                </label>
+            
+            <div class="eh-setting-group">
+              <div class="eh-setting-item">
+                <label>阅读模式</label>
+                <div class="eh-radio-group">
+                  <label class="eh-radio-label">
+                    <input type="radio" name="eh-read-mode-radio" value="single" checked>
+                    <span>单页</span>
+                  </label>
+                  <label class="eh-radio-label">
+                    <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
+                    <span>横向连续</span>
+                  </label>
+                </div>
               </div>
             </div>
-            <div class="eh-setting-item">
-              <label for="eh-preload-count">预加载页数（向后）</label>
-              <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2" style="width: 64px;">
+
+            <div class="eh-setting-group">
+              <div class="eh-setting-item eh-setting-inline">
+                <label for="eh-preload-count">预加载页数</label>
+                <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2">
+              </div>
             </div>
-            <div class="eh-setting-item">
-              <label for="eh-auto-interval">定时翻页间隔（秒）</label>
-              <input type="number" id="eh-auto-interval" min="0.5" max="60" step="0.5" value="3" style="width: 64px;">
+
+            <div class="eh-setting-group">
+              <div class="eh-setting-label-group">自动播放</div>
+              <div class="eh-setting-item eh-setting-inline">
+                <label for="eh-auto-interval">翻页间隔（秒）</label>
+                <input type="number" id="eh-auto-interval" min="0.5" max="60" step="0.5" value="3">
+              </div>
+              <div class="eh-setting-item eh-setting-inline">
+                <label for="eh-scroll-speed">滚动速度（px/帧）</label>
+                <input type="number" id="eh-scroll-speed" min="1" max="50" step="0.5" value="3">
+              </div>
             </div>
-            <div class="eh-setting-item">
-              <label for="eh-scroll-speed">自动滚动速度（px/帧）</label>
-              <input type="number" id="eh-scroll-speed" min="1" max="50" step="0.5" value="3" style="width: 64px;">
-            </div>
+
             <button id="eh-close-settings" class="eh-btn">关闭</button>
           </div>
         </div>
@@ -743,6 +754,7 @@
         const idx = pageNum - 1;
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
+          console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, 'img元素:', img, 'wrapper:', img.parentElement);
           if (options.instant) {
             scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
@@ -751,6 +763,7 @@
             const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
             const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft);
             const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
+            console.log('[EH Modern Reader] 计算居中偏移:', { basisWidth, basisOffsetLeft, offset, containerWidth: container.clientWidth });
             container.scrollLeft = offset;
             
             // 立即更新当前页状态（不依赖 scroll 事件）
@@ -774,7 +787,9 @@
                 const targetImg = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${i}"]`);
                 if (targetImg && !targetImg.src && !targetImg.getAttribute('data-loading')) {
                   targetImg.setAttribute('data-loading', 'true');
+                  console.log('[EH Modern Reader] 开始加载图片:', i);
                   loadImage(i).then(loadedImg => {
+                    console.log('[EH Modern Reader] 图片加载成功:', i, 'src:', loadedImg.src);
                     if (loadedImg && loadedImg.src) targetImg.src = loadedImg.src;
                     // 设置真实占位比例并移除骨架
                     try {
@@ -782,10 +797,14 @@
                       const w = loadedImg?.naturalWidth || loadedImg?.width;
                       const h = loadedImg?.naturalHeight || loadedImg?.height;
                       if (wrap && w && h && h > 0) {
-                        wrap.style.setProperty('--eh-aspect', String(Math.max(0.2, Math.min(5, w / h))));
+                        const ratio = Math.max(0.2, Math.min(5, w / h));
+                        console.log('[EH Modern Reader] 设置占位比例:', i, ratio);
+                        wrap.style.setProperty('--eh-aspect', String(ratio));
                         wrap.classList.remove('eh-ch-skeleton');
                       }
-                    } catch {}
+                    } catch (e) {
+                      console.warn('[EH Modern Reader] 设置占位失败:', i, e);
+                    }
                   }).catch(err => {
                     console.warn('[EH Modern Reader] 瞬时跳转加载失败:', i, err);
                   }).finally(() => {
