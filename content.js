@@ -236,9 +236,11 @@
             <span id="eh-page-info" title="快捷键: ← → 翻页 | + - 缩放 | 0 重置 | 空格 下一页">1 / ${pageData.pagecount}</span>
           </div>
           <div class="eh-header-right">
-            <button id="eh-reverse-btn" class="eh-icon-btn" title="反向阅读">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
+            <button id="eh-reverse-btn" class="eh-icon-btn" title="反向阅读 (左右方向切换)">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 5l-5 5 5 5" />
+                <path d="M16 5l5 5-5 5" />
+                <path d="M11 12h2" />
               </svg>
             </button>
             <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
@@ -363,8 +365,6 @@
                 <input type="number" id="eh-scroll-speed" min="0.1" max="100" step="0.1" value="3">
               </div>
             </div>
-
-            <button id="eh-close-settings" class="eh-btn">关闭</button>
           </div>
         </div>
       </div>
@@ -395,6 +395,11 @@
    * 初始化阅读器功能
    */
   function initializeReader(pageData) {
+    if (window.__EH_READER_INIT) {
+      console.warn('[EH Modern Reader] 已初始化，跳过重复执行');
+      return;
+    }
+    window.__EH_READER_INIT = true;
     console.log('[EH Modern Reader] 初始化阅读器');
     console.log('[EH Modern Reader] 页面数:', pageData.pagecount);
     console.log('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
@@ -468,7 +473,7 @@
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
       reverseBtn: document.getElementById('eh-reverse-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
-      closeSettingsBtn: document.getElementById('eh-close-settings'),
+      
   readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
   preloadCountInput: document.getElementById('eh-preload-count'),
   autoIntervalInput: document.getElementById('eh-auto-interval'),
@@ -1006,10 +1011,9 @@
     function updateThumbnailHighlight(pageNum) {
       const thumbnails = document.querySelectorAll('.eh-thumbnail');
       if (!thumbnails || thumbnails.length === 0) return;
-      // 逻辑页号 -> 物理索引（反向时映射）
-      const physicalPage = state.settings.reverse ? (state.pageCount - pageNum + 1) : pageNum;
-      const physIndex = physicalPage - 1;
-      const currentThumb = thumbnails[physIndex];
+      // 使用逻辑页号直接索引到 DOM 顺序（不随反向改变）
+      const idx = Math.max(0, Math.min(thumbnails.length - 1, pageNum - 1));
+      const currentThumb = thumbnails[idx];
       const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
       
       // 移除旧的高亮
@@ -1026,7 +1030,7 @@
     }
 
     // 生成缩略图
-    function generateThumbnails() {
+  function generateThumbnails() {
       if (!elements.thumbnails) {
         console.warn('[EH Modern Reader] 缩略图容器不存在');
         return;
@@ -1042,15 +1046,15 @@
         return;
       }
       
-      const list = state.settings.reverse ? [...state.imagelist].slice().reverse() : state.imagelist;
+      const list = state.imagelist;
       list.forEach((imageData, iterIndex) => {
-        const physicalIndex = state.settings.reverse ? (state.pageCount - iterIndex - 1) : iterIndex;
+        const physicalIndex = iterIndex;
         const thumb = document.createElement('div');
         thumb.className = 'eh-thumbnail';
-        if (physicalIndex === 0) thumb.classList.add('active');
+        // 初始不设置 active，高亮由 updateThumbnailHighlight 控制
         
-        const displayNum = physicalIndex + 1; // 显示的页码
-        const logicalPage = state.settings.reverse ? (state.pageCount - physicalIndex) : displayNum;
+  const displayNum = physicalIndex + 1; // 显示的页码
+  const logicalPage = displayNum; // 逻辑页与 DOM 顺序一致
         thumb.innerHTML = `
           <div class="eh-thumbnail-placeholder" title="第 ${displayNum} 页" role="img" aria-label="缩略图 ${displayNum}">
             <span style="display: none;">${displayNum}</span>
@@ -1370,14 +1374,7 @@
       };
     }
 
-    if (elements.closeSettingsBtn) {
-      elements.closeSettingsBtn.onclick = () => {
-        console.log('[EH Modern Reader] 关闭设置面板');
-        if (elements.settingsPanel) {
-          elements.settingsPanel.classList.add('eh-hidden');
-        }
-      };
-    }
+    // 移除关闭按钮逻辑（改为点击遮罩关闭）
 
     // 点击面板外部关闭
     if (elements.settingsPanel) {
@@ -1393,15 +1390,13 @@
     function applyReverseState() {
       try {
         const reversed = !!state.settings.reverse;
-        // 缩略图容器和内容都反向
+        // 缩略图容器方向（使用 flex-direction 实现从右向左的起点）
         if (elements.thumbnails) {
-          // 容器反向显示
-          elements.thumbnails.style.transform = reversed ? 'scaleX(-1)' : '';
-          // 每个缩略图内容反向回来
-          const thumbnails = elements.thumbnails.querySelectorAll('.eh-thumbnail');
-          thumbnails.forEach(thumb => {
-            thumb.style.transform = reversed ? 'scaleX(-1)' : '';
-          });
+          elements.thumbnails.style.display = 'flex';
+          elements.thumbnails.style.flexDirection = reversed ? 'row-reverse' : 'row';
+          // 清理任何历史 transform
+          const thumbs = elements.thumbnails.querySelectorAll('.eh-thumbnail');
+          thumbs.forEach(t => { t.style.transform = ''; });
         }
         // 横向连续容器也反向
         const horizontalContainer = document.getElementById('eh-continuous-horizontal');
