@@ -236,6 +236,11 @@
             <span id="eh-page-info" title="快捷键: ← → 翻页 | + - 缩放 | 0 重置 | 空格 下一页">1 / ${pageData.pagecount}</span>
           </div>
           <div class="eh-header-right">
+            <button id="eh-reverse-btn" class="eh-icon-btn" title="反向阅读">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 11l-5-5-5 5M17 18l-5-5-5 5"/>
+              </svg>
+            </button>
             <button id="eh-settings-btn" class="eh-icon-btn" title="设置">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="3"/>
@@ -340,14 +345,7 @@
                   </label>
                 </div>
             </div>
-              <div class="eh-setting-item eh-setting-inline">
-                <label for="eh-reverse-toggle">反向阅读</label>
-                <label class="eh-toggle-switch">
-                  <input type="checkbox" id="eh-reverse-toggle" />
-                  <span class="eh-toggle-slider"></span>
-                </label>
-              </div>
-            </div>            <div class="eh-setting-group">
+            <div class="eh-setting-group">
               <div class="eh-setting-item eh-setting-inline">
                 <label for="eh-preload-count">预加载页数</label>
                 <input type="number" id="eh-preload-count" min="0" max="10" step="1" value="2">
@@ -468,13 +466,13 @@
       settingsBtn: document.getElementById('eh-settings-btn'),
   autoBtn: document.getElementById('eh-auto-btn'),
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
+      reverseBtn: document.getElementById('eh-reverse-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
       closeSettingsBtn: document.getElementById('eh-close-settings'),
   readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
   preloadCountInput: document.getElementById('eh-preload-count'),
   autoIntervalInput: document.getElementById('eh-auto-interval'),
   scrollSpeedInput: document.getElementById('eh-scroll-speed')
-  , reverseToggle: document.getElementById('eh-reverse-toggle')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -491,6 +489,18 @@
         });
       } catch {}
     }
+
+    // 同步反向按钮的状态
+    function updateReverseBtn() {
+      if (elements.reverseBtn) {
+        if (state.settings.reverse) {
+          elements.reverseBtn.classList.add('eh-active');
+        } else {
+          elements.reverseBtn.classList.remove('eh-active');
+        }
+      }
+    }
+    updateReverseBtn();
 
     // 同步定时翻页和滚动速度输入框到状态
     if (elements.autoIntervalInput) {
@@ -1369,13 +1379,39 @@
       };
     }
 
+    // 点击面板外部关闭
+    if (elements.settingsPanel) {
+      elements.settingsPanel.addEventListener('click', (e) => {
+        // 如果点击的是面板背景层（overlay），而不是面板内容
+        if (e.target === elements.settingsPanel) {
+          elements.settingsPanel.classList.add('eh-hidden');
+        }
+      });
+    }
+
     // 反向开关
     function applyReverseState() {
       try {
         const reversed = !!state.settings.reverse;
-        // 缩略图方向
+        // 缩略图容器和内容都反向
         if (elements.thumbnails) {
-          elements.thumbnails.style.flexDirection = reversed ? 'row-reverse' : 'row';
+          // 容器反向显示
+          elements.thumbnails.style.transform = reversed ? 'scaleX(-1)' : '';
+          // 每个缩略图内容反向回来
+          const thumbnails = elements.thumbnails.querySelectorAll('.eh-thumbnail');
+          thumbnails.forEach(thumb => {
+            thumb.style.transform = reversed ? 'scaleX(-1)' : '';
+          });
+        }
+        // 横向连续容器也反向
+        const horizontalContainer = document.getElementById('eh-continuous-horizontal');
+        if (horizontalContainer) {
+          horizontalContainer.style.transform = reversed ? 'scaleX(-1)' : '';
+          // 每个图片wrapper也要翻转回来
+          const wrappers = horizontalContainer.querySelectorAll('.eh-ch-wrapper');
+          wrappers.forEach(wrapper => {
+            wrapper.style.transform = reversed ? 'scaleX(-1)' : '';
+          });
         }
         // 进度条视觉翻转：使用 transform scaleX(-1)
         const track = elements.sliderTrack;
@@ -1386,13 +1422,17 @@
             track.style.transform = '';
           }
         }
+        // 更新按钮状态
+        updateReverseBtn();
       } catch {}
     }
-    if (elements.reverseToggle) {
-      elements.reverseToggle.addEventListener('change', () => {
-        state.settings.reverse = !!elements.reverseToggle.checked;
+    
+    // 反向按钮点击事件
+    if (elements.reverseBtn) {
+      elements.reverseBtn.onclick = () => {
+        state.settings.reverse = !state.settings.reverse;
         applyReverseState();
-      });
+      };
     }
 
     if (elements.progressBar) {
@@ -1626,9 +1666,12 @@
     }
 
     function showDoublePages(pageNum) {
+      console.log('[EH Modern Reader] 显示双页:', pageNum);
+      
       // 第一页（封面）单独显示居中
       if (pageNum === 1) {
-        ensureRealImageUrl(0).then(url => {
+        const physicalIdx = state.settings.reverse ? (state.pageCount - 1) : 0;
+        ensureRealImageUrl(physicalIdx).then(url => {
           doublePage.leftPage.style.display = 'none';
           doublePage.rightPage.src = url;
           doublePage.rightPage.style.display = 'block';
@@ -1637,17 +1680,25 @@
         return;
       }
 
-      // 其他页：双页模式 (2-3, 4-5, 6-7...)
-      // 计算左页和右页的索引
-      const pairStart = Math.floor((pageNum - 1) / 2) * 2 + 1; // 奇数页为左页起点
-      const leftPageNum = pairStart;
-      const rightPageNum = pairStart + 1;
+      // 其他页：双页模式
+      // pageNum=2 显示 2-3页，pageNum=3 显示 2-3页
+      // pageNum=4 显示 4-5页，pageNum=5 显示 4-5页
+      const pairStart = pageNum % 2 === 0 ? pageNum : (pageNum - 1);
+      let leftPageNum = pairStart;
+      let rightPageNum = pairStart + 1;
+
+      console.log('[EH Modern Reader] 双页对:', leftPageNum, '-', rightPageNum);
 
       // 物理索引映射
       const getPhysicalIndex = (logical) => {
         const physicalPage = state.settings.reverse ? (state.pageCount - logical + 1) : logical;
         return physicalPage - 1;
       };
+
+      // 反向模式下左右页交换
+      if (state.settings.reverse) {
+        [leftPageNum, rightPageNum] = [rightPageNum, leftPageNum];
+      }
 
       const leftIdx = getPhysicalIndex(leftPageNum);
       const rightIdx = getPhysicalIndex(rightPageNum);
@@ -1691,6 +1742,11 @@
         continuous.container = document.createElement('div');
         continuous.container.id = 'eh-continuous-horizontal';
         continuous.container.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:16px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 16px;';
+        
+        // 反向模式下整体镜像翻转
+        if (state.settings.reverse) {
+          continuous.container.style.transform = 'scaleX(-1)';
+        }
 
         // 初始估算比例：若当前单页已加载则用其真实比例，否则用默认 0.7
         let baseRatio = 0.7;
@@ -1707,6 +1763,10 @@
           const wrapper = document.createElement('div');
           wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
           wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative; min-width:120px;';
+          // 反向模式下每个图片也要翻转回来
+          if (state.settings.reverse) {
+            wrapper.style.transform = 'scaleX(-1)';
+          }
           // 设置初始估算比例：若已有缓存比例则使用，否则用 baseRatio
           const cachedR = ratioCache.get(i);
           wrapper.style.setProperty('--eh-aspect', String(cachedR || baseRatio));

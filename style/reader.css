@@ -926,8 +926,8 @@ body.eh-dark-mode #eh-page-input {
 .eh-panel-content {
   background: #fff;
   border-radius: 12px;
-  padding: 28px 32px;
-  max-width: 450px;
+  padding: 20px 24px;
+  max-width: 420px;
   width: 90%;
   max-height: 80vh;
   overflow-y: auto;
@@ -954,8 +954,8 @@ body.eh-dark-mode .eh-panel-content {
 }
 
 .eh-panel-content h3 {
-  font-size: 20px;
-  margin-bottom: 24px;
+  font-size: 18px;
+  margin-bottom: 16px;
   font-weight: 600;
   color: #222;
   text-align: center;
@@ -966,13 +966,13 @@ body.eh-dark-mode .eh-panel-content h3 {
 }
 
 .eh-setting-item {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .eh-setting-item label {
   display: block;
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
   font-weight: 500;
   color: #555;
   text-align: center;
