@@ -708,6 +708,7 @@
     let navDelay = 140; // 合并跳转延时(ms)
     let lastRequestedPage = null;
     let loadToken = 0; // 用于竞态控制
+    let scrollJumping = false; // 标记正在程序化跳转
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
@@ -717,6 +718,7 @@
         const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
         if (img) {
           if (options.instant) {
+            scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
             const container = document.getElementById('eh-continuous-horizontal');
             // 使用包装元素宽度进行居中，避免未加载图片宽度为 0 导致定位失效
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
@@ -724,7 +726,15 @@
             const basisOffsetLeft = (wrapper ? wrapper.offsetLeft : img.offsetLeft);
             const offset = basisOffsetLeft - Math.max(0, (container.clientWidth - basisWidth) / 2);
             container.scrollLeft = offset;
-            // 不主动派发 scroll 事件，避免在布局尚未稳定时误判为第1页
+            
+            // 立即更新当前页状态（不依赖 scroll 事件）
+            const newPageNum = idx + 1;
+            state.currentPage = newPageNum;
+            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
+            if (elements.progressBar) elements.progressBar.value = newPageNum;
+            updateThumbnailHighlight(newPageNum);
+            preloadAdjacentPages(newPageNum);
+            saveProgress(newPageNum);
             
             // 瞬时跳转后主动触发目标图片及附近图片加载
             setTimeout(() => {
@@ -757,20 +767,12 @@
                   });
                 }
               });
+              // 延迟复位跳转标记，避免 scroll 回调干扰
+              setTimeout(() => { scrollJumping = false; }, 200);
             }, 50);
           } else {
             const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
             wrapper.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-          }
-          // 横向模式下手动跳转时立即更新当前页相关状态（之前只依赖滚动事件，导致瞬移后状态滞后）
-          const newPageNum = idx + 1;
-          if (newPageNum !== state.currentPage) {
-            state.currentPage = newPageNum;
-            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
-            if (elements.progressBar) elements.progressBar.value = newPageNum;
-            updateThumbnailHighlight(newPageNum);
-            preloadAdjacentPages(newPageNum);
-            saveProgress(newPageNum);
           }
         }
         return;
@@ -1502,7 +1504,8 @@
         // 滚动时根据居中元素更新当前页与进度条/高亮
         let scrollUpdating = false;
         const onScroll = () => {
-          if (scrollUpdating) return;
+          // 跳过程序化跳转期间的滚动回调，避免误判当前页
+          if (scrollJumping || scrollUpdating) return;
           scrollUpdating = true;
           requestAnimationFrame(() => {
             try {
@@ -1510,8 +1513,7 @@
               let bestIdx = 0; let bestDist = Infinity;
               const imgs = continuous.container.querySelectorAll('img[data-page-index]');
               imgs.forEach((img) => {
-                const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
-                const rect = wrapper.getBoundingClientRect();
+                const rect = img.getBoundingClientRect();
                 const parentRect = continuous.container.getBoundingClientRect();
                 const mid = rect.left - parentRect.left + rect.width / 2;
                 const dist = Math.abs(mid - viewportMid);

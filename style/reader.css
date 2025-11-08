@@ -201,12 +201,11 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   position: relative;
 }
 
-/* 简洁空白占位：仅浅色块，按最终比例撑开空间 */
 .eh-ch-skeleton::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(120,120,120,0.15);
+  background: rgba(60, 60, 60, 0.08);
   border-radius: 4px;
 }
 
