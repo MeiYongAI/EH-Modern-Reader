@@ -243,7 +243,7 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                <path d="M8 7h8M8 11h8M8 15h5"/>
+                <path d="M12 6v7l3 3"/>
               </svg>
             </button>
             <button id="eh-auto-btn" class="eh-icon-btn" title="定时翻页 (单击开关, Alt+单击设置间隔)">
@@ -306,9 +306,9 @@
           </div>
 
           <!-- 进度条区 -->
-          <div class="eh-slider-container" style="display: flex; align-items: center; gap: 12px; padding: 12px 16px;">
-            <span id="eh-progress-current" class="eh-progress-text" style="min-width: 40px; text-align: right; font-size: 14px; color: rgba(255,255,255,0.9);">1</span>
-            <div class="eh-slider-track" id="eh-slider-track" style="flex: 1;">
+          <div class="eh-slider-container">
+            <span id="eh-progress-current" class="eh-progress-number">1</span>
+            <div class="eh-slider-track" id="eh-slider-track">
               <div class="eh-slider-fill" id="eh-slider-fill"></div>
               <input 
                 type="range" 
@@ -319,7 +319,7 @@
                 class="eh-progress-slider"
               />
             </div>
-            <span id="eh-progress-total" class="eh-progress-text" style="min-width: 40px; text-align: left; font-size: 14px; color: rgba(255,255,255,0.9);">${pageData.pagecount}</span>
+            <span id="eh-progress-total" class="eh-progress-number">${pageData.pagecount}</span>
           </div>
         </footer>
 
@@ -330,7 +330,7 @@
             
             <div class="eh-setting-group">
               <div class="eh-setting-item">
-                <div class="eh-radio-group" style="flex-direction: column; align-items: center; gap: 8px;">
+                <div class="eh-radio-group">
                   <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="single" checked>
                     <span>单页</span>
@@ -466,17 +466,15 @@
       themeBtn: document.getElementById('eh-theme-btn'),
       fullscreenBtn: document.getElementById('eh-fullscreen-btn'),
       settingsBtn: document.getElementById('eh-settings-btn'),
-      autoBtn: document.getElementById('eh-auto-btn'),
+  autoBtn: document.getElementById('eh-auto-btn'),
       thumbnailsToggleBtn: document.getElementById('eh-thumbnails-toggle-btn'),
       reverseBtn: document.getElementById('eh-reverse-btn'),
       settingsPanel: document.getElementById('eh-settings-panel'),
-      progressCurrent: document.getElementById('eh-progress-current'),
-      progressTotal: document.getElementById('eh-progress-total'),
       
-      readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
-      preloadCountInput: document.getElementById('eh-preload-count'),
-      autoIntervalInput: document.getElementById('eh-auto-interval'),
-      scrollSpeedInput: document.getElementById('eh-scroll-speed')
+  readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
+  preloadCountInput: document.getElementById('eh-preload-count'),
+  autoIntervalInput: document.getElementById('eh-auto-interval'),
+  scrollSpeedInput: document.getElementById('eh-scroll-speed')
     };
     // 验证必要的 DOM 元素
     const requiredElements = ['currentImage', 'viewer', 'thumbnails'];
@@ -500,29 +498,6 @@
       } catch {}
     }
 
-    // 更新进度条和页码显示（支持反向模式）
-    function updateProgressDisplay(pageNum) {
-      if (elements.progressBar) {
-        elements.progressBar.value = pageNum;
-      }
-      if (elements.pageInfo) {
-        elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
-      }
-      
-      // 更新进度条两侧的页码显示（支持反向）
-      if (elements.progressCurrent && elements.progressTotal) {
-        if (state.settings.reverse) {
-          // 反向模式：左侧显示总页数，右侧显示当前页
-          elements.progressCurrent.textContent = state.pageCount;
-          elements.progressTotal.textContent = pageNum;
-        } else {
-          // 正常模式：左侧显示当前页，右侧显示总页数
-          elements.progressCurrent.textContent = pageNum;
-          elements.progressTotal.textContent = state.pageCount;
-        }
-      }
-    }
-
     // 同步反向按钮的状态
     function updateReverseBtn() {
       if (elements.reverseBtn) {
@@ -532,8 +507,6 @@
           elements.reverseBtn.classList.remove('eh-active');
         }
       }
-      // 反向切换时更新进度条显示
-      updateProgressDisplay(state.currentPage);
     }
     updateReverseBtn();
 
@@ -1010,7 +983,8 @@
             // 立即更新当前页状态（不依赖 scroll 事件）
             const newPageNum = pageNum; // 保持逻辑页号
             state.currentPage = newPageNum;
-            updateProgressDisplay(newPageNum);
+            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
+            if (elements.progressBar) elements.progressBar.value = newPageNum;
             updateThumbnailHighlight(newPageNum);
             preloadAdjacentPages(newPageNum);
             saveProgress(newPageNum);
@@ -1100,17 +1074,6 @@
     }
 
     async function internalShowPage(pageNum) {
-      // 双页模式：直接调用showDoublePages
-      if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-        state.currentPage = pageNum;
-        showDoublePages(pageNum);
-        updateThumbnailHighlight(pageNum);
-        preloadAdjacentPages(pageNum);
-        saveProgress(pageNum);
-        return;
-      }
-      
-      // 单页模式：使用原有逻辑
       const token = ++loadToken;
       await showPage(pageNum, token);
     }
@@ -1164,9 +1127,13 @@
           elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
         }
 
-        // 更新进度条位置
+        // 更新进度条位置和两端页码
         if (elements.progressBar) {
           elements.progressBar.value = pageNum;
+        }
+        const progressCurrent = document.getElementById('eh-progress-current');
+        if (progressCurrent) {
+          progressCurrent.textContent = pageNum;
         }
 
         if (elements.pageInput) {
@@ -1459,11 +1426,10 @@
         const clickX = e.clientX - rect.left;
         const viewerWidth = rect.width;
         
-        // 左中右三等分
         const leftThreshold = viewerWidth / 3;
         const rightThreshold = viewerWidth * 2 / 3;
         
-        // 中间1/3：切换顶栏显示/隐藏（所有模式通用）
+        // 中间1/3区域：切换顶栏显示/隐藏（所有模式通用）
         if (clickX >= leftThreshold && clickX <= rightThreshold) {
           const header = document.getElementById('eh-header');
           if (header) {
@@ -1501,7 +1467,6 @@
           // 点击右侧：反向时向前翻（-1），正常时向后翻（+1）
           direction = state.settings.reverse ? -1 : 1;
         } else {
-          // 理论上不会到这里（中间已处理）
           return;
         }
         
@@ -1689,6 +1654,19 @@
             track.style.transform = 'scaleX(-1)';
           } else {
             track.style.transform = '';
+          }
+        }
+        // 进度条两端页码切换位置
+        const progressCurrent = document.getElementById('eh-progress-current');
+        const progressTotal = document.getElementById('eh-progress-total');
+        const sliderContainer = document.querySelector('.eh-slider-container');
+        if (progressCurrent && progressTotal && sliderContainer) {
+          if (reversed) {
+            // 反向：总页数在左，当前页在右
+            sliderContainer.style.flexDirection = 'row-reverse';
+          } else {
+            // 正常：当前页在左，总页数在右
+            sliderContainer.style.flexDirection = 'row';
           }
         }
         // 如果自动播放正在运行，重启以应用新方向
@@ -1934,6 +1912,17 @@
 
     function enterDoublePageMode() {
       console.log('[EH Modern Reader] 进入双页阅读模式');
+      
+      // 退出横向连续模式
+      if (continuous.container && continuous.container.parentElement) {
+        continuous.container.parentElement.removeChild(continuous.container);
+        continuous.container = null;
+      }
+      if (continuous.observer) {
+        continuous.observer.disconnect();
+        continuous.observer = null;
+      }
+      
       // 隐藏单页viewer
       const singleViewer = document.getElementById('eh-viewer');
       if (singleViewer) singleViewer.style.display = 'none';
@@ -1942,15 +1931,15 @@
       if (!doublePage.container) {
         doublePage.container = document.createElement('div');
         doublePage.container.id = 'eh-double-page-container';
-        doublePage.container.style.cssText = 'display:flex; justify-content:center; align-items:center; gap:8px; width:100%; height:100%; padding:16px; box-sizing:border-box;';
+        doublePage.container.style.cssText = 'display:flex; justify-content:center; align-items:center; gap:16px; width:100%; height:100%; padding:16px; box-sizing:border-box; background: #000;';
 
         doublePage.leftPage = document.createElement('img');
         doublePage.leftPage.id = 'eh-double-left';
-        doublePage.leftPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; display:none;';
+        doublePage.leftPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; cursor:pointer;';
 
         doublePage.rightPage = document.createElement('img');
         doublePage.rightPage.id = 'eh-double-right';
-        doublePage.rightPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; display:none;';
+        doublePage.rightPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; cursor:pointer;';
 
         doublePage.container.appendChild(doublePage.leftPage);
         doublePage.container.appendChild(doublePage.rightPage);
@@ -1959,6 +1948,51 @@
         if (viewerContainer) {
           viewerContainer.appendChild(doublePage.container);
         }
+        
+        // 添加点击事件（左翻/右翻）
+        doublePage.leftPage.onclick = () => {
+          const direction = state.settings.reverse ? 1 : -1;
+          let target = state.currentPage + direction * 2;
+          const isOddTotal = state.pageCount % 2 === 1;
+          if (direction === -1) {
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          } else if (direction === 1) {
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          }
+          if (target >= 1 && target <= state.pageCount) {
+            scheduleShowPage(target);
+          }
+        };
+        
+        doublePage.rightPage.onclick = () => {
+          const direction = state.settings.reverse ? -1 : 1;
+          let target = state.currentPage + direction * 2;
+          const isOddTotal = state.pageCount % 2 === 1;
+          if (direction === -1) {
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          } else if (direction === 1) {
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          }
+          if (target >= 1 && target <= state.pageCount) {
+            scheduleShowPage(target);
+          }
+        };
+        
+        // 添加滚轮翻页
+        doublePage.container.addEventListener('wheel', (e) => {
+          const direction = e.deltaY > 0 ? 1 : -1;
+          let target = state.currentPage + direction * 2;
+          const isOddTotal = state.pageCount % 2 === 1;
+          if (direction === -1) {
+            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
+          } else if (direction === 1) {
+            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
+          }
+          if (target >= 1 && target <= state.pageCount) {
+            scheduleShowPage(target);
+          }
+          e.preventDefault();
+        }, { passive: false });
       } else {
         doublePage.container.style.display = 'flex';
       }
@@ -1981,52 +2015,33 @@
         rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
       }
       console.log('[EH Modern Reader] 显示双页(逻辑页):', logicalPage, '=>', leftNum, rightNum);
-      
-      // 更新进度显示
-      updateProgressDisplay(logicalPage);
-      
+      if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${total}`;
       // 双页模式下：仅做左右交换，不反转物理索引，防止跳到末尾图片
       const mapIndex = (num) => { if (!num) return null; return num - 1; };
       let finalLeft = leftNum, finalRight = rightNum;
       if (state.settings.reverse) { [finalLeft, finalRight] = [rightNum, leftNum]; }
       const leftIdx = mapIndex(finalLeft);
       const rightIdx = mapIndex(finalRight);
-      
-      // 确保双页容器存在且可见
-      if (!doublePage.leftPage || !doublePage.rightPage) {
-        console.error('[EH Modern Reader] 双页元素不存在');
-        return;
-      }
-      
-      // 加载左侧图片
-      if (finalLeft && leftIdx != null) {
+      if (leftNum && leftIdx != null) {
         ensureRealImageUrl(leftIdx).then(({ url }) => {
           doublePage.leftPage.src = url;
           doublePage.leftPage.style.display = 'block';
-          doublePage.leftPage.style.maxWidth = finalRight ? '50%' : '100%';
+          doublePage.leftPage.style.maxWidth = rightNum ? '50%' : '100%';
         }).catch(error => {
           console.error('[EH Modern Reader] 双页左侧加载失败:', error);
-          doublePage.leftPage.style.display = 'none';
+          showErrorMessage(leftNum, `左侧图片加载失败: ${error.message}`);
         });
-      } else { 
-        doublePage.leftPage.style.display = 'none'; 
-        doublePage.leftPage.src = '';
-      }
-      
-      // 加载右侧图片
-      if (finalRight && rightIdx != null) {
+      } else { doublePage.leftPage.style.display = 'none'; }
+      if (rightNum && rightIdx != null) {
         ensureRealImageUrl(rightIdx).then(({ url }) => {
           doublePage.rightPage.src = url;
           doublePage.rightPage.style.display = 'block';
           doublePage.rightPage.style.maxWidth = '50%';
         }).catch(error => {
           console.error('[EH Modern Reader] 双页右侧加载失败:', error);
-          doublePage.rightPage.style.display = 'none';
+          showErrorMessage(rightNum, `右侧图片加载失败: ${error.message}`);
         });
-      } else { 
-        doublePage.rightPage.style.display = 'none';
-        doublePage.rightPage.src = '';
-      }
+      } else { doublePage.rightPage.style.display = 'none'; }
     }
 
     function exitDoublePageMode() {
@@ -2174,7 +2189,7 @@
               }
             }
           });
-        }, { root: continuous.container, rootMargin: '200px', threshold: 0.01 });
+        }, { root: continuous.container, rootMargin: '500px', threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
@@ -2226,8 +2241,8 @@
                 }).finally(() => {
                   centerImg.removeAttribute('data-loading');
                 });
-                // 立即安排相邻1-2张的高优先级预热
-                const neighbors = [bestIdx - 1, bestIdx + 1].filter(i => i >= 0 && i < state.pageCount);
+                // 立即安排相邻3-4张的高优先级预热
+                const neighbors = [bestIdx - 2, bestIdx - 1, bestIdx + 1, bestIdx + 2].filter(i => i >= 0 && i < state.pageCount);
                 enqueuePrefetch(neighbors, true);
               }
 
@@ -2444,34 +2459,28 @@
       elements.bottomMenu.classList.add('eh-menu-hidden');
     }
 
-    // 缩略图和进度条始终显示（移除hover条件）
-    if (elements.bottomMenu) {
-      if (state.settings.menuVisible) {
-        elements.bottomMenu.classList.remove('eh-menu-hidden');
-      } else {
-        elements.bottomMenu.classList.add('eh-menu-hidden');
-      }
-    }
-
-    // 顶部缩略图切换按钮（现在只切换菜单显示/隐藏）
+    // 顶部缩略图悬停开关按钮
     if (elements.thumbnailsToggleBtn) {
-      elements.thumbnailsToggleBtn.onclick = () => {
-        state.settings.menuVisible = !state.settings.menuVisible;
-        if (elements.bottomMenu) {
-          if (state.settings.menuVisible) {
+      const updateToggleVisual = () => {
+        if (state.settings.thumbnailsHover) {
+          elements.thumbnailsToggleBtn.classList.add('eh-active');
+          if (elements.bottomMenu) {
             elements.bottomMenu.classList.remove('eh-menu-hidden');
-          } else {
+          }
+        } else {
+          elements.thumbnailsToggleBtn.classList.remove('eh-active');
+          if (elements.bottomMenu) {
             elements.bottomMenu.classList.add('eh-menu-hidden');
           }
         }
-        if (state.settings.menuVisible) {
-          elements.thumbnailsToggleBtn.classList.add('eh-active');
-        } else {
-          elements.thumbnailsToggleBtn.classList.remove('eh-active');
-        }
+      };
+      updateToggleVisual();
+      elements.thumbnailsToggleBtn.onclick = () => {
+        state.settings.thumbnailsHover = !state.settings.thumbnailsHover;
+        updateToggleVisual();
       };
     }
-    
+
     // 应用默认深色模式
     if (state.settings.darkMode) {
       document.body.classList.add('eh-dark-mode');
