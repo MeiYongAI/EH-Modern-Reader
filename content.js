@@ -1286,17 +1286,13 @@
           } catch (e) {
             console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
           }
-          // 使用 <img> 承载，便于后续样式控制
-          const thumbImg = document.createElement('img');
-          thumbImg.width = containerW;
-          thumbImg.height = containerH;
-          thumbImg.alt = `Page ${pageNum}`;
-          thumbImg.title = `Page ${pageNum}: ${title}`;
-          try { thumbImg.src = canvas.toDataURL('image/webp'); } catch { thumbImg.src = canvas.toDataURL(); }
-
+          // 直接使用 canvas 作为缩略图节点（避免跨域导出 dataURL 的安全限制）
+          canvas.setAttribute('role', 'img');
+          canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
+          canvas.style.display = 'block';
           // 幂等渲染
           thumb.replaceChildren();
-          thumb.appendChild(thumbImg);
+          thumb.appendChild(canvas);
           const badge = document.createElement('div');
           badge.className = 'eh-thumbnail-number';
           badge.textContent = String(pageNum);

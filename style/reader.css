@@ -363,6 +363,12 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   object-fit: contain;
   display: block;
 }
+/* Canvas 缩略图等同于 img 尺寸与居中展示 */
+.eh-thumbnail > canvas {
+  width: 100px !important;
+  height: 142px !important;
+  display: block;
+}
 
 .eh-thumbnail:hover { transform: scale(1.04); }
 
