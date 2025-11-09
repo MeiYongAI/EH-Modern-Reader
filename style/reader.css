@@ -318,6 +318,7 @@ body.eh-dark-mode #eh-bottom-menu {
 
 .eh-thumbnail {
   flex-shrink: 0;
+  width: 100px; /* 固定宽度，与缩略图内容一致 */
   display: flex;
   flex-direction: column;
   align-items: center;
