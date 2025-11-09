@@ -31,31 +31,6 @@ body.eh-dark-mode #eh-header {
   border-bottom-color: #404040;
 }
 
-body.eh-dark-mode #eh-sidebar {
-  background: #2d2d2d;
-  border-right-color: #404040;
-}
-
-body.eh-dark-mode #eh-footer {
-  background: #2d2d2d;
-  border-top-color: #404040;
-}
-
-body.eh-dark-mode .eh-thumb {
-  background-color: #3a3a3a;
-  border-color: #505050;
-}
-
-body.eh-dark-mode .eh-thumb:hover {
-  border-color: #FF6B9D;
-  background-color: #454545;
-}
-
-body.eh-dark-mode .eh-thumb.active {
-  border-color: #FF6B9D;
-  background-color: #505050;
-}
-
 body.eh-dark-mode .eh-panel-content {
   background: #2d2d2d;
   color: #e0e0e0;
@@ -77,11 +52,16 @@ body.eh-dark-mode .eh-loading {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative; /* 为绝对定位的header提供定位上下文 */
 }
 
 /* ==================== 顶部工具栏 ==================== */
 
 #eh-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 56px;
   background: #fff;
   border-bottom: 1px solid #e0e0e0;
@@ -91,7 +71,20 @@ body.eh-dark-mode .eh-loading {
   padding: 0 16px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 100;
-  flex-shrink: 0;
+  pointer-events: none; /* 允许点击穿透 */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* 隐藏header时向上滑出 */
+#eh-header.eh-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 恢复header内部按钮和元素的点击能力 */
+#eh-header * {
+  pointer-events: auto;
 }
 
 .eh-header-left,
@@ -160,6 +153,16 @@ body.eh-dark-mode .eh-icon-btn:hover {
   background: rgba(255,255,255,0.1);
 }
 
+/* 缩略图悬停开关激活样式 */
+.eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.4);
+}
+body.eh-dark-mode .eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.5);
+}
+
 .eh-icon-btn:active {
   transform: scale(0.95);
 }
@@ -193,96 +196,301 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   display: flex;
   overflow: hidden;
   position: relative;
+  padding-top: 56px; /* 为header预留空间 */
+  transition: padding-top 0.3s ease;
 }
 
-/* ==================== 侧边栏 ==================== */
+/* header隐藏时，main占据全部空间 */
+#eh-main.eh-fullheight {
+  padding-top: 0;
+}
 
-#eh-sidebar {
+/* 隐藏横向连续模式容器的原生滚动条（使用自定义进度条） */
+#eh-continuous-horizontal {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+#eh-continuous-horizontal::-webkit-scrollbar {
   width: 0;
-  background: #fff;
-  border-right: 1px solid #e0e0e0;
-  display: flex;
-  flex-direction: column;
-  transition: width 0.3s ease;
-  overflow: hidden;
-  flex-shrink: 0;
+  height: 0;
+  display: none;            /* Chrome/Safari/Edge (Blink/WebKit) */
 }
 
-#eh-sidebar.eh-sidebar-visible {
-  width: 240px;
-}
-
-.eh-sidebar-header {
-  height: 48px;
+/* 横向模式的占位包装与骨架 */
+.eh-ch-wrapper {
+  height: 100%;
+  aspect-ratio: var(--eh-aspect, 0.7); /* 默认2:3纵向图 */
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid #e0e0e0;
-  font-weight: 500;
-  flex-shrink: 0;
+  justify-content: center;
+  position: relative;
 }
 
-body.eh-dark-mode .eh-sidebar-header {
-  border-bottom-color: #404040;
+.eh-ch-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(60, 60, 60, 0.08);
+  border-radius: 4px;
 }
 
-#eh-thumbnails {
+/* ==================== 图片查看区 ==================== */
+
+#eh-viewer {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  background: #f5f5f5;
+  cursor: pointer; /* 提示可点击切换菜单 */
 }
 
-#eh-thumbnails::-webkit-scrollbar {
-  width: 6px;
+body.eh-dark-mode #eh-viewer {
+  background: #1a1a1a;
 }
 
-#eh-thumbnails::-webkit-scrollbar-track {
-  background: transparent;
+/* ==================== 底部菜单(缩略图+进度条+按钮) ==================== */
+
+#eh-bottom-menu {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
 }
 
-#eh-thumbnails::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.2);
+body.eh-dark-mode #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(20, 20, 20, 0.98) 0%, rgba(30, 30, 30, 0.95) 100%);
+}
+
+/* 浅色模式下的底部栏样式覆盖 */
+body:not(.eh-dark-mode) #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+#eh-bottom-menu.eh-menu-hidden {
+  bottom: calc(-100% - 20px); /* 完全隐藏到屏幕外 */
+}
+
+/* 缩略图容器 */
+
+.eh-thumbnails-container {
+  height: 160px;  /* 增高以完整显示缩略图 */
+  padding: 6px 0 6px 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+body:not(.eh-dark-mode) .eh-thumbnails-container { border-bottom-color: rgba(0,0,0,0.06); }
+
+.eh-thumbnails-horizontal {
+  display: flex;
+  flex-direction: row;
+  align-items: center; /* 垂直居中缩略图 */
+  gap: 8px;
+  padding: 6px 12px; /* 微调内边距 */
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar {
+  height: 6px;
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+/* 浅色模式滚动条颜色 */
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
 
-body.eh-dark-mode #eh-thumbnails::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.2);
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ==================== 缩略图 ==================== */
 
-.eh-thumb {
-  width: 100%;
-  aspect-ratio: 200 / 281;
-  margin-bottom: 8px;
+.eh-thumbnail {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center; /* 内部img/canvas垂直居中 */
+  justify-content: center; /* 内部img/canvas水平居中 */
+  position: relative;
+  cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
-  cursor: pointer;
-  background-color: #f0f0f0;
   border: 2px solid transparent;
-  transition: all 0.2s;
-  position: relative;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  background: rgba(255,255,255,0.04); /* 默认轻微底色，真正缩略图加载后会移除 */
 }
 
-.eh-thumb:hover {
-  border-color: #FF6B9D;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.eh-thumb.active {
-  border-color: #FF6B9D;
-  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
-}
-
-.eh-thumb-image {
+/* 缩略图占位内部容器：保持尺寸稳定，快速背景预览挂载在父 .eh-thumbnail 上 */
+.eh-thumb-placeholder {
   width: 100%;
   height: 100%;
-  background-size: cover;
-  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  background: transparent;
+  user-select: none;
 }
+body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
+
+/* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
+.eh-thumbnail > img {
+  width: 100px;
+  height: 142px;
+  object-fit: contain;
+  display: block;
+}
+/* Canvas 缩略图等同于 img 尺寸与居中展示 */
+.eh-thumbnail > canvas {
+  width: 100px !important;
+  height: 142px !important;
+  display: block;
+}
+
+.eh-thumbnail:hover { transform: scale(1.04); }
+
+.eh-thumbnail.active { border: 2px solid #FF6B9D; box-shadow: 0 0 0 3px rgba(255,107,157,0.25); }
+
+.eh-thumbnail-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.eh-thumbnail.active .eh-thumbnail-number {
+  color: #FF6B9D;
+  font-weight: 600;
+}
+
+/* ==================== 进度条区域 ==================== */
+
+.eh-slider-container {
+  padding: 16px 20px 12px 20px;  /* 增加上下空间 */
+  display: flex;
+  flex-direction: row;  /* 改为横向布局 */
+  align-items: center;
+  gap: 12px;
+}
+
+.eh-progress-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  opacity: 0.8;
+  min-width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+}
+body:not(.eh-dark-mode) .eh-progress-number { color: #333; opacity: 0.9; }
+
+.eh-slider-track {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  flex: 1;  /* 让进度条占据剩余空间 */
+}
+
+.eh-slider-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: linear-gradient(to right, #FF6B9D 0%, #FF8FAB 100%);
+  border-radius: 3px 0 0 3px;
+  pointer-events: none;
+  z-index: 1;
+  transition: width 0.2s ease;
+  box-shadow: 0 0 8px rgba(255, 107, 157, 0.5);
+}
+
+.eh-progress-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
+
+.eh-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF8FAB 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(255, 107, 157, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.eh-progress-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 3px 10px rgba(255, 107, 157, 0.6);
+}
+
+.eh-progress-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+/* 隐藏进度条的粉色填充，仅保留拖动球 */
+#eh-slider-fill, .eh-slider-fill {
+  display: none !important;
+}
+
+/* 移除进度条冗余页码（顶部已显示） */
 
 .eh-thumb-number {
   position: absolute;
@@ -294,6 +502,73 @@ body.eh-dark-mode #eh-thumbnails::-webkit-scrollbar-thumb {
   padding: 2px 6px;
   border-radius: 4px;
   font-weight: 500;
+}
+
+/* 缩略图容器（每个容器只放一张缩略图） */
+.eh-thumbnail {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
+  margin-bottom: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.eh-thumbnail:hover {
+  border-color: #FF6B9D;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.eh-thumbnail.active {
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
+}
+
+.eh-thumbnail-placeholder {
+  width: 100%;
+  height: 281px;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+body.eh-dark-mode .eh-thumbnail-placeholder {
+  background-color: #3a3a3a;
+}
+
+.eh-thumbnail-placeholder span {
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.2);
+  position: absolute;
+  z-index: 1;
+}
+
+body.eh-dark-mode .eh-thumbnail-placeholder span {
+  color: rgba(255,255,255,0.2);
+}
+
+.eh-thumbnail-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  z-index: 2;
 }
 
 /* ==================== 图片查看区 ==================== */
@@ -326,10 +601,20 @@ body.eh-dark-mode #eh-image-container {
   max-height: 100%;
   object-fit: contain;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease;
   cursor: pointer;
   user-select: none;
   -webkit-user-drag: none;
+  transform-origin: center center;
+}
+
+#eh-current-image[src] {
+  opacity: 1;
+}
+
+/* 缩放时的过渡效果 */
+#eh-current-image.zooming {
+  transition: transform 0.1s ease;
 }
 
 #eh-current-image[src] {
@@ -422,31 +707,94 @@ body.eh-dark-mode .eh-nav-btn:hover {
   right: 24px;
 }
 
+/* ==================== 浮动侧边栏切换按钮 ==================== */
+
+.eh-sidebar-toggle-float {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float {
+  background: rgba(45, 45, 45, 0.95);
+  color: #e0e0e0;
+}
+
+/* 当侧边栏隐藏时显示浮动按钮 */
+#eh-sidebar.eh-sidebar-hidden ~ #eh-viewer .eh-sidebar-toggle-float,
+.eh-sidebar-hidden ~ * .eh-sidebar-toggle-float {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.eh-sidebar-toggle-float:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float:hover {
+  background: rgba(60, 60, 60, 1);
+}
+
+.eh-sidebar-toggle-float:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.eh-sidebar-toggle-float svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
 /* ==================== 底部控制栏 ==================== */
 
 #eh-footer {
-  height: 64px;
+  height: 72px;
   background: #fff;
   border-top: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
-  padding: 8px 16px;
-  gap: 8px;
-  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  padding: 12px 20px;
+  gap: 10px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
   z-index: 100;
   flex-shrink: 0;
 }
 
+body.eh-dark-mode #eh-footer {
+  background: #2a2a2a;
+  border-top-color: #404040;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+}
+
 .eh-progress-container {
   position: relative;
-  height: 24px;
+  height: 28px;
   display: flex;
   align-items: center;
+  padding: 0 4px;
 }
 
 .eh-progress-bar {
   width: 100%;
-  height: 6px;
+  height: 8px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -454,32 +802,46 @@ body.eh-dark-mode .eh-nav-btn:hover {
   cursor: pointer;
   position: relative;
   z-index: 2;
+  border-radius: 4px;
 }
 
 .eh-progress-bar::-webkit-slider-track {
-  height: 6px;
-  background: #e0e0e0;
-  border-radius: 3px;
+  height: 8px;
+  background: linear-gradient(to right, #FFE5EE 0%, #e0e0e0 0%);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 
 body.eh-dark-mode .eh-progress-bar::-webkit-slider-track {
-  background: #404040;
+  background: linear-gradient(to right, #4a2a3a 0%, #404040 0%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .eh-progress-bar::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  background: #FF6B9D;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF8FAB 100%);
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 3px solid #fff;
+}
+
+body.eh-dark-mode .eh-progress-bar::-webkit-slider-thumb {
+  border-color: #2a2a2a;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.6);
 }
 
 .eh-progress-bar::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.5);
+}
+
+.eh-progress-bar::-webkit-slider-thumb:active {
+  transform: scale(1.05);
 }
 
 .eh-progress-bar::-moz-range-track {
@@ -609,13 +971,20 @@ body.eh-dark-mode #eh-page-input {
 .eh-panel-content {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
-  max-width: 400px;
-  width: 90%;
+  padding: 18px 20px;
+  max-width: 360px; /* 收窄弹窗 */
+  width: 92%;
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
   animation: eh-slideIn 0.3s ease;
+  color: #333;
+}
+
+body.eh-dark-mode .eh-panel-content {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
 @keyframes eh-slideIn {
@@ -630,25 +999,130 @@ body.eh-dark-mode #eh-page-input {
 }
 
 .eh-panel-content h3 {
-  font-size: 20px;
-  margin-bottom: 20px;
+  font-size: 18px;
+  margin-bottom: 16px;
   font-weight: 600;
+  color: #222;
+  text-align: center;
+}
+
+body.eh-dark-mode .eh-panel-content h3 {
+  color: #f0f0f0;
 }
 
 .eh-setting-item {
-  margin-bottom: 16px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .eh-setting-item label {
   display: block;
-  font-size: 14px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
   font-weight: 500;
-  color: #666;
+  color: #555;
+  text-align: center;
 }
 
 body.eh-dark-mode .eh-setting-item label {
-  color: #aaa;
+  color: #bbb;
+}
+
+/* 设置分组 */
+.eh-setting-group {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.eh-setting-group:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+body.eh-dark-mode .eh-setting-group {
+  border-bottom-color: #3a3a3a;
+}
+
+/* 分组标签 */
+.eh-setting-label-group {
+  font-size: 11px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 9px;
+}
+
+body.eh-dark-mode .eh-setting-label-group {
+  color: #777;
+}
+
+/* 内联设置项（label 和 input 同行） */
+.eh-setting-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+  min-height: 34px;
+}
+
+.eh-setting-inline label {
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+body.eh-dark-mode .eh-setting-inline label {
+  color: #e0e0e0;
+  flex: 1;
+}
+
+/* 数字输入：居中文本，移除浏览器默认spin按钮 */
+.eh-setting-inline input[type="number"] {
+  width: 90px;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  appearance: textfield; /* 标准属性 */
+  -moz-appearance: textfield; /* Firefox */
+}
+/* Chrome/Edge 隐藏上下箭头 */
+.eh-setting-inline input[type="number"]::-webkit-inner-spin-button,
+.eh-setting-inline input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.eh-setting-inline input[type="number"]:focus {
+  outline: none;
+  border-color: #FF6B9D;
+  font-size: 13px;
+  text-align: center;
+  background: #fff;
+}
+
+body.eh-dark-mode .eh-setting-inline input[type="number"] {
+  background: #333;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+body.eh-dark-mode .eh-setting-inline input[type="number"]:focus {
+  border-color: #FF6B9D;
+  background: #2a2a2a;
 }
 
 .eh-setting-item select {
@@ -674,6 +1148,164 @@ body.eh-dark-mode .eh-setting-item select {
   margin-right: 8px;
   cursor: pointer;
   accent-color: #FF6B9D;
+}
+
+/* 单选按钮组样式 */
+.eh-radio-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.eh-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fafafa;
+  color: #555;
+  user-select: none;
+}
+
+.eh-radio-label:hover {
+  border-color: #ffb3d1;
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.eh-radio-label input[type="radio"] {
+
+.eh-radio-label input[type="radio"]:checked + span {
+  color: #e91e63;
+  font-weight: 600;
+}
+
+.eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.25);
+}
+
+body.eh-dark-mode .eh-radio-label {
+  border-color: #484848;
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode .eh-radio-label:hover {
+  border-color: #ffb3d1;
+  background: #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+body.eh-dark-mode .eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #333;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.3);
+}
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #FF6B9D;
+}
+
+.eh-radio-label input[type="radio"]:checked + span {
+  font-weight: 600;
+  color: #FF6B9D;
+}
+
+body.eh-dark-mode .eh-radio-label {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #bbb;
+}
+
+body.eh-dark-mode .eh-radio-label:hover {
+  border-color: #FF6B9D;
+  background: rgba(255, 107, 157, 0.1);
+}
+
+body.eh-dark-mode .eh-radio-label input[type="radio"]:checked + span {
+  color: #FF6B9D;
+}
+
+/* Toggle Switch Styles */
+.eh-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  vertical-align: middle;
+}
+
+.eh-toggle-switch input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.eh-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 26px;
+  transition: background-color 0.3s ease;
+}
+
+.eh-toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider {
+  background-color: #FF6B9D;
+}
+
+.eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider::before {
+  transform: translateX(24px);
+}
+
+.eh-toggle-switch input[type="checkbox"]:focus + .eh-toggle-slider {
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+}
+
+.eh-toggle-switch input[type="checkbox"]:disabled + .eh-toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+body.eh-dark-mode .eh-toggle-slider {
+  background-color: #505050;
+}
+
+body.eh-dark-mode .eh-toggle-slider::before {
+  background-color: #ddd;
+}
+
+body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider {
+  background-color: #FF6B9D;
 }
 
 .eh-btn {

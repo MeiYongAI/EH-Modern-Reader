@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EH Modern Reader",
-  "version": "1.0.0",
-  "description": "现代化的 E-Hentai 阅读器扩展，提供更优雅的阅读体验",
+  "version": "1.2.0",
+  "description": "现代化的 E-Hentai 阅读器扩展，完美居中缩略图 | 快速预览 | 智能加载 | 横向连续模式",
   "permissions": [
     "storage",
     "activeTab"
@@ -33,8 +33,8 @@
         "https://e-hentai.org/mpv/*",
         "https://exhentai.org/mpv/*"
       ],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+  "js": ["content.js"],
+  "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [
