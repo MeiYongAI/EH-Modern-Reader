@@ -339,20 +339,32 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
 /* ==================== 缩略图 ==================== */
 
 .eh-thumbnail {
-  /* 动态尺寸：由 JS 设置 width/height，不再固定 */
+  width: 100px;
+  min-width: 100px;
   max-width: 100px;
-  max-height: 142px;
+  height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
   flex-shrink: 0;
   display: flex;
-  align-items: center; /* 内容垂直居中 */
-  justify-content: center; /* 内容水平居中 */
+  align-items: center; /* 内部img/canvas垂直居中 */
+  justify-content: center; /* 内部img/canvas水平居中 */
   position: relative;
   cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
+}
+
+/* 骨架占位，防止布局跳动 */
+.eh-thumb-skeleton {
+  animation: eh-skeleton 1.2s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes eh-skeleton {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.15); }
+  100% { filter: brightness(1); }
 }
 
 /* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
@@ -364,8 +376,8 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
 }
 /* Canvas 缩略图等同于 img 尺寸与居中展示 */
 .eh-thumbnail > canvas {
-  width: 100% !important; /* 填满容器（容器即缩放后尺寸） */
-  height: 100% !important;
+  width: 100px !important;
+  height: 142px !important;
   display: block;
 }
 
@@ -491,7 +503,10 @@ body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
 
 /* 缩略图容器（每个容器只放一张缩略图） */
 .eh-thumbnail {
-  /* 保留外观，不再设置固定宽高，避免与前面动态尺寸冲突 */
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
   margin-bottom: 0;
   border-radius: 8px;
   overflow: hidden;
