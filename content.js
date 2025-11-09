@@ -436,7 +436,7 @@
       thumbnailObserver: null, // 缩略图懒加载观察器
       settings: {
         menuVisible: false,  // 初始隐藏底部菜单
-        darkMode: true,  // 默认启用深色模式
+        darkMode: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? true : false,  // 跟随系统主题
         imageScale: 1,     // 图片缩放比例
         imageOffsetX: 0,   // 图片X偏移
         imageOffsetY: 0,   // 图片Y偏移
