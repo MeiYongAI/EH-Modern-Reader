@@ -363,11 +363,11 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   object-fit: contain;
   display: block;
 }
-/* Canvas 缩略图：尺寸由 JS 动态设置为实际图像大小，容器 flex 居中 */
+/* Canvas 缩略图：尺寸由JS动态设置（缩放后实际尺寸），容器flex居中 */
 .eh-thumbnail > canvas {
+  max-width: 100px;
+  max-height: 142px;
   display: block;
-  max-width: 100%;
-  max-height: 100%;
 }
 
 .eh-thumbnail:hover { transform: scale(1.04); }

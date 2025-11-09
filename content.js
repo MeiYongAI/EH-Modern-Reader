@@ -1271,7 +1271,7 @@
           const scale = Math.min(containerW / srcW, containerH / srcH);
           const dw = Math.max(1, Math.floor(srcW * scale));
           const dh = Math.max(1, Math.floor(srcH * scale));
-          // canvas 尺寸等于实际绘制图像尺寸（不是容器尺寸），然后通过容器 flex 居中
+          // 绘制到canvas（canvas尺寸=缩放后图片尺寸，由容器flex居中）
           const canvas = document.createElement('canvas');
           canvas.width = dw;
           canvas.height = dh;
@@ -1279,6 +1279,7 @@
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           try {
+            ctx.clearRect(0, 0, dw, dh);
             ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, dw, dh);
           } catch (e) {
             console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
@@ -1287,8 +1288,6 @@
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
           canvas.style.display = 'block';
-          canvas.style.maxWidth = '100%';
-          canvas.style.maxHeight = '100%';
           // 幂等渲染
           thumb.replaceChildren();
           thumb.appendChild(canvas);
