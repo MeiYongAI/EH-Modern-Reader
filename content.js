@@ -1309,9 +1309,12 @@
         const title = imageData.n || `Page ${pageNum}`;
         
         // 直接使用EH原生的sprite sheet方式
-        // 200x283px缩略图尺寸
+        // 缩略图缩小到100px宽度（保持宽高比）
+        const thumbWidth = 100;
+        const thumbHeight = Math.round(283 * thumbWidth / 200); // 约141.5px
+        
         thumb.innerHTML = `
-          <div style="width: 200px; height: 283px; background: url('${url}') ${xPos} ${yPos} no-repeat transparent;" 
+          <div style="width: ${thumbWidth}px; height: ${thumbHeight}px; background: url('${url}') ${xPos} ${yPos} no-repeat transparent; background-size: ${thumbWidth * 5}px auto;" 
                title="Page ${pageNum}: ${title}"></div>
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
@@ -1399,9 +1402,14 @@
         // 中间1/3区域：切换顶栏显示/隐藏（所有模式通用）
         if (clickX >= leftThreshold && clickX <= rightThreshold) {
           const header = document.getElementById('eh-header');
+          const main = document.getElementById('eh-main');
           if (header) {
-            header.classList.toggle('eh-hidden');
-            console.log('[EH Modern Reader] 顶栏显示状态:', !header.classList.contains('eh-hidden'));
+            const isHidden = header.classList.toggle('eh-hidden');
+            // 同步调整main的padding
+            if (main) {
+              main.classList.toggle('eh-fullheight', isHidden);
+            }
+            console.log('[EH Modern Reader] 顶栏显示状态:', !isHidden);
           }
           e.stopPropagation();
           return;

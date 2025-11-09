@@ -52,11 +52,16 @@ body.eh-dark-mode .eh-loading {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative; /* 为绝对定位的header提供定位上下文 */
 }
 
 /* ==================== 顶部工具栏 ==================== */
 
 #eh-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   height: 56px;
   background: #fff;
   border-bottom: 1px solid #e0e0e0;
@@ -66,7 +71,6 @@ body.eh-dark-mode .eh-loading {
   padding: 0 16px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   z-index: 100;
-  flex-shrink: 0;
   pointer-events: none; /* 允许点击穿透 */
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
@@ -192,6 +196,13 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   display: flex;
   overflow: hidden;
   position: relative;
+  padding-top: 56px; /* 为header预留空间 */
+  transition: padding-top 0.3s ease;
+}
+
+/* header隐藏时，main占据全部空间 */
+#eh-main.eh-fullheight {
+  padding-top: 0;
 }
 
 /* 隐藏横向连续模式容器的原生滚动条（使用自定义进度条） */
