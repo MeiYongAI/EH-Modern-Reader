@@ -441,44 +441,6 @@
     };
     // 比例缓存：pageIndex -> ratio （从真实 URL 中解析或已加载图）
     const ratioCache = new Map();
-    // 雪碧图元数据缓存：url -> { cellW, cellH, cols }
-    const spriteMeta = new Map();
-
-    function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a || 1; }
-    function gcdArray(arr) { return arr.reduce((acc, v) => gcd(acc, v), 0) || 1; }
-
-    function buildSpriteMeta() {
-      try {
-        const groups = new Map(); // url -> [{x,y}]
-        for (let i = 0; i < state.imagelist.length; i++) {
-          const t = state.imagelist[i]?.t;
-          if (!t || typeof t !== 'string') continue;
-          const m = t.match(/url\(['"]?([^'"\)]+)['"]?\)\s+(-?\d+)px\s+(-?\d+)px/i);
-          if (!m) continue;
-          const url = m[1];
-          const x = parseInt(m[2], 10);
-          const y = parseInt(m[3], 10);
-          if (!groups.has(url)) groups.set(url, []);
-          groups.get(url).push({ x, y });
-        }
-        groups.forEach((list, url) => {
-          if (!list || list.length === 0) return;
-          // 计算单元宽高：x/y 差值的最大公约数
-          const xs = Array.from(new Set(list.map(p => p.x))).sort((a,b)=>a-b);
-          const ys = Array.from(new Set(list.map(p => p.y))).sort((a,b)=>a-b);
-          const xDiffs = []; for (let i=1;i<xs.length;i++){ const d = Math.abs(xs[i]-xs[i-1]); if (d>0) xDiffs.push(d); }
-          const yDiffs = []; for (let i=1;i<ys.length;i++){ const d = Math.abs(ys[i]-ys[i-1]); if (d>0) yDiffs.push(d); }
-          const cellW = Math.max(50, Math.min(600, gcdArray(xDiffs.length?xDiffs:[200])));
-          const cellH = Math.max(50, Math.min(600, gcdArray(yDiffs.length?yDiffs:[280])));
-          const maxAbsX = Math.max(...xs.map(v => Math.abs(v)));
-          const cols = Math.max(1, Math.round(maxAbsX / cellW) + 1);
-          spriteMeta.set(url, { cellW, cellH, cols });
-        });
-        console.log('[EH Modern Reader] 构建雪碧图元数据完成:', spriteMeta);
-      } catch (e) {
-        console.warn('[EH Modern Reader] 构建雪碧图元数据失败:', e);
-      }
-    }
 
     // 读取/保存进度（关闭阅读记忆：总是从第1页开始，且不写入存储）
     function loadProgress() { return 1; }
@@ -1142,7 +1104,7 @@
       }
     }
 
-  // 生成缩略图（懒加载优化版）
+    // 生成缩略图（懒加载优化版）
   function generateThumbnails() {
       if (!elements.thumbnails) {
         console.warn('[EH Modern Reader] 缩略图容器不存在');
@@ -1159,9 +1121,7 @@
         return;
       }
       
-  const list = state.imagelist;
-  // 构建一次雪碧图元数据，确保不同sprite在切换处（如481页以后）位置正确
-  buildSpriteMeta();
+      const list = state.imagelist;
       const fragment = document.createDocumentFragment();
       
       list.forEach((imageData, iterIndex) => {
@@ -1227,58 +1187,50 @@
 
     // 加载单个缩略图（使用EH原生sprite sheet，按比例缩放坐标）
     function loadThumbnail(thumb, imageData, pageNum) {
-      if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
-        console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效`);
+      const raw = imageData && imageData.t;
+      if (typeof raw !== 'string') {
         thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
         return;
       }
-
-      try {
-  // 解析格式: url("...") -Xpx -Ypx
-  const match = imageData.t.match(/url\(['"]?([^'"\)]+)['"]?\)\s+(-?\d+)px\s+(-?\d+)px/i);
-        
-        if (!match) {
-          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
-          thumb.replaceChildren();
-          thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
-          return;
-        }
-
-  let [, url, xStr, yStr] = match;
-        
-        // 获取图片名称作为title
-        const title = imageData.n || `Page ${pageNum}`;
-        
-        // ===== 自适应容器显示完整缩略图 =====
-        const containerW = 100;      // 容器宽度（与CSS一致）
-        const containerH = 142;      // 容器高度（与CSS一致）
-        const meta = spriteMeta.get(url) || { cellW: 200, cellH: 280, cols: 20 };
-        const cellW = meta.cellW; const cellH = meta.cellH; const cols = meta.cols;
-        const x = parseInt(xStr, 10); const y = parseInt(yStr, 10);
-        // 按单元尺寸缩放，保证完整显示
-        const scale = Math.min(containerW / cellW, containerH / cellH);
-        const scaledW = Math.round(cellW * scale);
-        const scaledH = Math.round(cellH * scale);
-        // 背景尺寸与偏移统一乘以 scale（相对原图）
-        const scaledX = Math.round(x * scale);
-        const scaledY = Math.round(y * scale);
-        const bgSizeW = Math.round(cols * cellW * scale);
-        // 居中偏移（容器 > 缩略图时居中）
-        const offsetX = Math.round((containerW - scaledW) / 2);
-        const offsetY = Math.round((containerH - scaledH) / 2);
-        // 幂等渲染
-        thumb.replaceChildren();
-        thumb.innerHTML = `
-          <div class="eh-thumb-inner" style="width:${scaledW}px;height:${scaledH}px;position:absolute;left:${offsetX}px;top:${offsetY}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;" title="Page ${pageNum}: ${title}"></div>
-          <div class="eh-thumbnail-number">${pageNum}</div>
-        `;
-        thumb.dataset.loaded = 'true';
-      } catch (err) {
-        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, err);
+      // 严格格式 (url) -Xpx Y  或 (url) -Xpx -Ypx；E-H 常见为 (spriteURL) -0px 0
+      const strict = raw.match(/^\((https?:[^)]+)\)\s+(-?\d+)px\s+(-?\d+)px?$/i);
+      if (!strict) {
+        // 不再输出大量 warn，直接显示序号占位
         thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+        return;
       }
+      const spriteUrl = strict[1];
+      const originX = parseInt(strict[2], 10); // 负值
+      const originY = parseInt(strict[3], 10); // 通常 0
+      // 单元尺寸：固定 200 宽 290 高（经验值：纵向图裁剪区域高度约 290）
+      const cellW = 200;
+      const cellH = 290;
+      // 容器尺寸（与 CSS 保持一致）
+      const containerW = 100;
+      const containerH = 142;
+      // 等比缩放以完整显示单元
+      const scale = Math.min(containerW / cellW, containerH / cellH);
+      const showW = Math.round(cellW * scale);
+      const showH = Math.round(cellH * scale);
+      const offsetX = Math.round((containerW - showW) / 2);
+      const offsetY = Math.round((containerH - showH) / 2);
+      // 背景尺寸：仅缩放宽度即可（高度自动按比例）
+      // 计算缩放后的背景位移：sprite 原始坐标按 scale 缩放
+      const bgPosX = Math.round(originX * scale);
+      const bgPosY = Math.round(originY * scale);
+      // 估算整张雪碧图宽（通过坐标 / 单元宽取列数，最少 1）
+      const colIndex = Math.abs(originX) / cellW; // 0-based 列号
+      const colsApprox = Math.max(colIndex + 1, 20); // 给个下限 20，避免早期列数不足导致裁切
+      const spriteScaledW = Math.round(colsApprox * cellW * scale);
+      const title = imageData.n || `Page ${pageNum}`;
+      thumb.replaceChildren();
+      thumb.innerHTML = `
+        <div class="eh-thumb-inner" style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${showW}px;height:${showH}px;background:url('${spriteUrl}') ${bgPosX}px ${bgPosY}px no-repeat;background-size:${spriteScaledW}px auto;"></div>
+        <div class="eh-thumbnail-number">${pageNum}</div>
+      `;
+      thumb.dataset.loaded = 'true';
     }
 
     // 事件监听
