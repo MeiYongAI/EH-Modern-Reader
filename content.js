@@ -424,6 +424,7 @@
       galleryId: galleryId,
       imageCache: new Map(), // pageIndex -> { img, status: 'loaded'|'loading'|'error', promise }
       imageRequests: new Map(), // pageIndex -> { controller }
+      thumbnailObserver: null, // 缩略图懒加载观察器
       settings: {
         menuVisible: false,  // 初始隐藏底部菜单
         darkMode: true,  // 默认启用深色模式
@@ -1196,7 +1197,7 @@
       }
     }
 
-    // 生成缩略图
+    // 生成缩略图（懒加载优化版）
   function generateThumbnails() {
       if (!elements.thumbnails) {
         console.warn('[EH Modern Reader] 缩略图容器不存在');
@@ -1214,14 +1215,18 @@
       }
       
       const list = state.imagelist;
+      const fragment = document.createDocumentFragment();
+      
       list.forEach((imageData, iterIndex) => {
         const physicalIndex = iterIndex;
         const thumb = document.createElement('div');
         thumb.className = 'eh-thumbnail';
-        // 初始不设置 active，高亮由 updateThumbnailHighlight 控制
+        thumb.dataset.page = physicalIndex + 1; // 存储页码用于懒加载
+        thumb.dataset.loaded = 'false'; // 标记是否已加载
         
-  const displayNum = physicalIndex + 1; // 显示的页码
-  const logicalPage = displayNum; // 逻辑页与 DOM 顺序一致
+        const displayNum = physicalIndex + 1; // 显示的页码
+        const logicalPage = displayNum; // 逻辑页与 DOM 顺序一致
+        
         thumb.innerHTML = `
           <div class="eh-thumbnail-placeholder" title="第 ${displayNum} 页" role="img" aria-label="缩略图 ${displayNum}">
             <span style="display: none;">${displayNum}</span>
@@ -1233,10 +1238,50 @@
           // 统一逻辑页跳转，双页模式内部处理配对
             scheduleShowPage(logicalPage, { instant: true });
         };
-        elements.thumbnails.appendChild(thumb);
-
-        // 缩略图加载逻辑
-        loadThumbnail(thumb, imageData, displayNum);
+        
+        fragment.appendChild(thumb);
+      });
+      
+      // 一次性添加所有缩略图DOM（但不加载图片）
+      elements.thumbnails.appendChild(fragment);
+      
+      // 设置懒加载观察器
+      setupThumbnailLazyLoad();
+    }
+    
+    // 设置缩略图懒加载
+    function setupThumbnailLazyLoad() {
+      // 如果已有观察器，先断开
+      if (state.thumbnailObserver) {
+        state.thumbnailObserver.disconnect();
+      }
+      
+      const options = {
+        root: elements.thumbnails,
+        rootMargin: '300px', // 提前300px加载
+        threshold: 0.01
+      };
+      
+      state.thumbnailObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const thumb = entry.target;
+            if (thumb.dataset.loaded === 'false') {
+              thumb.dataset.loaded = 'true';
+              const pageNum = parseInt(thumb.dataset.page);
+              const imageData = state.imagelist[pageNum - 1];
+              loadThumbnail(thumb, imageData, pageNum);
+              // 加载后停止观察该元素
+              state.thumbnailObserver.unobserve(thumb);
+            }
+          }
+        });
+      }, options);
+      
+      // 观察所有缩略图
+      const thumbnails = elements.thumbnails.querySelectorAll('.eh-thumbnail');
+      thumbnails.forEach(thumb => {
+        state.thumbnailObserver.observe(thumb);
       });
     }
 
