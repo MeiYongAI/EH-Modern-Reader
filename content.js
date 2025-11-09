@@ -5,9 +5,6 @@
 
 (function() {
   'use strict';
-  // 可切换的调试输出
-  const DEBUG = false;
-  const dlog = (...args) => { if (DEBUG) console.log(...args); };
 
   // 防止重复注入
   if (window.ehModernReaderInjected) {
@@ -111,7 +108,7 @@
     console.warn('[EH Modern Reader] 早期脚本拦截失败:', e);
   }
 
-  dlog('[EH Modern Reader] 正在初始化...');
+  console.log('[EH Modern Reader] 正在初始化...');
 
   /**
    * 从原页面提取必要数据
@@ -376,7 +373,7 @@
 
     // 等待 CSS 加载完成后初始化阅读器
     link.onload = () => {
-  dlog('[EH Modern Reader] CSS 加载完成');
+      console.log('[EH Modern Reader] CSS 加载完成');
       initializeReader(pageData);
     };
 
@@ -396,11 +393,11 @@
       return;
     }
     window.__EH_READER_INIT = true;
-  dlog('[EH Modern Reader] 初始化阅读器');
-  dlog('[EH Modern Reader] 页面数:', pageData.pagecount);
-  dlog('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
-  dlog('[EH Modern Reader] 第一张图片数据示例:', pageData.imagelist?.[0]);
-  dlog('[EH Modern Reader] GID:', pageData.gid);
+    console.log('[EH Modern Reader] 初始化阅读器');
+    console.log('[EH Modern Reader] 页面数:', pageData.pagecount);
+    console.log('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
+    console.log('[EH Modern Reader] 第一张图片数据示例:', pageData.imagelist?.[0]);
+    console.log('[EH Modern Reader] GID:', pageData.gid);
 
     // 验证必要数据
     if (!pageData.imagelist || pageData.imagelist.length === 0) {
@@ -756,7 +753,7 @@
     // 从 E-Hentai 图片页面提取真实图片 URL
     async function fetchRealImageUrl(pageUrl, signal) {
       try {
-  dlog('[EH Modern Reader] 开始获取图片页面:', pageUrl);
+        console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
         const response = await fetch(pageUrl, { signal });
         if (!response.ok) {
@@ -764,31 +761,31 @@
         }
         
         const html = await response.text();
-  dlog('[EH Modern Reader] 页面 HTML 长度:', html.length);
+        console.log('[EH Modern Reader] 页面 HTML 长度:', html.length);
         
         // 从页面中提取图片 URL (主要方法)
         const match = html.match(/<img[^>]+id="img"[^>]+src="([^"]+)"/);
         if (match && match[1]) {
-          dlog('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
+          console.log('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
           return match[1];
         }
         
         // 尝试备用匹配模式
         const match2 = html.match(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|gif|webp)[^"]*)"/i);
         if (match2 && match2[1]) {
-          dlog('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
+          console.log('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
           return match2[1];
         }
         
         // 尝试直接匹配 URL
         const match3 = html.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp))/i);
         if (match3 && match3[1]) {
-          dlog('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
+          console.log('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
           return match3[1];
         }
         
         console.error('[EH Modern Reader] 无法从页面提取图片 URL');
-  dlog('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
+        console.log('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
         throw new Error('无法从页面提取图片 URL');
       } catch (error) {
         console.error('[EH Modern Reader] 获取图片 URL 失败:', pageUrl, error);
@@ -819,7 +816,7 @@
         }
 
         const retryMsg = retryCount > 0 ? ` (重试 ${retryCount}/${MAX_RETRIES})` : '';
-  dlog('[EH Modern Reader] 获取图片页面:', pageUrl, retryMsg);
+        console.log('[EH Modern Reader] 获取图片页面:', pageUrl, retryMsg);
 
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
@@ -834,7 +831,7 @@
             throw new Error('无法获取真实图片 URL');
           }
 
-          dlog('[EH Modern Reader] 真实图片 URL:', realImageUrl);
+          console.log('[EH Modern Reader] 真实图片 URL:', realImageUrl);
 
           // 建立加载中的 Promise 并写入缓存，避免重复并发
           const pending = new Promise((resolve, reject) => {
@@ -843,7 +840,7 @@
 
             img.onload = () => {
               clearTimeout(timeoutId);
-              dlog('[EH Modern Reader] 图片加载成功:', realImageUrl);
+              console.log('[EH Modern Reader] 图片加载成功:', realImageUrl);
               state.imageCache.set(pageIndex, { status: 'loaded', img });
               resolve(img);
             };
@@ -905,7 +902,7 @@
         
         // 自动重试机制
         if (retryCount < MAX_RETRIES) {
-          dlog(`[EH Modern Reader] 将在2秒后重试... (${retryCount + 1}/${MAX_RETRIES})`);
+          console.log(`[EH Modern Reader] 将在2秒后重试... (${retryCount + 1}/${MAX_RETRIES})`);
           await new Promise(resolve => setTimeout(resolve, 2000));
           return loadImage(pageIndex, retryCount + 1);
         }
@@ -1051,7 +1048,7 @@
           elements.pageInput.value = pageNum;
         }
 
-  dlog('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
+  console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
 
   // 更新缩略图高亮（单页模式必须）
   updateThumbnailHighlight(pageNum);
@@ -1133,18 +1130,29 @@
         thumb.className = 'eh-thumbnail';
         thumb.dataset.page = physicalIndex + 1; // 存储页码用于懒加载
         thumb.dataset.loaded = 'false'; // 标记是否已加载
+        // 提前放入一个简单占位，避免布局跳动
+        const ph = document.createElement('div');
+        ph.className = 'eh-thumb-placeholder';
+        thumb.appendChild(ph);
+        // 轻量级的首屏预览：用站点自带雪碧图片段作为背景（仅作为占位，不做精细对齐）
+        if (imageData && typeof imageData.t === 'string') {
+          try {
+            // MPV 的 t 字段形如："(https://.../xxx.webp) -0px -284px"
+            // 直接作为 background 以获得即时占位预览
+            thumb.style.background = imageData.t;
+            thumb.style.backgroundRepeat = 'no-repeat';
+            thumb.style.backgroundColor = 'transparent';
+          } catch {}
+        }
+        
+        const displayNum = physicalIndex + 1; // 显示的页码
+        const logicalPage = displayNum; // 逻辑页与 DOM 顺序一致
 
-        // 骨架占位：固定尺寸，避免跳动
-        const skeleton = document.createElement('div');
-        skeleton.className = 'eh-thumb-skeleton';
-        skeleton.style.cssText = 'width:100%;height:100%;background:linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02));display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,0.25);';
-        skeleton.textContent = physicalIndex + 1;
-        thumb.appendChild(skeleton);
-
-        const logicalPage = physicalIndex + 1;
         thumb.onclick = () => {
-          scheduleShowPage(logicalPage, { instant: true });
+          // 统一逻辑页跳转
+            scheduleShowPage(logicalPage, { instant: true });
         };
+        
         fragment.appendChild(thumb);
       });
       
@@ -1164,7 +1172,7 @@
       
       const options = {
         root: elements.thumbnails,
-        rootMargin: '300px', // 提前300px加载
+        rootMargin: '600px', // 提前 600px 加载，提升滚动时的感知速度
         threshold: 0.01
       };
       
@@ -1277,6 +1285,8 @@
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
           canvas.style.display = 'block';
 
+          // 移除占位与背景，插入最终缩略图
+          thumb.style.background = 'none';
           thumb.replaceChildren();
           thumb.appendChild(canvas);
           const badge = document.createElement('div');
@@ -1286,6 +1296,7 @@
         })
         .catch(err => {
           console.warn('[EH Modern Reader] 缩略图加载失败（真实图）:', err);
+          thumb.style.background = 'none';
           thumb.replaceChildren();
           thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
         });
@@ -1356,7 +1367,7 @@
             if (main) {
               main.classList.toggle('eh-fullheight', isHidden);
             }
-            dlog('[EH Modern Reader] 顶栏显示状态:', !isHidden);
+            console.log('[EH Modern Reader] 顶栏显示状态:', !isHidden);
           }
           e.stopPropagation();
           return;
@@ -1501,10 +1512,10 @@
     // 设置按钮和面板
     if (elements.settingsBtn) {
       elements.settingsBtn.onclick = () => {
-  dlog('[EH Modern Reader] 点击设置按钮');
+        console.log('[EH Modern Reader] 点击设置按钮');
         if (elements.settingsPanel) {
           elements.settingsPanel.classList.toggle('eh-hidden');
-          dlog('[EH Modern Reader] 设置面板显示状态:', !elements.settingsPanel.classList.contains('eh-hidden'));
+          console.log('[EH Modern Reader] 设置面板显示状态:', !elements.settingsPanel.classList.contains('eh-hidden'));
         }
       };
     }
@@ -2257,7 +2268,7 @@
   function init() {
     try {
       // 简单等待器：等待早期捕获拿到 imagelist
-      const waitForImagelist = (timeoutMs = 3000) => new Promise((resolve) => {
+      const waitForImagelist = (timeoutMs = 6000) => new Promise((resolve) => {
         const start = Date.now();
         const timer = setInterval(() => {
           const cap = window.__ehCaptured || {};
@@ -2270,6 +2281,34 @@
           }
         }, 50);
       });
+
+      // 兜底：直接抓取当前 MPV 页面 HTML 并解析 imagelist
+      async function fallbackFetchImagelist() {
+        try {
+          const resp = await fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const html = await resp.text();
+          const data = { imagelist: [], gid: null, mpvkey: null, pagecount: null, gallery_url: null, title: document.title.replace(/ - E-Hentai.*/, '') };
+          const listMatch = html.match(/var\s+imagelist\s*=\s*(\[[\s\S]*?\]);/);
+          if (listMatch) {
+            try { data.imagelist = JSON.parse(listMatch[1]); } catch {}
+          }
+          const gidMatch = html.match(/var\s+gid\s*=\s*(\d+);/);
+          if (gidMatch) data.gid = gidMatch[1];
+          const keyMatch = html.match(/var\s+mpvkey\s*=\s*"([^"]+)";/);
+          if (keyMatch) data.mpvkey = keyMatch[1];
+          const countMatch = html.match(/var\s+pagecount\s*=\s*(\d+);/);
+          if (countMatch) data.pagecount = parseInt(countMatch[1]);
+          const gurlMatch = html.match(/var\s+gallery_url\s*=\s*"([^"]+)";/);
+          if (gurlMatch) data.gallery_url = gurlMatch[1];
+          if (Array.isArray(data.imagelist) && data.imagelist.length > 0) {
+            return data;
+          }
+        } catch (e) {
+          console.warn('[EH Modern Reader] fallbackFetchImagelist 失败:', e);
+        }
+        return null;
+      }
 
       // 等待 DOM 加载完成
       if (document.readyState === 'loading') {
@@ -2285,8 +2324,15 @@
                 if (retryData.imagelist && retryData.imagelist.length > 0) {
                   injectModernReader(retryData);
                 } else {
-                  console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
-                  alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+                  // 最后一搏：直接抓取页面 HTML 解析
+                  fallbackFetchImagelist().then((fetched) => {
+                    if (fetched && fetched.imagelist && fetched.imagelist.length > 0) {
+                      injectModernReader(fetched);
+                    } else {
+                      console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+                      alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+                    }
+                  });
                 }
               });
             }
@@ -2305,8 +2351,14 @@
             if (retryData.imagelist && retryData.imagelist.length > 0) {
               injectModernReader(retryData);
             } else {
-              console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
-              alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+              fallbackFetchImagelist().then((fetched) => {
+                if (fetched && fetched.imagelist && fetched.imagelist.length > 0) {
+                  injectModernReader(fetched);
+                } else {
+                  console.error('[EH Modern Reader] 无法提取页面数据或图片列表为空');
+                  alert('EH Modern Reader: 无法加载图片列表，请刷新页面重试。');
+                }
+              });
             }
           });
         }

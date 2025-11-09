@@ -353,19 +353,22 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   overflow: hidden;
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
+  background: rgba(255,255,255,0.04); /* 默认轻微底色，真正缩略图加载后会移除 */
 }
 
-/* 骨架占位，防止布局跳动 */
-.eh-thumb-skeleton {
-  animation: eh-skeleton 1.2s ease-in-out infinite;
-  border-radius: 6px;
+/* 缩略图占位内部容器：保持尺寸稳定，快速背景预览挂载在父 .eh-thumbnail 上 */
+.eh-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  background: transparent;
+  user-select: none;
 }
-@keyframes eh-skeleton {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.15); }
-  100% { filter: brightness(1); }
-}
+body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
 
 /* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
 .eh-thumbnail > img {
@@ -968,9 +971,9 @@ body.eh-dark-mode #eh-page-input {
 .eh-panel-content {
   background: #fff;
   border-radius: 12px;
-  padding: 20px 24px;
-  max-width: 420px;
-  width: 90%;
+  padding: 18px 20px;
+  max-width: 360px; /* 收窄弹窗 */
+  width: 92%;
   max-height: 80vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0,0,0,0.2);
