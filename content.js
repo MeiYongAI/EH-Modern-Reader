@@ -336,10 +336,6 @@
                     <span>单页</span>
                   </label>
                   <label class="eh-radio-label">
-                    <input type="radio" name="eh-read-mode-radio" value="double">
-                    <span>双页</span>
-                  </label>
-                  <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
                     <span>横向连续</span>
                   </label>
@@ -432,7 +428,7 @@
         imageOffsetX: 0,   // 图片X偏移
         imageOffsetY: 0,   // 图片Y偏移
         thumbnailsHover: false, // 顶部开关：鼠标靠近底部时显示缩略图
-        readMode: 'single', // 阅读模式：single | continuous-horizontal
+  readMode: 'single', // 阅读模式：single | continuous-horizontal
         prefetchAhead: 2,   // 向后预加载页数
         reverse: false      // 反向阅读（翻页/缩略图/进度条方向）
       },
@@ -924,140 +920,52 @@
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
-      // 双页模式：pageNum 始终视为“逻辑图片页码”，展示包含该页的双页，不再转换
-      if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-        state.currentPage = pageNum; // 保持逻辑页索引
-        showDoublePages(pageNum);    // 传入逻辑页
-        if (elements.progressBar) elements.progressBar.value = pageNum;
-        updateThumbnailHighlight(pageNum);
-        return;
-      }
-      // 在横向连续模式下，转为滚动定位而不是替换单图
-      if (state.settings.readMode === 'continuous-horizontal' && document.getElementById('eh-continuous-horizontal')) {
-        // 逻辑页号直接映射到物理索引（0-based），反向阅读仅为视觉镜像，不反转索引
+      // 连续横向模式：滚动居中目标页而不是直接替换单图
+      const horizontalContainer = (state.settings.readMode === 'continuous-horizontal')
+        ? document.getElementById('eh-continuous-horizontal')
+        : null;
+      if (horizontalContainer) {
         const idx = pageNum - 1;
-        const img = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${idx}"]`);
+        const img = horizontalContainer.querySelector(`img[data-page-index="${idx}"]`);
         if (img) {
-          console.log('[EH Modern Reader] 横向模式跳转到页面:', pageNum, 'img元素:', img, 'wrapper:', img.parentElement);
-          if (options.instant) {
-            scrollJumping = true; // 标记进入程序化跳转，避免 scroll 事件误判
-            const container = document.getElementById('eh-continuous-horizontal');
-            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement;
-            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
-            
-            // flex 布局中 offsetLeft 不可靠，改用累计前面所有元素宽度 + gap
-            const allWrappers = Array.from(container.querySelectorAll('.eh-ch-wrapper'));
-            const targetIndex = allWrappers.indexOf(wrapper);
-            let cumulativeLeft = 0;
-            const gap = 16; // 容器 gap: 16px
-            for (let i = 0; i < targetIndex; i++) {
-              cumulativeLeft += allWrappers[i].clientWidth + gap;
-            }
-            // 加上左侧 padding
-            const leftPadding = 16;
-            cumulativeLeft += leftPadding;
-            
-            const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
-            // 正常坐标系下使目标居中的滚动位置
-            let target = cumulativeLeft - centerOffset;
-            // scaleX(-1) 镜像模式：scrollLeft 坐标系也被镜像
-            // scrollLeft=0 对应视觉最右侧，scrollLeft=max 对应视觉最左侧
-            // 因此 DOM 左侧的元素(小页码)需要小 scrollLeft，右侧元素(大页码)需要大 scrollLeft
-            // 直接使用计算出的 target 即可，无需转换
-            
-            // 夹取到有效范围
-            const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
-            target = Math.max(0, Math.min(maxScrollNow, target));
-            console.log('[EH Modern Reader] 计算居中偏移:', {
-              basisWidth,
-              targetIndex,
-              cumulativeLeft,
-              centerOffset,
-              target,
-              reverse: !!state.settings.reverse,
-              containerWidth: container.clientWidth,
-              scrollWidth: container.scrollWidth,
-              currentScrollLeft: container.scrollLeft
-            });
-            container.scrollLeft = target;
-            
-            // 立即更新当前页状态（不依赖 scroll 事件）
-            const newPageNum = pageNum; // 保持逻辑页号
-            state.currentPage = newPageNum;
-            if (elements.pageInfo) elements.pageInfo.textContent = `${newPageNum} / ${state.pageCount}`;
-            if (elements.progressBar) elements.progressBar.value = newPageNum;
-            updateThumbnailHighlight(newPageNum);
-            preloadAdjacentPages(newPageNum);
-            saveProgress(newPageNum);
-            
-            // 瞬时跳转后主动触发目标图片及附近图片加载
-            setTimeout(() => {
-              const indices = [idx];
-              // 加载前后各 1-2 张
-              if (idx > 0) indices.push(idx - 1);
-              if (idx < state.pageCount - 1) indices.push(idx + 1);
-              if (idx < state.pageCount - 2) indices.push(idx + 2);
-              
-              indices.forEach(i => {
-                const targetImg = document.querySelector(`#eh-continuous-horizontal img[data-page-index="${i}"]`);
-                if (targetImg && !targetImg.src && !targetImg.getAttribute('data-loading')) {
-                  targetImg.setAttribute('data-loading', 'true');
-                  console.log('[EH Modern Reader] 开始加载图片:', i);
-                  loadImage(i).then(loadedImg => {
-                    console.log('[EH Modern Reader] 图片加载成功:', i, 'src:', loadedImg.src);
-                    if (loadedImg && loadedImg.src) targetImg.src = loadedImg.src;
-                    // 设置真实占位比例并移除骨架
-                    try {
-                      const wrap = targetImg.parentElement;
-                      const w = loadedImg?.naturalWidth || loadedImg?.width;
-                      const h = loadedImg?.naturalHeight || loadedImg?.height;
-                      if (wrap && w && h && h > 0) {
-                        const ratio = Math.max(0.2, Math.min(5, w / h));
-                        console.log('[EH Modern Reader] 设置占位比例:', i, ratio);
-                        wrap.style.setProperty('--eh-aspect', String(ratio));
-                        wrap.classList.remove('eh-ch-skeleton');
-                      }
-                    } catch (e) {
-                      console.warn('[EH Modern Reader] 设置占位失败:', i, e);
-                    }
-                  }).catch(err => {
-                    console.warn('[EH Modern Reader] 瞬时跳转加载失败:', i, err);
-                  }).finally(() => {
-                    targetImg.removeAttribute('data-loading');
-                  });
-                }
-              });
-              // 延迟复位跳转标记，避免 scroll 回调干扰
-              setTimeout(() => { scrollJumping = false; }, 200);
-            }, 50);
-          } else {
-            // 平滑滚动同样改为手动计算，避免在镜像下 scrollIntoView 行为不一致
-            const container = document.getElementById('eh-continuous-horizontal');
-            const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
-            const basisWidth = wrapper?.clientWidth || img.clientWidth || 0;
-            
-            // flex 布局中 offsetLeft 不可靠，改用累计前面所有元素宽度 + gap
-            const allWrappers = Array.from(container.querySelectorAll('.eh-ch-wrapper'));
-            const targetIndex = allWrappers.indexOf(wrapper);
-            let cumulativeLeft = 0;
-            const gap = 16;
-            for (let i = 0; i < targetIndex; i++) {
-              cumulativeLeft += allWrappers[i].clientWidth + gap;
-            }
-            const leftPadding = 16;
-            cumulativeLeft += leftPadding;
-            
-            const centerOffset = Math.max(0, (container.clientWidth - basisWidth) / 2);
-            let target = cumulativeLeft - centerOffset;
-            // scaleX(-1) 镜像模式：scrollLeft 坐标系也被镜像，无需转换
-            
-            const maxScrollNow = Math.max(0, container.scrollWidth - container.clientWidth);
-            target = Math.max(0, Math.min(maxScrollNow, target));
-            container.scrollTo({ left: target, behavior: 'smooth' });
+          const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
+          // 计算目标居中 scrollLeft
+          const allWrappers = Array.from(horizontalContainer.querySelectorAll('.eh-ch-wrapper'));
+          const targetIndex = allWrappers.indexOf(wrapper);
+          let cumulativeLeft = 0;
+          const gap = 16; // 与容器 gap 保持一致
+          for (let i = 0; i < targetIndex; i++) {
+            cumulativeLeft += allWrappers[i].clientWidth + gap;
           }
+          const leftPadding = 16; // 容器左右 padding 16px
+            cumulativeLeft += leftPadding;
+          const basisWidth = wrapper.clientWidth || img.clientWidth || 0;
+          const centerOffset = Math.max(0, (horizontalContainer.clientWidth - basisWidth) / 2);
+          let targetScroll = cumulativeLeft - centerOffset;
+          const maxScroll = Math.max(0, horizontalContainer.scrollWidth - horizontalContainer.clientWidth);
+          targetScroll = Math.max(0, Math.min(maxScroll, targetScroll));
+          if (options.instant) {
+            scrollJumping = true;
+            horizontalContainer.scrollLeft = targetScroll;
+            setTimeout(() => { scrollJumping = false; }, 180);
+          } else {
+            horizontalContainer.scrollTo({ left: targetScroll, behavior: 'smooth' });
+          }
+          // 同步页码与缩略图高亮（避免等待 scroll 事件）
+          state.currentPage = pageNum;
+          if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+          if (elements.progressBar) elements.progressBar.value = pageNum;
+          updateThumbnailHighlight(pageNum);
+          preloadAdjacentPages(pageNum);
+          saveProgress(pageNum);
+          // 提前加载目标与相邻图片
+          const eager = [idx, idx-1, idx+1].filter(i => i >=0 && i < state.pageCount);
+          enqueuePrefetch(eager, true);
+          return;
         }
-        return;
+        // 找不到元素则回退为普通展示
       }
+      // 普通（单页）模式：延时合并为一次实际加载
       lastRequestedPage = pageNum;
       if (navTimer) clearTimeout(navTimer);
       navTimer = setTimeout(() => {
@@ -1068,7 +976,6 @@
             try { entry.controller.abort('navigation-switch'); } catch {}
           }
         });
-        // 取消预取队列中非目标页
         cancelPrefetchExcept(lastRequestedPage - 1);
         internalShowPage(lastRequestedPage);
       }, navDelay);
@@ -1350,16 +1257,7 @@
         const direction = state.settings.reverse ? 1 : -1;
         let target = state.currentPage + direction;
         
-        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === -1) {
-            // 正常模式向前
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          } else {
-            // 反向模式向后
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          }
-        }
+  // 普通单页模式翻页
         
         if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
@@ -1372,16 +1270,7 @@
         const direction = state.settings.reverse ? -1 : 1;
         let target = state.currentPage + direction;
         
-        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === 1) {
-            // 正常模式向后
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          } else {
-            // 反向模式向前
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          }
-        }
+  // 普通单页模式翻页
         
         if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
@@ -1450,7 +1339,7 @@
           }
         }
         
-        // 单页/双页模式：左侧1/3向左翻，右侧1/3向右翻
+  // 单页模式：左侧1/3向左翻，右侧1/3向右翻
         let direction = 0;
         if (clickX < leftThreshold) {
           // 点击左侧：反向时向后翻（+1），正常时向前翻（-1）
@@ -1464,15 +1353,7 @@
         
         let target = state.currentPage + direction;
         
-        // 双页模式特殊处理
-        if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === -1) {
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          } else if (direction === 1) {
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          }
-        }
+  // 普通单页翻页逻辑
         
         if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
@@ -1549,7 +1430,7 @@
         };
         state.autoPage.timer = { rafId: requestAnimationFrame(step) };
       } else {
-        // 单页/双页模式：逻辑页序永远递增（1→N），反向阅读只影响左右键和左右区域的交互含义，不改变自动播放顺序
+  // 单页自动翻页：逻辑页递增（1→N），反向阅读只改变交互语义
         state.autoPage.timer = setInterval(() => {
           const next = state.currentPage + 1;
           if (next > state.pageCount) {
@@ -1689,48 +1570,33 @@
       };
     }
 
-    // 阅读模式单选按钮监听
+  // 阅读模式单选按钮监听
     if (elements.readModeRadios && elements.readModeRadios.length > 0) {
       elements.readModeRadios.forEach(radio => {
         radio.onchange = () => {
-          if (radio.checked) {
-            const newMode = radio.value;
-            const oldMode = state.settings.readMode;
-            
-            // 如果模式没变，不做处理
-            if (newMode === oldMode) return;
-            
-            state.settings.readMode = newMode;
-            console.log('[EH Modern Reader] 阅读模式切换:', oldMode, '→', newMode);
-            
-            // 先退出当前模式
-            if (oldMode === 'continuous-horizontal') {
-              // 退出横向连续模式
-              const singleViewer = document.getElementById('eh-viewer');
-              if (singleViewer) singleViewer.style.display = '';
-              if (continuous.observer) { continuous.observer.disconnect(); continuous.observer = null; }
-              if (continuous.container && continuous.container.parentElement) {
-                continuous.container.parentElement.removeChild(continuous.container);
-              }
-              continuous.container = null;
-            } else if (oldMode === 'double') {
-              // 退出双页模式
-              exitDoublePageMode();
+          if (!radio.checked) return;
+          const newMode = radio.value;
+          const oldMode = state.settings.readMode;
+          if (newMode === oldMode) return;
+          state.settings.readMode = newMode;
+          console.log('[EH Modern Reader] 阅读模式切换:', oldMode, '→', newMode);
+          // 退出旧模式（仅可能是 continuous-horizontal 或 single）
+          if (oldMode === 'continuous-horizontal') {
+            const singleViewer = document.getElementById('eh-viewer');
+            if (singleViewer) singleViewer.style.display = '';
+            if (continuous.observer) { continuous.observer.disconnect(); continuous.observer = null; }
+            if (continuous.container && continuous.container.parentElement) {
+              continuous.container.parentElement.removeChild(continuous.container);
             }
-            
-            // 进入新模式
-            if (newMode === 'continuous-horizontal') {
-              exitDoublePageMode(); // 确保双页模式已退出
-              enterContinuousHorizontalMode();
-            } else if (newMode === 'double') {
-              enterDoublePageMode();
-            } else {
-              // 单页模式：确保单页viewer可见
-              const singleViewer = document.getElementById('eh-viewer');
-              if (singleViewer) singleViewer.style.display = '';
-              // 显示当前页
-              scheduleShowPage(state.currentPage, { instant: true });
-            }
+            continuous.container = null;
+          }
+          // 进入新模式
+          if (newMode === 'continuous-horizontal') {
+            enterContinuousHorizontalMode();
+          } else {
+            const singleViewer = document.getElementById('eh-viewer');
+            if (singleViewer) singleViewer.style.display = '';
+            scheduleShowPage(state.currentPage, { instant: true });
           }
         };
       });
@@ -1790,7 +1656,7 @@
         }, 120);
       };
       elements.progressBar.onchange = (e) => {
-        // 统一为逻辑页索引，双页模式内部负责配对显示
+  // 统一为逻辑页索引
         const imageNum = parseInt(e.target.value);
         scheduleShowPage(imageNum, { instant: true });
       };
@@ -1897,160 +1763,12 @@
       });
     }
 
-    // 双页阅读模式
-    let doublePage = { container: null, leftPage: null, rightPage: null };
-    
-    // 已弃用的双页转换函数已移除，统一使用逻辑单页索引
-
-    function enterDoublePageMode() {
-      console.log('[EH Modern Reader] 进入双页阅读模式');
-      
-      // 退出横向连续模式
-      if (continuous.container && continuous.container.parentElement) {
-        continuous.container.parentElement.removeChild(continuous.container);
-        continuous.container = null;
-      }
-      if (continuous.observer) {
-        continuous.observer.disconnect();
-        continuous.observer = null;
-      }
-      
-      // 隐藏单页viewer
-      const singleViewer = document.getElementById('eh-viewer');
-      if (singleViewer) singleViewer.style.display = 'none';
-
-      // 创建双页容器
-      if (!doublePage.container) {
-        doublePage.container = document.createElement('div');
-        doublePage.container.id = 'eh-double-page-container';
-        doublePage.container.style.cssText = 'display:flex; justify-content:center; align-items:center; gap:16px; width:100%; height:100%; padding:16px; box-sizing:border-box; background: #000;';
-
-        doublePage.leftPage = document.createElement('img');
-        doublePage.leftPage.id = 'eh-double-left';
-        doublePage.leftPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; cursor:pointer;';
-
-        doublePage.rightPage = document.createElement('img');
-        doublePage.rightPage.id = 'eh-double-right';
-        doublePage.rightPage.style.cssText = 'max-width:50%; max-height:100%; object-fit:contain; cursor:pointer;';
-
-        doublePage.container.appendChild(doublePage.leftPage);
-        doublePage.container.appendChild(doublePage.rightPage);
-
-        const viewerContainer = document.getElementById('eh-viewer-container');
-        if (viewerContainer) {
-          viewerContainer.appendChild(doublePage.container);
-        }
-        
-        // 添加点击事件（左翻/右翻）
-        doublePage.leftPage.onclick = () => {
-          const direction = state.settings.reverse ? 1 : -1;
-          let target = state.currentPage + direction * 2;
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === -1) {
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          } else if (direction === 1) {
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          }
-          if (target >= 1 && target <= state.pageCount) {
-            scheduleShowPage(target);
-          }
-        };
-        
-        doublePage.rightPage.onclick = () => {
-          const direction = state.settings.reverse ? -1 : 1;
-          let target = state.currentPage + direction * 2;
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === -1) {
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          } else if (direction === 1) {
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          }
-          if (target >= 1 && target <= state.pageCount) {
-            scheduleShowPage(target);
-          }
-        };
-        
-        // 添加滚轮翻页
-        doublePage.container.addEventListener('wheel', (e) => {
-          const direction = e.deltaY > 0 ? 1 : -1;
-          let target = state.currentPage + direction * 2;
-          const isOddTotal = state.pageCount % 2 === 1;
-          if (direction === -1) {
-            target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-          } else if (direction === 1) {
-            target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-          }
-          if (target >= 1 && target <= state.pageCount) {
-            scheduleShowPage(target);
-          }
-          e.preventDefault();
-        }, { passive: false });
-      } else {
-        doublePage.container.style.display = 'flex';
-      }
-
-      // 显示当前页对应的双页
-      showDoublePages(state.currentPage);
-    }
-
-    function showDoublePages(logicalPage) {
-      const total = state.pageCount;
-      const isOddTotal = total % 2 === 1;
-      let leftNum, rightNum;
-      if (isOddTotal) {
-        if (logicalPage === 1) { leftNum = 1; rightNum = null; } else {
-          leftNum = (logicalPage % 2 === 0) ? logicalPage : logicalPage - 1;
-          rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
-        }
-      } else {
-        leftNum = (logicalPage % 2 === 1) ? logicalPage : logicalPage - 1;
-        rightNum = leftNum + 1 <= total ? leftNum + 1 : null;
-      }
-      console.log('[EH Modern Reader] 显示双页(逻辑页):', logicalPage, '=>', leftNum, rightNum);
-      if (elements.pageInfo) elements.pageInfo.textContent = `${logicalPage} / ${total}`;
-      // 双页模式下：仅做左右交换，不反转物理索引，防止跳到末尾图片
-      const mapIndex = (num) => { if (!num) return null; return num - 1; };
-      let finalLeft = leftNum, finalRight = rightNum;
-      if (state.settings.reverse) { [finalLeft, finalRight] = [rightNum, leftNum]; }
-      const leftIdx = mapIndex(finalLeft);
-      const rightIdx = mapIndex(finalRight);
-      if (leftNum && leftIdx != null) {
-        ensureRealImageUrl(leftIdx).then(({ url }) => {
-          doublePage.leftPage.src = url;
-          doublePage.leftPage.style.display = 'block';
-          doublePage.leftPage.style.maxWidth = rightNum ? '50%' : '100%';
-        }).catch(error => {
-          console.error('[EH Modern Reader] 双页左侧加载失败:', error);
-          showErrorMessage(leftNum, `左侧图片加载失败: ${error.message}`);
-        });
-      } else { doublePage.leftPage.style.display = 'none'; }
-      if (rightNum && rightIdx != null) {
-        ensureRealImageUrl(rightIdx).then(({ url }) => {
-          doublePage.rightPage.src = url;
-          doublePage.rightPage.style.display = 'block';
-          doublePage.rightPage.style.maxWidth = '50%';
-        }).catch(error => {
-          console.error('[EH Modern Reader] 双页右侧加载失败:', error);
-          showErrorMessage(rightNum, `右侧图片加载失败: ${error.message}`);
-        });
-      } else { doublePage.rightPage.style.display = 'none'; }
-    }
-
-    function exitDoublePageMode() {
-      const singleViewer = document.getElementById('eh-viewer');
-      if (singleViewer) singleViewer.style.display = '';
-      if (doublePage.container) {
-        doublePage.container.style.display = 'none';
-      }
-    }
+  // （双页模式已删除，仅保留单页与横向连续）
 
     // 连续模式：横向 MVP（懒加载 + 观察器）
     let continuous = { container: null, observer: null };
     function enterContinuousHorizontalMode() {
-      // 进入横向模式时，若双页容器可见则先隐藏，避免界面叠加
-      if (doublePage && doublePage.container) {
-        doublePage.container.style.display = 'none';
-      }
+  // 仅处理横向模式容器
       // 若已存在则直接显示
       if (!continuous.container) {
         continuous.container = document.createElement('div');
@@ -2289,8 +2007,7 @@
     }
 
     function exitContinuousMode() {
-      // 退出双页模式
-      exitDoublePageMode();
+  // 退出横向模式
       
       // 显示单页 viewer，移除连续容器
       const singleViewer = document.getElementById('eh-viewer');
@@ -2379,15 +2096,7 @@
           // 反向阅读：左箭头应该向逻辑后翻（+1），正常时向前翻（-1）
           const direction = state.settings.reverse ? 1 : -1;
           let target = state.currentPage + direction;
-          
-          if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-            const isOddTotal = state.pageCount % 2 === 1;
-            if (direction === -1) {
-              target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-            } else {
-              target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-            }
-          }
+          // 单页左右方向翻页
           
           if (target < 1 || target > state.pageCount) target = state.currentPage;
           if (target !== state.currentPage) scheduleShowPage(target);
@@ -2400,15 +2109,7 @@
           // 反向阅读：右箭头应该向逻辑前翻（-1），正常时向后翻（+1）
           const direction = state.settings.reverse ? -1 : 1;
           let target = state.currentPage + direction;
-          
-          if (state.settings.readMode === 'double' && doublePage.container && doublePage.container.style.display !== 'none') {
-            const isOddTotal = state.pageCount % 2 === 1;
-            if (direction === 1) {
-              target = isOddTotal ? (state.currentPage === 1 ? 2 : state.currentPage + 2) : state.currentPage + 2;
-            } else {
-              target = isOddTotal ? (state.currentPage === 2 ? 1 : state.currentPage - 2) : state.currentPage - 2;
-            }
-          }
+          // 单页左右方向翻页
           
           if (target < 1 || target > state.pageCount) target = state.currentPage;
           if (target !== state.currentPage) scheduleShowPage(target);
