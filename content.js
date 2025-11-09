@@ -1271,7 +1271,7 @@
           const scale = Math.min(containerW / srcW, containerH / srcH);
           const dw = Math.max(1, Math.floor(srcW * scale));
           const dh = Math.max(1, Math.floor(srcH * scale));
-          // 绘制到canvas：使用缩放后的实际尺寸，避免再次拉伸
+          // 绘制到canvas（画布尺寸即为缩放后图像尺寸）
           const canvas = document.createElement('canvas');
           canvas.width = dw;
           canvas.height = dh;
@@ -1287,12 +1287,13 @@
           // 直接使用 canvas 作为缩略图节点（避免跨域导出 dataURL 的安全限制）
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
-          // 绝对居中到容器
+          // 绝对居中到 100x142 容器
           canvas.style.position = 'absolute';
           canvas.style.left = '50%';
           canvas.style.top = '50%';
           canvas.style.transform = 'translate(-50%, -50%)';
-          canvas.style.display = 'block';
+          canvas.style.maxWidth = '100%';
+          canvas.style.maxHeight = '100%';
           // 幂等渲染
           thumb.replaceChildren();
           thumb.appendChild(canvas);
