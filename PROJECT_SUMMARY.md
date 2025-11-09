@@ -2,82 +2,99 @@
 
 ## 📦 项目概述
 
-基于 E-Hentai 官方 MPV 阅读器（E.html）的现代化浏览器扩展，提供更优雅、流畅的阅读体验。
+基于 E-Hentai 官方 MPV 阅读器的现代化浏览器扩展，提供更优雅、流畅的阅读体验。
+
+**当前版本：v1.2.0** (2025-01-09)
 
 ### 核心特点
-- ✅ 完全基于原版结构改造
-- ✅ 保留所有核心功能
-- ✅ 现代化 UI/UX 设计
+- ✅ 完全替代原版 MPV
+- ✅ 双阅读模式（单页 & 横向连续）
+- ✅ 现代化 UI/UX 设计（深浅主题自动适配）
+- ✅ 完美居中缩略图系统（v1.2.0 重构）
+- ✅ 智能预加载 & 多级缓存
+- ✅ 三区点击导航（v1.2.0）
 - ✅ 原生技术栈（无依赖）
-- ✅ 符合浏览器扩展规范
-- ✅ 可直接加载测试
+- ✅ Manifest V3 规范
 
 ## 📁 完整文件清单
 
 ```
 eh-reader-extension/
-├─ manifest.json              [扩展配置] Manifest V3
-├─ content.js                 [内容脚本] 页面注入与数据提取
+├─ manifest.json              [扩展配置] Manifest V3 (v1.2.0)
+├─ content.js                 [核心脚本] 2300+ 行（早期拦截、缩略图、双模式）
 ├─ background.js              [后台脚本] Service Worker
-├─ popup.html                 [弹出窗口] UI 界面
-├─ popup.js                   [弹出逻辑] 交互处理
-├─ welcome.html               [欢迎页面] 安装后展示
-├─ README.md                  [项目说明] 功能介绍
+├─ popup.html / popup.js      [扩展弹窗] UI 界面（预留）
+├─ welcome.html               [欢迎页面] v1.2.0 更新说明
+├─ README.md                  [项目说明] 功能介绍与使用指南
+├─ CHANGELOG.md               [更新日志] 详细版本历史 (v1.2.0)
+├─ RELEASE_NOTES.md           [发版说明] v1.2.0 重点特性
+├─ PROJECT_SUMMARY.md         [项目总结] 本文档
 ├─ INSTALL.md                 [安装指南] 详细步骤
 ├─ DEVELOPMENT.md             [开发文档] 技术细节
 ├─ LICENSE                    [开源协议] MIT License
 ├─ style/
-│  └─ reader.css              [样式表] 2000+ 行现代化样式
-├─ js/
-│  └─ reader.js               [核心逻辑] 600+ 行阅读器引擎
+│  └─ reader.css              [样式表] 1400+ 行现代化样式
 └─ icons/
    ├─ README.md               [图标说明] 创建指南
-   ├─ icon16.png              [图标] 16x16 (需创建)
-   ├─ icon48.png              [图标] 48x48 (需创建)
-   └─ icon128.png             [图标] 128x128 (需创建)
+   ├─ icon16.png              [图标] 16x16
+   ├─ icon48.png              [图标] 48x48
+   └─ icon128.png             [图标] 128x128
 ```
 
 ## 🎯 核心功能实现
 
-### 1. 数据提取 (content.js)
+### 1. 早期脚本拦截与兜底 (content.js) - v1.2.0 强化
 ```javascript
-✓ 从原页面 JavaScript 提取 imagelist
-✓ 解析 gid, mpvkey, pagecount 等配置
-✓ 提取画廊标题和 URL
-✓ 使用正则表达式精确匹配
+✓ document_start 阶段覆写 appendChild/insertBefore
+✓ 拦截内联脚本，捕获 imagelist / gid / mpvkey
+✓ 三层兜底：早期捕获 → 延迟重试（6秒）→ HTTP 回退
+✓ fallbackFetchImagelist 直接抓取页面 HTML 解析
 ```
 
-### 2. 界面替换 (content.js)
+### 2. 缩略图系统 (content.js) - v1.2.0 重构
 ```javascript
-✓ 完全重写 body.innerHTML
-✓ 注入现代化 HTML 结构
-✓ 动态生成缩略图列表
-✓ 创建响应式布局
+✓ 固定占位容器（100×142）+ 雪碧图快速预览
+✓ IntersectionObserver（rootMargin: 600px）
+✓ 真实图片独立请求 → Canvas contain 缩放 → 完美居中
+✓ 加载后清除背景，替换为最终缩略图
+✓ 防止布局跳动，跳转位置稳定
 ```
 
-### 3. 阅读器引擎 (reader.js)
+### 3. 双阅读模式 (content.js)
 ```javascript
-✓ ReaderState - 状态管理
-✓ ImageLoader - 图片加载与缓存
-✓ PageController - 翻页控制
-✓ ThumbnailGenerator - 缩略图生成
-✓ SettingsManager - 设置持久化
-✓ EventHandler - 统一事件处理
+✓ 单页模式 - 经典翻页体验
+✓ 横向连续模式 - 水平滚动 + 懒加载
+✓ 模式切换实时生效
+✓ 自动检测当前页并更新高亮
 ```
 
-### 4. 样式系统 (reader.css)
+### 4. 智能预加载系统 (content.js)
+```javascript
+✓ 预取队列（并发上限 2）
+✓ AbortController 可取消请求
+✓ 真实 URL 缓存（减少 HTML 解析）
+✓ 图片加载结果缓存
+✓ 预测性预加载（横向模式滚轮方向检测）- v1.2.0
+```
+
+### 5. 交互增强 (content.js) - v1.2.0
+```javascript
+✓ 三区点击导航（左翻 | 切换顶栏 | 右翻）
+✓ 滚轮映射（横向模式垂直→水平）
+✓ 进度条拖动预热
+✓ 瞬跳 vs 平滑滚动策略
+✓ 自动播放（单页定时翻页 | 横向持续滚动）
+```
+
+### 6. 样式系统 (reader.css)
 ```css
-✓ 现代化扁平设计
-✓ 完整的暗色模式
+✓ 现代化扁平设计（1400+ 行）
+✓ 深浅主题自动适配（prefers-color-scheme）
 ✓ 响应式布局（桌面/移动）
 ✓ 流畅动画过渡
 ✓ 性能优化（will-change, contain）
+✓ 收窄设置面板（360px max-width）- v1.2.0
 ```
-
-### 5. 交互功能
-```
-✓ 键盘控制（← → Home End F F11 Esc）
-✓ 鼠标点击（左右翻页、缩略图跳转）
 ✓ 滚轮翻页（防抖处理）
 ✓ 触摸支持（响应式）
 ✓ 进度拖动（实时预览）
