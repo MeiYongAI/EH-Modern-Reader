@@ -272,6 +272,12 @@ body.eh-dark-mode #eh-bottom-menu {
   background: linear-gradient(to top, rgba(20, 20, 20, 0.98) 0%, rgba(30, 30, 30, 0.95) 100%);
 }
 
+/* 浅色模式下的底部栏样式覆盖 */
+body:not(.eh-dark-mode) #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
 #eh-bottom-menu.eh-menu-hidden {
   bottom: calc(-100% - 20px); /* 完全隐藏到屏幕外 */
 }
@@ -279,12 +285,12 @@ body.eh-dark-mode #eh-bottom-menu {
 /* 缩略图容器 */
 
 .eh-thumbnails-container {
-  height: 150px;  /* 提升高度以容纳等比缩放后的完整缩略图 */
+  height: 160px;  /* 增高以完整显示缩略图 */
   padding: 6px 0 6px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative; /* 让内部滑轨绝对定位 */
 }
+body:not(.eh-dark-mode) .eh-thumbnails-container { border-bottom-color: rgba(0,0,0,0.06); }
 
 .eh-thumbnails-horizontal {
   display: flex;
@@ -297,31 +303,6 @@ body.eh-dark-mode #eh-bottom-menu {
   overflow-y: hidden;
   scroll-behavior: smooth;
 }
-/* 缩略图滑轨：复用进度条外观的小球 */
-.eh-thumbs-slider {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 6px;
-  height: 6px;
-  z-index: 3;
-  opacity: 0.9;
-}
-
-/* 亮色模式：底部菜单与文字颜色 */
-body:not(.eh-dark-mode) #eh-bottom-menu {
-  background: linear-gradient(to top, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.92) 100%);
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
-  border-top: 1px solid rgba(0,0,0,0.06);
-}
-
-body:not(.eh-dark-mode) .eh-progress-number {
-  color: #333;
-}
-
-body:not(.eh-dark-mode) .eh-progress-slider {
-  background: rgba(0,0,0,0.15);
-}
 
 .eh-thumbnails-horizontal::-webkit-scrollbar {
   height: 6px;
@@ -330,6 +311,20 @@ body:not(.eh-dark-mode) .eh-progress-slider {
 .eh-thumbnails-horizontal::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 3px;
+}
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+/* 浅色模式滚动条颜色 */
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
@@ -347,22 +342,19 @@ body:not(.eh-dark-mode) .eh-progress-slider {
   width: 100px;
   min-width: 100px;
   max-width: 100px;
-  height: 142px; /* 容器高度，内部图片按 contain 缩放并居中 */
+  height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
   flex-shrink: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: center; /* 子背景居中 */
+  justify-content: center; /* 子背景居中 */
   position: relative;
   cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
 }
-
-/* 内部自适应层（由 JS 注入） */
-.eh-thumb-inner { display: block; }
 
 .eh-thumbnail:hover { transform: scale(1.04); }
 
@@ -405,6 +397,7 @@ body:not(.eh-dark-mode) .eh-progress-slider {
   text-align: center;
   flex-shrink: 0;
 }
+body:not(.eh-dark-mode) .eh-progress-number { color: #333; opacity: 0.9; }
 
 .eh-slider-track {
   position: relative;
@@ -440,6 +433,7 @@ body:not(.eh-dark-mode) .eh-progress-slider {
   position: relative;
   z-index: 2;
 }
+body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
 
 .eh-progress-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -487,15 +481,15 @@ body:not(.eh-dark-mode) .eh-progress-slider {
   width: 100px;
   min-width: 100px;
   max-width: 100px;
-  height: auto;
-  margin-bottom: 8px;
+  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
+  margin-bottom: 0;
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   position: relative;
-  flex: 0 0 auto; /* 防止被拉伸，占用固定宽度 */
+  flex: 0 0 auto;
 }
 
 .eh-thumbnail:hover {
@@ -588,22 +582,6 @@ body.eh-dark-mode #eh-image-container {
 
 #eh-current-image[src] {
   opacity: 1;
-}
-
-/* 单页模式的占位骨架 */
-.eh-single-skeleton-box {
-  aspect-ratio: var(--eh-single-aspect, 0.7);
-  height: 80%;
-  width: auto;
-  border-radius: 8px;
-  background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06));
-  background-size: 200% 100%;
-  animation: eh-skeleton 1.2s linear infinite;
-}
-
-@keyframes eh-skeleton {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 
 /* 缩放时的过渡效果 */

@@ -277,11 +277,6 @@
         <main id="eh-main">
           <section id="eh-viewer">
             <div id="eh-image-container">
-              <div id="eh-single-skeleton" hidden style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
-                <div style="aspect-ratio:var(--eh-single-aspect,0.7);height:80%;width:auto;background:rgba(120,120,120,0.12);border-radius:8px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;">
-                  <div class="eh-spinner" style="position:absolute;inset:auto;" ></div>
-                </div>
-              </div>
               <div id="eh-loading" class="eh-loading">
                 <div class="eh-spinner"></div>
                 <p>加载中...</p>
@@ -308,14 +303,6 @@
           <!-- 缩略图横向滚动区 -->
           <div id="eh-thumbnails-container" class="eh-thumbnails-container">
             <div id="eh-thumbnails" class="eh-thumbnails-horizontal"></div>
-            <!-- 缩略图滑轨：与进度条同款小球，便于快速拖动定位缩略图滚动 -->
-            <input 
-              type="range" 
-              id="eh-thumbs-slider" 
-              min="0" max="0" value="0" 
-              class="eh-progress-slider eh-thumbs-slider"
-              aria-label="缩略图滚动"
-            />
           </div>
 
           <!-- 进度条区 -->
@@ -436,7 +423,7 @@
       thumbnailObserver: null, // 缩略图懒加载观察器
       settings: {
         menuVisible: false,  // 初始隐藏底部菜单
-        darkMode: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? true : false,  // 跟随系统主题
+        darkMode: true,  // 默认启用深色模式
         imageScale: 1,     // 图片缩放比例
         imageOffsetX: 0,   // 图片X偏移
         imageOffsetY: 0,   // 图片Y偏移
@@ -468,7 +455,6 @@
       sliderTrack: document.getElementById('eh-slider-track'),
       sliderFill: document.getElementById('eh-slider-fill'),
       thumbnails: document.getElementById('eh-thumbnails'),
-  thumbsSlider: document.getElementById('eh-thumbs-slider'),
       bottomMenu: document.getElementById('eh-bottom-menu'),
       viewer: document.getElementById('eh-viewer'),
       prevBtn: document.getElementById('eh-prev-btn'),
@@ -625,22 +611,6 @@
       if (errorContainer) {
         errorContainer.style.display = 'none';
       }
-    }
-
-    // 缩略图滑轨尺寸与数值同步
-    function updateThumbsSliderMetrics() {
-      try {
-        if (!elements.thumbsSlider || !elements.thumbnails) return;
-        const maxScroll = Math.max(0, elements.thumbnails.scrollWidth - elements.thumbnails.clientWidth);
-        elements.thumbsSlider.max = String(maxScroll);
-        elements.thumbsSlider.value = String(Math.max(0, Math.min(maxScroll, elements.thumbnails.scrollLeft)));
-        // 当无需滚动时隐藏滑轨
-        if (maxScroll <= 2) {
-          elements.thumbsSlider.style.visibility = 'hidden';
-        } else {
-          elements.thumbsSlider.style.visibility = 'visible';
-        }
-      } catch {}
     }
 
     // 获取图片 URL - E-Hentai MPV 使用 API 动态加载
@@ -1035,18 +1005,8 @@
       const targetLoaded = cachedTarget && cachedTarget.status === 'loaded' && cachedTarget.img;
       if (!targetLoaded) {
         if (!elements.currentImage || !elements.currentImage.src || elements.currentImage.style.display === 'none') {
-          // 单页模式显示占位骨架
-          const sk = document.getElementById('eh-single-skeleton');
-          if (sk) {
-            const r = ratioCache.get(targetIndex) || 0.7;
-            sk.style.setProperty('--eh-single-aspect', String(r));
-            sk.removeAttribute('hidden');
-          }
           showLoading();
         }
-      } else {
-        const sk = document.getElementById('eh-single-skeleton');
-        if (sk) sk.setAttribute('hidden', '');
       }
 
       try {
@@ -1057,10 +1017,8 @@
           return; // 丢弃过期加载
         }
         
-  // 隐藏加载状态和占位
+        // 隐藏加载状态
         hideLoading();
-  const sk2 = document.getElementById('eh-single-skeleton');
-  if (sk2) sk2.setAttribute('hidden', '');
         
         // 隐藏错误提示（如果有）
         hideErrorMessage();
@@ -1189,26 +1147,6 @@
       
       // 设置懒加载观察器
       setupThumbnailLazyLoad();
-
-      // 缩略图滚动滑轨 (范围: 0 -> scrollWidth - clientWidth)
-      if (elements.thumbsSlider) {
-        requestAnimationFrame(updateThumbsSliderMetrics);
-        elements.thumbsSlider.oninput = () => {
-          const v = parseInt(elements.thumbsSlider.value);
-          elements.thumbnails.scrollLeft = v;
-        };
-        // 同步滑轨位置（节流）
-        let syncTimer = null;
-        elements.thumbnails.addEventListener('scroll', () => {
-          if (!elements.thumbsSlider) return;
-          if (syncTimer) return;
-          syncTimer = requestAnimationFrame(() => {
-            syncTimer = null;
-            updateThumbsSliderMetrics();
-          });
-        });
-        window.addEventListener('resize', () => requestAnimationFrame(updateThumbsSliderMetrics));
-      }
     }
     
     // 设置缩略图懒加载
@@ -1245,7 +1183,6 @@
       thumbnails.forEach(thumb => {
         state.thumbnailObserver.observe(thumb);
       });
-      updateThumbsSliderMetrics();
     }
 
     // 加载单个缩略图（使用EH原生sprite sheet，按比例缩放坐标）
@@ -1279,44 +1216,38 @@
         
         // 获取图片名称作为title
         const title = imageData.n || `Page ${pageNum}`;
-        // === 自适应缩略图：保持整张原雪碧图子单元完整显示在 100x142 容器内 ===
-        // 通过精确缩放 sprite sheet 来“截取”这一个单元，不再强行拉伸为固定高宽比
-        const CONTAINER_W = 100;
-        const CONTAINER_H = 142;
-        const CELL_W = 200;   // 原始单元宽度
-        const CELL_H = 281;   // 原始单元高度（EH 普遍竖向缩略图高度）
+        
+        // ===== 自适应容器显示完整缩略图 =====
+        // 约定：雪碧图单元原始宽200px，高度近似为200/ratio。ratio从完整图的宽高比缓存中获取，若未获取则fallback 0.7
+  const containerW = 100;      // 统一容器宽度 (CSS 中固定)
+  const containerH = 142;      // 容器高度 (CSS 中固定)
+  const cellW = 200;           // 雪碧图单元原始宽度
+  const ratio = 0.7;           // 雪碧图单元的典型宽高比 (w/h)
+        const cellH = Math.round(cellW / ratio); // 估算单元原始高度
+        // 计算缩放，使整个单元完整呈现于容器
+        const scale = Math.min(containerW / cellW, containerH / cellH);
+        // 计算缩放后单元尺寸
+        const scaledW = Math.round(cellW * scale);
+        const scaledH = Math.round(cellH * scale);
+        // 雪碧图整体宽度（列数假设 20）
         const SPRITE_COLS = 20;
-        const SPRITE_W = SPRITE_COLS * CELL_W; // 4000
-
-        // contain 缩放：保证整单元完整展示
-        const scaleContain = Math.min(CONTAINER_W / CELL_W, CONTAINER_H / CELL_H);
-        const dispW = CELL_W * scaleContain;
-        const dispH = CELL_H * scaleContain;
-
-        // 计算缩放后的背景尺寸（整张 sprite 的缩放）
-        const bgSizeW = SPRITE_W * scaleContain;
+        const SPRITE_CELL_W = cellW;
+        const SPRITE_W = SPRITE_COLS * SPRITE_CELL_W;
+        // 背景偏移（缩放后）
         const x = parseFloat(xPos);
         const y = parseFloat(yPos);
-        const scaledX = x * scaleContain;
-        const scaledY = y * scaleContain;
-
-        // 居中偏移：若缩放后宽或高小于容器，则在剩余空间内居中
-        const offsetX = (CONTAINER_W - dispW) / 2;
-        const offsetY = (CONTAINER_H - dispH) / 2;
-
+        const scaledX = Math.round(x * (scaledW / cellW));
+        const scaledY = Math.round(y * (scaledH / cellH));
+        const bgSizeW = Math.round(SPRITE_W * (scaledW / cellW));
+        // 居中偏移（容器 > 缩略图时居中）
+        const offsetX = Math.round((containerW - scaledW) / 2);
+        const offsetY = Math.round((containerH - scaledH) / 2);
+        // 幂等渲染
         thumb.replaceChildren();
-        const wrapper = document.createElement('div');
-        wrapper.className = 'eh-thumb-inner';
-        wrapper.style.cssText = `position:relative;width:${CONTAINER_W}px;height:${CONTAINER_H}px;display:flex;align-items:center;justify-content:center;`;
-        const bg = document.createElement('div');
-        bg.style.cssText = `position:absolute;left:${offsetX}px;top:${offsetY}px;width:${dispW}px;height:${dispH}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;`;
-        bg.title = `Page ${pageNum}: ${title}`;
-        wrapper.appendChild(bg);
-        const num = document.createElement('div');
-        num.className = 'eh-thumbnail-number';
-        num.textContent = pageNum;
-        wrapper.appendChild(num);
-        thumb.appendChild(wrapper);
+        thumb.innerHTML = `
+          <div class="eh-thumb-inner" style="width:${scaledW}px;height:${scaledH}px;position:absolute;left:${offsetX}px;top:${offsetY}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;" title="Page ${pageNum}: ${title}"></div>
+          <div class="eh-thumbnail-number">${pageNum}</div>
+        `;
         thumb.dataset.loaded = 'true';
       } catch (err) {
         console.error(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, err);
@@ -1362,10 +1293,9 @@
       };
     }
 
-    // 点击主区域的左右/中间区域（适用单页与横向连续）
-    const mainArea = document.getElementById('eh-main');
-    if (mainArea) {
-      mainArea.onclick = (e) => {
+    // 点击图片左右区域翻页（适用所有模式）
+    if (elements.viewer) {
+      elements.viewer.onclick = (e) => {
         // 排除按钮、缩略图、进度条的点击
         if (e.target.tagName === 'BUTTON' || 
             e.target.closest('button') || 
@@ -1374,7 +1304,7 @@
         }
         
         // 获取点击位置
-        const rect = mainArea.getBoundingClientRect();
+        const rect = elements.viewer.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const viewerWidth = rect.width;
         
@@ -1397,25 +1327,7 @@
           return;
         }
         
-        // 横向连续模式：左侧1/3向左滚动，右侧1/3向右滚动
-        if (state.settings.readMode === 'continuous-horizontal') {
-          const container = document.getElementById('eh-continuous-horizontal');
-          if (container) {
-            if (clickX < leftThreshold) {
-              // 左侧1/3：向左滚动一个视口宽度
-              const scrollAmount = container.clientWidth * 0.8;
-              container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
-            } else if (clickX > rightThreshold) {
-              // 右侧1/3：向右滚动一个视口宽度
-              const scrollAmount = container.clientWidth * 0.8;
-              container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-            }
-            e.stopPropagation();
-            return;
-          }
-        }
-        
-  // 单页模式：左侧1/3向左翻，右侧1/3向右翻
+        // 在所有模式下左/右区域直接按页翻（连续横向模式下滚动居中到相邻页）
         let direction = 0;
         if (clickX < leftThreshold) {
           // 点击左侧：反向时向后翻（+1），正常时向前翻（-1）
@@ -1429,7 +1341,7 @@
         
         let target = state.currentPage + direction;
         
-  // 普通单页翻页逻辑
+        // 翻页逻辑（连续横向模式由 scheduleShowPage 处理居中）
         
         if (target < 1 || target > state.pageCount) return;
         scheduleShowPage(target);
@@ -1975,7 +1887,7 @@
               }
             }
           });
-  }, { root: continuous.container, rootMargin: '800px', threshold: 0.01 }); // 提前预加载扩大 rootMargin
+  }, { root: continuous.container, rootMargin: '1200px', threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
@@ -1985,15 +1897,57 @@
         // 映射垂直滚轮为水平滚动
         continuous.container.addEventListener('wheel', (e) => {
           if (e.deltaY !== 0) {
-            const dir = state.settings.reverse ? -1 : 1;
-            continuous.container.scrollLeft += e.deltaY * dir;
+            const dirVisual = state.settings.reverse ? -1 : 1; // 视觉滚动方向
+            continuous.container.scrollLeft += e.deltaY * dirVisual;
+            // 预测翻页方向以提前预取
+            const forward = e.deltaY > 0; // true: 向右滚
+            const logicalDir = forward ? 1 : -1; // 页码逻辑递增/递减
+            const base = state.currentPage - 1;
+            const targets = [];
+            for (let i = 1; i <= 4; i++) {
+              const idx = base + logicalDir * i;
+              if (idx >= 0 && idx < state.pageCount) targets.push(idx);
+            }
+            if (targets.length) enqueuePrefetch(targets, true);
             e.preventDefault();
-            // 滚轮滚动时提前高优先级预热附近区域，提高加载响应
-            const mid = state.currentPage - 1;
-            const extra = [mid+2, mid+3, mid-2, mid-3].filter(i=>i>=0 && i<state.pageCount);
-            enqueuePrefetch(extra, true);
           }
         }, { passive: false });
+
+        // 连续横向模式：左/中/右三分区点击
+        continuous.container.addEventListener('click', (e) => {
+          // 排除底部菜单与按钮
+          if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
+            return;
+          }
+          const rect = continuous.container.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const width = rect.width;
+          const leftThreshold = width / 3;
+          const rightThreshold = width * 2 / 3;
+          // 中间切换顶栏
+          if (clickX >= leftThreshold && clickX <= rightThreshold) {
+            const header = document.getElementById('eh-header');
+            const main = document.getElementById('eh-main');
+            if (header) {
+              const isHidden = header.classList.toggle('eh-hidden');
+              if (main) main.classList.toggle('eh-fullheight', isHidden);
+            }
+            e.stopPropagation();
+            return;
+          }
+          // 左右按页移动
+          let direction = 0;
+          if (clickX < leftThreshold) {
+            direction = state.settings.reverse ? 1 : -1;
+          } else if (clickX > rightThreshold) {
+            direction = state.settings.reverse ? -1 : 1;
+          } else {
+            return;
+          }
+          const target = Math.max(1, Math.min(state.pageCount, state.currentPage + direction));
+          scheduleShowPage(target);
+          e.stopPropagation();
+        });
 
         // 滚动时根据居中元素更新当前页与进度条/高亮
         let scrollUpdating = false;
