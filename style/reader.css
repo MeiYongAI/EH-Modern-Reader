@@ -279,10 +279,11 @@ body.eh-dark-mode #eh-bottom-menu {
 /* 缩略图容器 */
 
 .eh-thumbnails-container {
-  height: 110px;  /* 放大缩略图：90px -> 110px */
+  height: 150px;  /* 提升高度以容纳等比缩放后的完整缩略图 */
   padding: 6px 0 6px 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative; /* 让内部滑轨绝对定位 */
 }
 
 .eh-thumbnails-horizontal {
@@ -295,6 +296,31 @@ body.eh-dark-mode #eh-bottom-menu {
   overflow-x: auto;
   overflow-y: hidden;
   scroll-behavior: smooth;
+}
+/* 缩略图滑轨：复用进度条外观的小球 */
+.eh-thumbs-slider {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 6px;
+  height: 6px;
+  z-index: 3;
+  opacity: 0.9;
+}
+
+/* 亮色模式：底部菜单与文字颜色 */
+body:not(.eh-dark-mode) #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.92) 100%);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+body:not(.eh-dark-mode) .eh-progress-number {
+  color: #333;
+}
+
+body:not(.eh-dark-mode) .eh-progress-slider {
+  background: rgba(0,0,0,0.15);
 }
 
 .eh-thumbnails-horizontal::-webkit-scrollbar {
@@ -321,19 +347,22 @@ body.eh-dark-mode #eh-bottom-menu {
   width: 100px;
   min-width: 100px;
   max-width: 100px;
-  height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
+  height: 142px; /* 容器高度，内部图片按 contain 缩放并居中 */
   flex-shrink: 0;
   display: flex;
-  align-items: center; /* 子背景居中 */
-  justify-content: center; /* 子背景居中 */
+  align-items: center;
+  justify-content: center;
   position: relative;
   cursor: pointer;
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
+  background: rgba(255,255,255,0.04);
 }
+
+/* 内部自适应层（由 JS 注入） */
+.eh-thumb-inner { display: block; }
 
 .eh-thumbnail:hover { transform: scale(1.04); }
 
@@ -559,6 +588,22 @@ body.eh-dark-mode #eh-image-container {
 
 #eh-current-image[src] {
   opacity: 1;
+}
+
+/* 单页模式的占位骨架 */
+.eh-single-skeleton-box {
+  aspect-ratio: var(--eh-single-aspect, 0.7);
+  height: 80%;
+  width: auto;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06));
+  background-size: 200% 100%;
+  animation: eh-skeleton 1.2s linear infinite;
+}
+
+@keyframes eh-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* 缩放时的过渡效果 */
