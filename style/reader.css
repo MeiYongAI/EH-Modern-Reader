@@ -491,10 +491,7 @@ body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
 
 /* 缩略图容器（每个容器只放一张缩略图） */
 .eh-thumbnail {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
-  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
+  /* 保留外观，不再设置固定宽高，避免与前面动态尺寸冲突 */
   margin-bottom: 0;
   border-radius: 8px;
   overflow: hidden;
