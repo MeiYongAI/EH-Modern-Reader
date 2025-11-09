@@ -1226,16 +1226,9 @@
         
         const displayNum = physicalIndex + 1; // 显示的页码
         const logicalPage = displayNum; // 逻辑页与 DOM 顺序一致
-        
-        thumb.innerHTML = `
-          <div class="eh-thumbnail-placeholder" title="第 ${displayNum} 页" role="img" aria-label="缩略图 ${displayNum}">
-            <span style="display: none;">${displayNum}</span>
-          </div>
-          <div class="eh-thumbnail-number">${displayNum}</div>
-        `;
 
         thumb.onclick = () => {
-          // 统一逻辑页跳转，双页模式内部处理配对
+          // 统一逻辑页跳转
             scheduleShowPage(logicalPage, { instant: true });
         };
         
@@ -1285,119 +1278,48 @@
       });
     }
 
-    // 加载单个缩略图（支持容错和默认图）
+    // 加载单个缩略图（使用EH原生sprite sheet）
     function loadThumbnail(thumb, imageData, pageNum) {
-      const placeholder = thumb.querySelector('.eh-thumbnail-placeholder');
-      if (!placeholder) return;
-
-      // 添加 loading 状态
-      placeholder.classList.add('loading');
-
-      // 数据校验
       if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
-        console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效，使用默认图`);
-        setDefaultThumbnail(placeholder);
+        console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效`);
+        thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
         return;
       }
 
       try {
-        // 提取 URL 和位置 - 修正: Y坐标可能没有px单位
-        const match = imageData.t.match(/\(([^)]+)\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/) || 
-                     imageData.t.match(/url\("?([^")]+)"?\)\s+(-?\d+px)\s+(-?\d+(?:px)?)/);
+        // 解析格式: "(url) xPos yPos" 或 "url(url) xPos yPos"
+        const match = imageData.t.match(/\(?([^)]+)\)?\s+(-?\d+(?:px)?)\s+(-?\d+(?:px)?)/);
         
         if (!match) {
           console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
-          setDefaultThumbnail(placeholder);
+          thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
           return;
         }
 
         let [, url, xPos, yPos] = match;
         
-        // 参数校验
-        if (!url || !xPos || !yPos) {
-          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 参数不完整`);
-          setDefaultThumbnail(placeholder);
-          return;
-        }
-
-        // 确保Y坐标有px单位
-        if (!yPos.endsWith('px')) {
-          yPos = yPos + 'px';
-        }
+        // 清理URL
+        url = url.replace(/^url\(['"]?|['"]?\)$/g, '').trim();
         
-        // E-Hentai sprite sheet: 每张缩略图200x281px
-        // 我们缩放到50x70px (缩放因子 0.25)
-        const xOffset = parseInt(xPos);
-        const yOffset = parseInt(yPos);
+        // 确保位置值有px单位
+        if (!xPos.endsWith('px')) xPos = xPos + 'px';
+        if (!yPos.endsWith('px')) yPos = yPos + 'px';
         
-        // 参数验证
-        if (isNaN(xOffset) || isNaN(yOffset)) {
-          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 位置参数无效`);
-          setDefaultThumbnail(placeholder);
-          return;
-        }
-
-        const scale = 0.25; // 缩放因子
-        const scaledX = Math.round(xOffset * scale);
-        const scaledY = Math.round(yOffset * scale);
+        // 获取图片名称作为title
+        const title = imageData.n || `Page ${pageNum}`;
         
-        // 计算sprite sheet的总宽度
-        // E-Hentai通常一行20张图片: 20 * 200px = 4000px
-        // 缩放后: 4000 * 0.25 = 1000px
-        const spriteSheetWidth = 1000;
+        // 直接使用EH原生的sprite sheet方式
+        // 200x283px缩略图尺寸
+        thumb.innerHTML = `
+          <div style="width: 200px; height: 283px; background: url('${url}') ${xPos} ${yPos} no-repeat transparent;" 
+               title="Page ${pageNum}: ${title}"></div>
+          <div class="eh-thumbnail-number">${pageNum}</div>
+        `;
         
-        // 添加加载错误处理
-        const testImg = new Image();
-        
-        testImg.onerror = () => {
-          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, url);
-          setDefaultThumbnail(placeholder);
-        };
-        
-        testImg.onload = () => {
-          // 移除 loading 状态
-          placeholder.classList.remove('loading');
-          
-          // 设置背景图和位置
-          placeholder.style.backgroundImage = `url("${url}")`;
-          placeholder.style.backgroundPosition = `${scaledX}px ${scaledY}px`;
-          placeholder.style.backgroundRepeat = 'no-repeat';
-          placeholder.style.backgroundSize = `${spriteSheetWidth}px auto`;
-          
-          // 隐藏页码数字(因为有真实缩略图了)
-          const pageNumSpan = placeholder.querySelector('span');
-          if (pageNumSpan) pageNumSpan.style.display = 'none';
-        };
-        
-        testImg.src = url;
-        
-      } catch (e) {
-        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 解析失败:`, e, imageData.t);
-        setDefaultThumbnail(placeholder);
-      }
-    }
-
-    // 设置默认缩略图
-    function setDefaultThumbnail(placeholder) {
-      if (!placeholder) return;
-      
-      // 移除 loading 状态
-      placeholder.classList.remove('loading');
-      
-      // 添加错误状态
-      placeholder.classList.add('error');
-      
-      // 使用渐变色作为默认背景
-      placeholder.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-      placeholder.style.backgroundSize = 'cover';
-      
-      // 显示 placeholder 内的页码（作为备用显示）
-      const pageNumSpan = placeholder.querySelector('span');
-      if (pageNumSpan) {
-        pageNumSpan.style.display = 'block';
-        pageNumSpan.style.color = 'rgba(255, 255, 255, 0.9)';
-        pageNumSpan.style.fontSize = '14px';  // 改小一点，避免与外部数字冲突
-        pageNumSpan.style.fontWeight = '600';
+        thumb.dataset.loaded = 'true';
+      } catch (err) {
+        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, err);
+        thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
       }
     }
 
