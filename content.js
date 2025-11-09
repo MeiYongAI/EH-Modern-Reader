@@ -1278,10 +1278,11 @@
       });
     }
 
-    // 加载单个缩略图（使用EH原生sprite sheet）
+    // 加载单个缩略图（使用EH原生sprite sheet，按比例缩放坐标）
     function loadThumbnail(thumb, imageData, pageNum) {
       if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
         console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效`);
+        thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
         return;
       }
@@ -1292,6 +1293,7 @@
         
         if (!match) {
           console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
+          thumb.replaceChildren();
           thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
           return;
         }
@@ -1308,20 +1310,35 @@
         // 获取图片名称作为title
         const title = imageData.n || `Page ${pageNum}`;
         
-        // 直接使用EH原生的sprite sheet方式
-        // 缩略图缩小到100px宽度（保持宽高比）
+        // 以 100px 宽显示（原始每格200px宽），缩放因子 = 0.5
         const thumbWidth = 100;
-        const thumbHeight = Math.round(283 * thumbWidth / 200); // 约141.5px
+        const scale = thumbWidth / 200; // 0.5
+        // E-H 雪碧图通常一行20张 => 原始宽度约 4000px
+        const SPRITE_COLS = 20;
+        const SPRITE_CELL_W = 200;
+        const SPRITE_W = SPRITE_COLS * SPRITE_CELL_W; // 4000
         
+        // 背景位置缩放
+        const x = parseFloat(xPos);
+        const y = parseFloat(yPos);
+        const scaledX = Math.round(x * scale);
+        const scaledY = Math.round(y * scale);
+        const bgSizeW = Math.round(SPRITE_W * scale); // 2000 when scale=0.5
+        
+        // 目标高度：按常见比例0.7给一个稳定高度，避免行高跳动
+        const thumbHeight = Math.round(thumbWidth / 0.7); // 约142
+        
+        // 幂等保护：确保每次只渲染一次内容
+        thumb.replaceChildren();
         thumb.innerHTML = `
-          <div style="width: ${thumbWidth}px; height: ${thumbHeight}px; background: url('${url}') ${xPos} ${yPos} no-repeat transparent; background-size: ${thumbWidth * 5}px auto;" 
-               title="Page ${pageNum}: ${title}"></div>
+          <div style="width:${thumbWidth}px; height:${thumbHeight}px; background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent; background-size:${bgSizeW}px auto;" title="Page ${pageNum}: ${title}"></div>
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
-        
+
         thumb.dataset.loaded = 'true';
       } catch (err) {
         console.error(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, err);
+        thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
       }
     }
