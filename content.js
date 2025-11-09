@@ -6,6 +6,10 @@
 (function() {
   'use strict';
 
+  // 调试开关：默认关闭以减少控制台噪音（需要时在控制台执行 window.__EH_DEBUG=true 开启）
+  window.__EH_DEBUG = window.__EH_DEBUG || false;
+  const DBG = (...args) => { if (window.__EH_DEBUG) try { console.log(...args); } catch {} };
+
   // 防止重复注入
   if (window.ehModernReaderInjected) {
     return;
@@ -108,7 +112,7 @@
     console.warn('[EH Modern Reader] 早期脚本拦截失败:', e);
   }
 
-  console.log('[EH Modern Reader] 正在初始化...');
+  DBG('[EH Modern Reader] 正在初始化...');
 
   /**
    * 从原页面提取必要数据
@@ -373,7 +377,7 @@
 
     // 等待 CSS 加载完成后初始化阅读器
     link.onload = () => {
-      console.log('[EH Modern Reader] CSS 加载完成');
+  DBG('[EH Modern Reader] CSS 加载完成');
       initializeReader(pageData);
     };
 
@@ -393,11 +397,11 @@
       return;
     }
     window.__EH_READER_INIT = true;
-    console.log('[EH Modern Reader] 初始化阅读器');
-    console.log('[EH Modern Reader] 页面数:', pageData.pagecount);
-    console.log('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
-    console.log('[EH Modern Reader] 第一张图片数据示例:', pageData.imagelist?.[0]);
-    console.log('[EH Modern Reader] GID:', pageData.gid);
+  DBG('[EH Modern Reader] 初始化阅读器');
+  DBG('[EH Modern Reader] 页面数:', pageData.pagecount);
+  DBG('[EH Modern Reader] 图片列表长度:', pageData.imagelist?.length);
+  DBG('[EH Modern Reader] 第一张图片数据示例:', pageData.imagelist?.[0]);
+  DBG('[EH Modern Reader] GID:', pageData.gid);
 
     // 验证必要数据
     if (!pageData.imagelist || pageData.imagelist.length === 0) {
@@ -430,7 +434,8 @@
         thumbnailsHover: false, // 顶部开关：鼠标靠近底部时显示缩略图
   readMode: 'single', // 阅读模式：single | continuous-horizontal
         prefetchAhead: 2,   // 向后预加载页数
-        reverse: false      // 反向阅读（翻页/缩略图/进度条方向）
+        reverse: false,     // 反向阅读（翻页/缩略图/进度条方向）
+        highQualityThumbs: false // 缩略图使用真实图片（关闭时用快速雪碧图）
       },
       autoPage: {
         running: false,
@@ -753,7 +758,7 @@
     // 从 E-Hentai 图片页面提取真实图片 URL
     async function fetchRealImageUrl(pageUrl, signal) {
       try {
-        console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
+    DBG('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
         const response = await fetch(pageUrl, { signal });
         if (!response.ok) {
@@ -761,26 +766,26 @@
         }
         
         const html = await response.text();
-        console.log('[EH Modern Reader] 页面 HTML 长度:', html.length);
+  DBG('[EH Modern Reader] 页面 HTML 长度:', html.length);
         
         // 从页面中提取图片 URL (主要方法)
         const match = html.match(/<img[^>]+id="img"[^>]+src="([^"]+)"/);
         if (match && match[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
+          DBG('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
           return match[1];
         }
         
         // 尝试备用匹配模式
         const match2 = html.match(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|gif|webp)[^"]*)"/i);
         if (match2 && match2[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
+          DBG('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
           return match2[1];
         }
         
         // 尝试直接匹配 URL
         const match3 = html.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp))/i);
         if (match3 && match3[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
+          DBG('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
           return match3[1];
         }
         
@@ -816,7 +821,7 @@
         }
 
         const retryMsg = retryCount > 0 ? ` (重试 ${retryCount}/${MAX_RETRIES})` : '';
-        console.log('[EH Modern Reader] 获取图片页面:', pageUrl, retryMsg);
+  DBG('[EH Modern Reader] 获取图片页面:', pageUrl, retryMsg);
 
         // 如果是 E-Hentai 的图片页面 URL，需要先获取真实图片 URL
         if (pageUrl.includes('/s/')) {
@@ -831,7 +836,7 @@
             throw new Error('无法获取真实图片 URL');
           }
 
-          console.log('[EH Modern Reader] 真实图片 URL:', realImageUrl);
+          DBG('[EH Modern Reader] 真实图片 URL:', realImageUrl);
 
           // 建立加载中的 Promise 并写入缓存，避免重复并发
           const pending = new Promise((resolve, reject) => {
@@ -840,7 +845,7 @@
 
             img.onload = () => {
               clearTimeout(timeoutId);
-              console.log('[EH Modern Reader] 图片加载成功:', realImageUrl);
+              DBG('[EH Modern Reader] 图片加载成功:', realImageUrl);
               state.imageCache.set(pageIndex, { status: 'loaded', img });
               resolve(img);
             };
@@ -1048,7 +1053,7 @@
           elements.pageInput.value = pageNum;
         }
 
-  console.log('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
+  DBG('[EH Modern Reader] 显示页面:', pageNum, '图片 URL:', img.src);
 
   // 更新缩略图高亮（单页模式必须）
   updateThumbnailHighlight(pageNum);
@@ -1158,8 +1163,8 @@
       
       const options = {
         root: elements.thumbnails,
-        rootMargin: '300px', // 提前300px加载
-        threshold: 0.01
+        rootMargin: '80px', // 减少提前量降低并发
+        threshold: 0.05
       };
       
       state.thumbnailObserver = new IntersectionObserver((entries) => {
@@ -1237,52 +1242,83 @@
       return promise;
     }
 
+    // 缩略图请求并发控制（真实图升级时使用）
+    const thumbQueue = { list: [], running: 0, max: 2 };
+    function runNextThumbJob() {
+      while (thumbQueue.running < thumbQueue.max && thumbQueue.list.length > 0) {
+        const job = thumbQueue.list.shift();
+        thumbQueue.running++;
+        job().finally(() => { thumbQueue.running--; runNextThumbJob(); });
+      }
+    }
+    function enqueueThumbJob(fn) { thumbQueue.list.push(fn); runNextThumbJob(); }
+
     function loadThumbnail(thumb, imageData, pageNum) {
-      const idx = pageNum - 1;
-      const title = (imageData && imageData.n) ? imageData.n : `Page ${pageNum}`;
+      // 第一阶段：使用雪碧图快速裁剪（避免大量真实图并发）
+      if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
+        thumb.replaceChildren();
+        thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+        return;
+      }
+      const match = imageData.t.match(/\(?([^)]+)\)?\s+(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/);
+      if (!match) {
+        thumb.replaceChildren();
+        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
+        return;
+      }
+      const [, rawUrl, xStr, yStr] = match;
+      const spriteUrl = rawUrl.replace(/^url\(['"]?|['"]?\)$/g, '').trim();
+      const sx = Math.abs(parseInt(xStr, 10)) || 0;
+      const sy = Math.abs(parseInt(yStr, 10)) || 0;
       const containerW = 100, containerH = 142;
-      // 使用真实图片生成缩略图，彻底消除雪碧图单元自带的底部留白，保证居中
-      ensureRealImageUrl(idx)
-        .then(({ url }) => new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = (e) => reject(e);
-          img.src = url;
-        }))
-        .then((img) => {
-          const iw = img.naturalWidth || img.width;
-          const ih = img.naturalHeight || img.height;
-          const scale = Math.min(containerW / iw, containerH / ih);
-          const dw = Math.max(1, Math.floor(iw * scale));
-          const dh = Math.max(1, Math.floor(ih * scale));
-          const dx = Math.floor((containerW - dw) / 2);
-          const dy = Math.floor((containerH - dh) / 2);
-
-          const canvas = document.createElement('canvas');
-          canvas.width = containerW;
-          canvas.height = containerH;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.clearRect(0,0,containerW,containerH);
-          ctx.drawImage(img, dx, dy, dw, dh);
-
-          canvas.setAttribute('role', 'img');
-          canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
-          canvas.style.display = 'block';
-
-          thumb.replaceChildren();
-          thumb.appendChild(canvas);
-          const badge = document.createElement('div');
-          badge.className = 'eh-thumbnail-number';
-          badge.textContent = String(pageNum);
-          thumb.appendChild(badge);
-        })
-        .catch(err => {
-          console.warn('[EH Modern Reader] 缩略图加载失败（真实图）:', err);
-          thumb.replaceChildren();
-          thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
-        });
+      getSpriteMeta(spriteUrl).then(meta => {
+        const { img, tileW, tileH } = meta;
+        const canvas = document.createElement('canvas');
+        canvas.width = containerW; canvas.height = containerH;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.min(containerW / tileW, containerH / tileH);
+        const dw = Math.floor(tileW * scale);
+        const dh = Math.floor(tileH * scale);
+        const dx = Math.floor((containerW - dw) / 2);
+        const dy = Math.floor((containerH - dh) / 2);
+        try { ctx.drawImage(img, sx, sy, tileW, tileH, dx, dy, dw, dh); } catch {}
+        canvas.setAttribute('role', 'img');
+        canvas.style.display = 'block';
+        thumb.replaceChildren();
+        thumb.appendChild(canvas);
+        const badge = document.createElement('div');
+        badge.className = 'eh-thumbnail-number';
+        badge.textContent = String(pageNum);
+        thumb.appendChild(badge);
+        // 第二阶段：根据设置升级为真实图（仅可选）
+        if (state.settings.highQualityThumbs) {
+          const idx = pageNum - 1;
+          enqueueThumbJob(() => ensureRealImageUrl(idx)
+            .then(({ url }) => new Promise((resolve, reject) => {
+              const full = new Image();
+              full.onload = () => resolve(full);
+              full.onerror = reject;
+              full.src = url;
+            }))
+            .then(fullImg => {
+              const iw = fullImg.naturalWidth || fullImg.width;
+              const ih = fullImg.naturalHeight || fullImg.height;
+              const scale2 = Math.min(containerW / iw, containerH / ih);
+              const dw2 = Math.floor(iw * scale2);
+              const dh2 = Math.floor(ih * scale2);
+              const dx2 = Math.floor((containerW - dw2) / 2);
+              const dy2 = Math.floor((containerH - dh2) / 2);
+              const ctx2 = canvas.getContext('2d');
+              ctx2.clearRect(0,0,containerW,containerH);
+              ctx2.drawImage(fullImg, dx2, dy2, dw2, dh2);
+            })
+            .catch(e => DBG('缩略图真实图升级失败', pageNum, e))
+          );
+        }
+      }).catch(() => {
+        thumb.replaceChildren();
+        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
+      });
     }
 
     // 事件监听
