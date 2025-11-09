@@ -1185,7 +1185,58 @@
       });
     }
 
-    // 加载单个缩略图（使用EH原生sprite sheet，按比例缩放坐标）
+    // ===== 独立缩略图（基于雪碧图裁剪到 canvas，再按 contain 居中） =====
+    const spriteCache = new Map(); // url -> { img, promise, tileW:200, tileH }
+
+    function computeTileHeightForSprite(url) {
+      // 从同一 sprite 的 y 偏移推断行高；取差值的众数或首个有效差值
+      try {
+        const ys = [];
+        for (let i = 0; i < state.imagelist.length; i++) {
+          const it = state.imagelist[i];
+          if (!it || typeof it.t !== 'string') continue;
+          const m = it.t.match(/\(?([^)]+)\)?\s+(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/);
+          if (m) {
+            const u = m[1].replace(/^url\(['"]?|['"]?\)$/g, '').trim();
+            if (u === url) {
+              const y = Math.abs(parseInt(m[3] || '0'));
+              if (!isNaN(y)) ys.push(y);
+            }
+          }
+        }
+        const uniq = Array.from(new Set(ys)).sort((a,b)=>a-b);
+        const diffs = [];
+        for (let i=1;i<uniq.length;i++) {
+          const d = uniq[i]-uniq[i-1];
+          if (d>0) diffs.push(d);
+        }
+        if (diffs.length === 0) return 267; // 回退
+        // 众数
+        const map = new Map();
+        diffs.forEach(d=>map.set(d,(map.get(d)||0)+1));
+        let best = diffs[0], cnt = 0;
+        map.forEach((v,k)=>{ if (v>cnt) { cnt=v; best=k; } });
+        return best || 267;
+      } catch { return 267; }
+    }
+
+    function getSpriteMeta(url) {
+      const hit = spriteCache.get(url);
+      if (hit) return hit.promise;
+      const img = new Image();
+      const promise = new Promise((resolve, reject) => {
+        img.onload = () => {
+          const tileH = computeTileHeightForSprite(url);
+          resolve({ img, tileW: 200, tileH });
+        };
+        img.onerror = (e) => reject(e);
+      });
+      img.src = url;
+      const entry = { img, promise };
+      spriteCache.set(url, entry);
+      return promise;
+    }
+
     function loadThumbnail(thumb, imageData, pageNum) {
       if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
         console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效`);
@@ -1195,118 +1246,70 @@
       }
 
       try {
-        // 解析格式: "(url) xPos yPos" 或 "url(url) xPos yPos"
-        const match = imageData.t.match(/\(?([^)]+)\)?\s+(-?\d+(?:px)?)\s+(-?\d+(?:px)?)/);
-        
+        const match = imageData.t.match(/\(?([^)]+)\)?\s+(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/);
         if (!match) {
           console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
           thumb.replaceChildren();
-          thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+          thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
           return;
         }
-
-        let [, url, xPos, yPos] = match;
-        
-        // 清理URL
-        url = url.replace(/^url\(['"]?|['"]?\)$/g, '').trim();
-        
-        // 确保位置值有px单位
-        if (!xPos.endsWith('px')) xPos = xPos + 'px';
-        if (!yPos.endsWith('px')) yPos = yPos + 'px';
-        
-        // 获取图片名称作为title
+        let [, rawUrl, xStr, yStr] = match;
+        const url = rawUrl.replace(/^url\(['"]?|['"]?\)$/g, '').trim();
+        const sx = Math.abs(parseInt(xStr, 10)) || 0; // 源起点x（背景偏移为负，这里取绝对值）
+        const sy = Math.abs(parseInt(yStr, 10)) || 0; // 源起点y
         const title = imageData.n || `Page ${pageNum}`;
-        
-        // ===== 自适应容器显示完整缩略图 =====
-        // 约定：雪碧图单元原始宽200px，高度近似为200/ratio。ratio从完整图的宽高比缓存中获取，若未获取则fallback 0.7
-  const containerW = 100;      // 统一容器宽度 (CSS 中固定)
-  const containerH = 142;      // 容器高度 (CSS 中固定)
-  const cellW = 200;           // 雪碧图单元原始宽度（与原版MPV一致）
-  const cellH = 267;           // 雪碧图单元原始高度（与原版MPV一致）
-        // 计算缩放，使整个单元完整呈现于容器
-        const scale = Math.min(containerW / cellW, containerH / cellH);
-        // 计算缩放后单元尺寸
-  const scaledW = Math.round(cellW * scale);
-  const scaledH = Math.round(cellH * scale);
-        // 雪碧图整体宽度（列数假设 20）
-        const SPRITE_COLS = 20;
-        const SPRITE_CELL_W = cellW;
-        const SPRITE_W = SPRITE_COLS * SPRITE_CELL_W;
-        // 背景偏移（缩放后）
-        const x = parseFloat(xPos);
-        const y = parseFloat(yPos);
-        // 解析sprite位置偏移（原始雪碧图坐标）
-        const spriteX = parseFloat(xPos);
-        const spriteY = parseFloat(yPos);
-        // 加载雪碧图并裁剪出单张缩略图
-        const spriteKey = url;
-        const thumbIndex = pageNum - 1;
-        const canvasCache = window.__ehThumbCanvasCache = window.__ehThumbCanvasCache || new Map();
-        const spriteImageCache = window.__ehSpriteImageCache = window.__ehSpriteImageCache || new Map();
-        function ensureSpriteImage(src) {
-          if (spriteImageCache.has(src)) return spriteImageCache.get(src);
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          const p = new Promise((resolve, reject) => {
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-          });
-          img.src = src;
-          spriteImageCache.set(src, p);
-          return p;
-        }
-        function buildThumbDataURL(spriteImg) {
-          const key = `${spriteKey}|${spriteX}|${spriteY}`;
-          if (canvasCache.has(key)) return canvasCache.get(key);
+
+        const containerW = 100, containerH = 142;
+        getSpriteMeta(url).then(meta => {
+          const { img, tileW, tileH } = meta;
+          // 源裁剪区域
+          const srcX = sx;
+          const srcY = sy;
+          const srcW = tileW;
+          const srcH = tileH;
+          // 目标缩放（contain）
+          const scale = Math.min(containerW / srcW, containerH / srcH);
+          const dw = Math.max(1, Math.floor(srcW * scale));
+          const dh = Math.max(1, Math.floor(srcH * scale));
+          const dx = Math.floor((containerW - dw) / 2);
+          const dy = Math.floor((containerH - dh) / 2);
+          // 绘制到canvas
+          const canvas = document.createElement('canvas');
+          canvas.width = containerW;
+          canvas.height = containerH;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           try {
-            const c = document.createElement('canvas');
-            c.width = cellW; c.height = cellH;
-            const ctx = c.getContext('2d');
-            ctx.drawImage(spriteImg, -spriteX, -spriteY);
-            const dataURL = c.toDataURL('image/webp');
-            canvasCache.set(key, dataURL);
-            return dataURL;
-          } catch (err) {
-            console.warn('[EH Modern Reader] Canvas裁剪缩略图失败，回退背景方式', err);
-            return null;
+            ctx.clearRect(0,0,containerW,containerH);
+            ctx.drawImage(img, srcX, srcY, srcW, srcH, dx, dy, dw, dh);
+          } catch (e) {
+            console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
           }
-        }
-        ensureSpriteImage(url).then(imgSprite => {
-          const dataURL = buildThumbDataURL(imgSprite);
-          // 居中偏移（按 contain 缩放后居中）
-          const offsetX = Math.round((containerW - scaledW) / 2);
-          const offsetY = Math.round((containerH - scaledH) / 2);
+          // 使用 <img> 承载，便于后续样式控制
+          const thumbImg = document.createElement('img');
+          thumbImg.width = containerW;
+          thumbImg.height = containerH;
+          thumbImg.alt = `Page ${pageNum}`;
+          thumbImg.title = `Page ${pageNum}: ${title}`;
+          try { thumbImg.src = canvas.toDataURL('image/webp'); } catch { thumbImg.src = canvas.toDataURL(); }
+
+          // 幂等渲染
           thumb.replaceChildren();
-          if (dataURL) {
-            const imgEl = document.createElement('img');
-            imgEl.src = dataURL;
-            imgEl.alt = title;
-            imgEl.style.cssText = `position:absolute;left:${offsetX}px;top:${offsetY}px;width:${scaledW}px;height:${scaledH}px;object-fit:contain;`;
-            thumb.appendChild(imgEl);
-          } else {
-            // 回退：背景定位方式
-            const bgSizeW = Math.round(SPRITE_W * (scaledW / cellW));
-            const scaledX = Math.round(spriteX * (scaledW / cellW));
-            const scaledY = Math.round(spriteY * (scaledH / cellH));
-            const fallbackDiv = document.createElement('div');
-            fallbackDiv.className = 'eh-thumb-inner';
-            fallbackDiv.style.cssText = `width:${scaledW}px;height:${scaledH}px;position:absolute;left:${offsetX}px;top:${offsetY}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;`;
-            thumb.appendChild(fallbackDiv);
-          }
-          const num = document.createElement('div');
-          num.className = 'eh-thumbnail-number';
-          num.textContent = pageNum;
-          thumb.appendChild(num);
-          thumb.dataset.loaded = 'true';
+          thumb.appendChild(thumbImg);
+          const badge = document.createElement('div');
+          badge.className = 'eh-thumbnail-number';
+          badge.textContent = String(pageNum);
+          thumb.appendChild(badge);
         }).catch(err => {
-          console.warn('[EH Modern Reader] 缩略图图片加载失败:', err);
+          console.warn('[EH Modern Reader] 缩略图sprite加载失败，使用占位:', err);
           thumb.replaceChildren();
           thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
         });
       } catch (err) {
-        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 加载失败:`, err);
+        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 处理失败:`, err);
         thumb.replaceChildren();
-        thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
       }
     }
 

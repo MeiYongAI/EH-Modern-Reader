@@ -345,8 +345,8 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
   flex-shrink: 0;
   display: flex;
-  align-items: center; /* 子背景居中 */
-  justify-content: center; /* 子背景居中 */
+  align-items: center; /* 内部img/canvas垂直居中 */
+  justify-content: center; /* 内部img/canvas水平居中 */
   position: relative;
   cursor: pointer;
   border-radius: 8px;
@@ -354,6 +354,14 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
+}
+
+/* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
+.eh-thumbnail > img {
+  width: 100px;
+  height: 142px;
+  object-fit: contain;
+  display: block;
 }
 
 .eh-thumbnail:hover { transform: scale(1.04); }
@@ -490,16 +498,6 @@ body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   position: relative;
   flex: 0 0 auto;
-}
-/* 新的缩略图居中显示：img为独立生成的裁剪图 */
-.eh-thumbnail img {
-  display: block;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  margin: 0 auto;
-  pointer-events: none;
-  user-select: none;
 }
 
 .eh-thumbnail:hover {
