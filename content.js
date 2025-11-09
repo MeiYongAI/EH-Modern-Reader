@@ -441,6 +441,55 @@
     };
     // 比例缓存：pageIndex -> ratio （从真实 URL 中解析或已加载图）
     const ratioCache = new Map();
+    // 雪碧图尺寸元数据缓存（缩略图用）
+    let spriteMeta = null; // { cellW, cellH, cols, rows, spriteW, spriteH }
+
+    // 探测雪碧图单元尺寸：遍历若干 imageData.t，取不同的 xPos / yPos 绝对差的最小正值
+    function detectSpriteMeta(limit = 120) {
+      if (spriteMeta) return spriteMeta;
+      try {
+        const xs = new Set();
+        const ys = new Set();
+        const list = state.imagelist || [];
+        for (let i = 0; i < list.length && i < limit; i++) {
+          const t = list[i]?.t;
+            if (!t || typeof t !== 'string') continue;
+          const m = t.match(/\(?[^)]+\)?\s+(-?\d+(?:px)?)\s+(-?\d+(?:px)?)/);
+          if (!m) continue;
+          let x = m[1]; let y = m[2];
+          if (!x.endsWith('px')) x += 'px';
+          if (!y.endsWith('px')) y += 'px';
+          const xv = Math.abs(parseInt(x));
+          const yv = Math.abs(parseInt(y));
+          xs.add(xv); ys.add(yv);
+        }
+        const diff = (arr) => {
+          const sorted = Array.from(arr).sort((a,b)=>a-b);
+          let best = null;
+          for (let i=1;i<sorted.length;i++) {
+            const d = sorted[i] - sorted[i-1];
+            if (d > 0 && (best === null || d < best)) best = d;
+          }
+          return best;
+        };
+        const cellW = diff(xs) || 200; // 回退默认200
+        const cellH = diff(ys) || Math.round(cellW * 1.4); // 粗略高度回退为宽的1.4倍
+        // 推导列数：最大x / cellW + 1
+        const maxX = Math.max(...Array.from(xs).concat([0]));
+        const cols = maxX > 0 ? (Math.round(maxX / cellW) + 1) : 20; // 若无法推断则默认20列
+        // 推导行数：最大y / cellH + 1
+        const maxY = Math.max(...Array.from(ys).concat([0]));
+        const rows = maxY > 0 ? (Math.round(maxY / cellH) + 1) : Math.ceil(list.length / cols);
+        const spriteW = cols * cellW;
+        const spriteH = rows * cellH;
+        spriteMeta = { cellW, cellH, cols, rows, spriteW, spriteH };
+        console.log('[EH Modern Reader] SpriteMeta', spriteMeta);
+        return spriteMeta;
+      } catch (e) {
+        spriteMeta = { cellW: 200, cellH: 300, cols: 20, rows: Math.ceil(state.pageCount/20), spriteW: 4000, spriteH: 300 * Math.ceil(state.pageCount/20) };
+        return spriteMeta;
+      }
+    }
 
     // 读取/保存进度（关闭阅读记忆：总是从第1页开始，且不写入存储）
     function loadProgress() { return 1; }
@@ -1110,6 +1159,8 @@
         console.warn('[EH Modern Reader] 缩略图容器不存在');
         return;
       }
+      // 确保已探测雪碧图尺寸
+      detectSpriteMeta();
 
       // 清空容器，防止重复添加
       elements.thumbnails.innerHTML = '';
@@ -1219,33 +1270,27 @@
         
         // ===== 自适应容器显示完整缩略图 =====
         // 约定：雪碧图单元原始宽200px，高度近似为200/ratio。ratio从完整图的宽高比缓存中获取，若未获取则fallback 0.7
-  const containerW = 100;      // 统一容器宽度 (CSS 中固定)
-  const containerH = 142;      // 容器高度 (CSS 中固定)
-  const cellW = 200;           // 雪碧图单元原始宽度
-  const ratio = 0.7;           // 雪碧图单元的典型宽高比 (w/h)
-        const cellH = Math.round(cellW / ratio); // 估算单元原始高度
-        // 计算缩放，使整个单元完整呈现于容器
+        const meta = spriteMeta || detectSpriteMeta();
+        const containerW = 100;
+        const containerH = 142;
+        const cellW = meta.cellW;
+        const cellH = meta.cellH;
+        // 统一缩放（contain）
         const scale = Math.min(containerW / cellW, containerH / cellH);
-        // 计算缩放后单元尺寸
-        const scaledW = Math.round(cellW * scale);
-        const scaledH = Math.round(cellH * scale);
-        // 雪碧图整体宽度（列数假设 20）
-        const SPRITE_COLS = 20;
-        const SPRITE_CELL_W = cellW;
-        const SPRITE_W = SPRITE_COLS * SPRITE_CELL_W;
-        // 背景偏移（缩放后）
-        const x = parseFloat(xPos);
+        const displayW = Math.round(cellW * scale);
+        const displayH = Math.round(cellH * scale);
+        // 背景整体尺寸只需缩放宽度（高度 auto 保持纵向比例）
+        const bgSizeW = Math.round(meta.spriteW * scale);
+        const x = parseFloat(xPos); // 原始负偏移
         const y = parseFloat(yPos);
-        const scaledX = Math.round(x * (scaledW / cellW));
-        const scaledY = Math.round(y * (scaledH / cellH));
-        const bgSizeW = Math.round(SPRITE_W * (scaledW / cellW));
-        // 居中偏移（容器 > 缩略图时居中）
-        const offsetX = Math.round((containerW - scaledW) / 2);
-        const offsetY = Math.round((containerH - scaledH) / 2);
+        const scaledX = Math.round(x * scale);
+        const scaledY = Math.round(y * scale);
+        const offsetX = Math.round((containerW - displayW) / 2);
+        const offsetY = Math.round((containerH - displayH) / 2);
         // 幂等渲染
         thumb.replaceChildren();
         thumb.innerHTML = `
-          <div class="eh-thumb-inner" style="width:${scaledW}px;height:${scaledH}px;position:absolute;left:${offsetX}px;top:${offsetY}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;" title="Page ${pageNum}: ${title}"></div>
+          <div class="eh-thumb-inner" style="width:${displayW}px;height:${displayH}px;position:absolute;left:${offsetX}px;top:${offsetY}px;background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;" title="Page ${pageNum}: ${title}"></div>
           <div class="eh-thumbnail-number">${pageNum}</div>
         `;
         thumb.dataset.loaded = 'true';
