@@ -317,8 +317,10 @@ body.eh-dark-mode #eh-bottom-menu {
 /* ==================== 缩略图 ==================== */
 
 .eh-thumbnail {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
   flex-shrink: 0;
-  width: 100px; /* 固定宽度，与缩略图内容一致 */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -449,16 +451,20 @@ body.eh-dark-mode #eh-bottom-menu {
   font-weight: 500;
 }
 
-/* 缩略图占位符 - 用于显示 E-Hentai 雪碧图 */
+/* 缩略图容器（每个容器只放一张缩略图） */
 .eh-thumbnail {
-  width: 100%;
-  margin-bottom: 12px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: auto;
+  margin-bottom: 8px;
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: all 0.2s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
   position: relative;
+  flex: 0 0 auto; /* 防止被拉伸，占用固定宽度 */
 }
 
 .eh-thumbnail:hover {
