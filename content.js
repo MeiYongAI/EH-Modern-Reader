@@ -1259,7 +1259,7 @@
         const sy = Math.abs(parseInt(yStr, 10)) || 0; // 源起点y
         const title = imageData.n || `Page ${pageNum}`;
 
-        const containerW = 100, containerH = 142;
+        const maxW = 100, maxH = 142;
         getSpriteMeta(url).then(meta => {
           const { img, tileW, tileH } = meta;
           // 源裁剪区域
@@ -1267,11 +1267,11 @@
           const srcY = sy;
           const srcW = tileW;
           const srcH = tileH;
-          // 目标缩放（contain）
-          const scale = Math.min(containerW / srcW, containerH / srcH);
+          // 目标缩放（contain），并让容器尺寸==缩放后尺寸
+          const scale = Math.min(maxW / srcW, maxH / srcH);
           const dw = Math.max(1, Math.floor(srcW * scale));
           const dh = Math.max(1, Math.floor(srcH * scale));
-          // 绘制到canvas（canvas尺寸=缩放后图片尺寸，由容器flex居中）
+          // 绘制到canvas（0,0 无需偏移），canvas实际像素=缩放后尺寸
           const canvas = document.createElement('canvas');
           canvas.width = dw;
           canvas.height = dh;
@@ -1279,7 +1279,7 @@
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           try {
-            ctx.clearRect(0, 0, dw, dh);
+            ctx.clearRect(0,0,dw,dh);
             ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, dw, dh);
           } catch (e) {
             console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
@@ -1288,6 +1288,9 @@
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
           canvas.style.display = 'block';
+          // 容器尺寸 = 缩放后尺寸，实现真正的“内容大小就是容器大小”
+          thumb.style.width = `${dw}px`;
+          thumb.style.height = `${dh}px`;
           // 幂等渲染
           thumb.replaceChildren();
           thumb.appendChild(canvas);
