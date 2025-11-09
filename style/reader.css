@@ -356,6 +356,9 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.04); /* 轻微底色增强视觉分隔 */
 }
 
+/* 缩略图 inner 采用绝对定位 + 50% 居中 */
+.eh-thumb-inner { position: absolute; left:50%; top:50%; transform: translate(-50%,-50%); }
+
 .eh-thumbnail:hover { transform: scale(1.04); }
 
 .eh-thumbnail.active { border: 2px solid #FF6B9D; box-shadow: 0 0 0 3px rgba(255,107,157,0.25); }

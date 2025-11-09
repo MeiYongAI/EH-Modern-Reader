@@ -1185,52 +1185,104 @@
       });
     }
 
+    // 解析 EH 雪碧图 t 字段: 形如 "(url) -200px -0px" / "url(url) -200px 0" / "url -200 0"
+    function parseSpriteInfo(t) {
+      if (!t || typeof t !== 'string') return null;
+      t = t.trim();
+      let m = t.match(/\(\s*(https?:\/\/[^)]+?)\s*\)\s+(-?\d+)px?\s+(-?\d+)px?/i);
+      if (!m) m = t.match(/url\(\s*['"]?(https?:\/\/[^'"\)]+)['"]?\s*\)\s+(-?\d+)px?\s+(-?\d+)px?/i);
+      if (!m) {
+        // 宽松拆分：URL + x y
+        const parts = t.replace(/^url\(/i, '').replace(/\)$/,'').trim().split(/\s+/);
+        if (parts.length >= 3 && /^https?:\/\//i.test(parts[0])) {
+          m = [null, parts[0], parts[1], parts[2]];
+        }
+      }
+      if (!m) return null;
+      const url = m[1];
+      const x = parseInt(String(m[2]).replace('px',''), 10) || 0;
+      const y = parseInt(String(m[3]).replace('px',''), 10) || 0;
+      return { url, x, y };
+    }
+
+    // 雪碧图尺寸缓存（用于计算 background-size，避免 481+ 使用错误宽度）
+    const spriteMetaCache = new Map(); // url -> { width, height, promise }
+    function ensureSpriteMeta(url) {
+      const cached = spriteMetaCache.get(url);
+      if (cached && (cached.width && cached.height)) return Promise.resolve(cached);
+      if (cached && cached.promise) return cached.promise;
+      const p = new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const meta = { width: img.naturalWidth || img.width, height: img.naturalHeight || img.height };
+          spriteMetaCache.set(url, meta);
+          resolve(meta);
+        };
+        img.onerror = () => {
+          // 即便失败也返回一个兜底尺寸，避免缩略图不显示
+          const meta = { width: 4000, height: 2000 };
+          spriteMetaCache.set(url, meta);
+          resolve(meta);
+        };
+        img.src = url;
+      });
+      spriteMetaCache.set(url, { promise: p });
+      return p;
+    }
+
     // 加载单个缩略图（使用EH原生sprite sheet，按比例缩放坐标）
     function loadThumbnail(thumb, imageData, pageNum) {
-      const raw = imageData && imageData.t;
-      if (typeof raw !== 'string') {
+      if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
+        // 静默降级：仅显示页码，不输出警告
         thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
         return;
       }
-      // 严格格式 (url) -Xpx Y  或 (url) -Xpx -Ypx；E-H 常见为 (spriteURL) -0px 0
-      const strict = raw.match(/^\((https?:[^)]+)\)\s+(-?\d+)px\s+(-?\d+)px?$/i);
-      if (!strict) {
-        // 不再输出大量 warn，直接显示序号占位
+
+      try {
+        const info = parseSpriteInfo(imageData.t);
+        if (!info) {
+          // 静默降级
+          thumb.replaceChildren();
+          thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+          return;
+        }
+        const { url, x, y } = info;
+        
+        // 获取图片名称作为title
+        const title = imageData.n || `Page ${pageNum}`;
+
+        // ===== 自适应容器显示完整缩略图（依赖真实雪碧图宽度） =====
+        const containerW = 100;      // 容器宽度
+        const containerH = 142;      // 容器高度
+        const cellW = 200;           // 每格原始宽度（EH 约定）
+        const cellH = Math.round(cellW / 0.7); // 估算原始高度，取 0.7 比例
+
+        ensureSpriteMeta(url).then(meta => {
+          const scale = Math.min(containerW / cellW, containerH / cellH);
+          const scaledW = Math.round(cellW * scale);
+          const scaledH = Math.round(cellH * scale);
+          const bgSizeW = Math.round((meta.width || 4000) * scale);
+          const scaledX = Math.round(x * scale);
+          const scaledY = Math.round(y * scale);
+          // 居中显示：使用 50%+translate 避免数值误差
+          thumb.replaceChildren();
+          const inner = document.createElement('div');
+          inner.className = 'eh-thumb-inner';
+          inner.style.cssText = `width:${scaledW}px;height:${scaledH}px;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:url('${url}') ${scaledX}px ${scaledY}px no-repeat transparent;background-size:${bgSizeW}px auto;`;
+          inner.title = `Page ${pageNum}: ${title}`;
+          thumb.appendChild(inner);
+          const badge = document.createElement('div');
+          badge.className = 'eh-thumbnail-number';
+          badge.textContent = String(pageNum);
+          thumb.appendChild(badge);
+          thumb.dataset.loaded = 'true';
+        });
+      } catch (err) {
+        // 静默降级
         thumb.replaceChildren();
         thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
-        return;
       }
-      const spriteUrl = strict[1];
-      const originX = parseInt(strict[2], 10); // 负值
-      const originY = parseInt(strict[3], 10); // 通常 0
-      // 单元尺寸：固定 200 宽 290 高（经验值：纵向图裁剪区域高度约 290）
-      const cellW = 200;
-      const cellH = 290;
-      // 容器尺寸（与 CSS 保持一致）
-      const containerW = 100;
-      const containerH = 142;
-      // 等比缩放以完整显示单元
-      const scale = Math.min(containerW / cellW, containerH / cellH);
-      const showW = Math.round(cellW * scale);
-      const showH = Math.round(cellH * scale);
-      const offsetX = Math.round((containerW - showW) / 2);
-      const offsetY = Math.round((containerH - showH) / 2);
-      // 背景尺寸：仅缩放宽度即可（高度自动按比例）
-      // 计算缩放后的背景位移：sprite 原始坐标按 scale 缩放
-      const bgPosX = Math.round(originX * scale);
-      const bgPosY = Math.round(originY * scale);
-      // 估算整张雪碧图宽（通过坐标 / 单元宽取列数，最少 1）
-      const colIndex = Math.abs(originX) / cellW; // 0-based 列号
-      const colsApprox = Math.max(colIndex + 1, 20); // 给个下限 20，避免早期列数不足导致裁切
-      const spriteScaledW = Math.round(colsApprox * cellW * scale);
-      const title = imageData.n || `Page ${pageNum}`;
-      thumb.replaceChildren();
-      thumb.innerHTML = `
-        <div class="eh-thumb-inner" style="position:absolute;left:${offsetX}px;top:${offsetY}px;width:${showW}px;height:${showH}px;background:url('${spriteUrl}') ${bgPosX}px ${bgPosY}px no-repeat;background-size:${spriteScaledW}px auto;"></div>
-        <div class="eh-thumbnail-number">${pageNum}</div>
-      `;
-      thumb.dataset.loaded = 'true';
     }
 
     // 事件监听
