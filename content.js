@@ -71,6 +71,7 @@
 
     Element.prototype.appendChild = function(child) {
       if (child && child.tagName === 'SCRIPT' && shouldBlockScript(child)) {
+        // 可能是内联脚本，尽量从其文本提取
         try { captureFromScriptText(child.textContent || ''); } catch {}
         return child; // 丢弃
       }
@@ -85,6 +86,7 @@
       return originalInsertBefore.call(this, newNode, referenceNode);
     };
 
+    // 观察动态添加的脚本并移除
     const mo = new MutationObserver((mutations) => {
       for (const m of mutations) {
         m.addedNodes && m.addedNodes.forEach((n) => {
@@ -1269,11 +1271,8 @@
           const scale = Math.min(containerW / srcW, containerH / srcH);
           const dw = Math.max(1, Math.floor(srcW * scale));
           const dh = Math.max(1, Math.floor(srcH * scale));
-          const dx = Math.floor((containerW - dw) / 2);
-          const dy = Math.floor((containerH - dh) / 2);
-          // 绘制到canvas
+          // 绘制到canvas：使用缩放后的实际尺寸，避免再次拉伸
           const canvas = document.createElement('canvas');
-          // 画布尺寸等于目标图像尺寸，由容器flex居中
           canvas.width = dw;
           canvas.height = dh;
           const ctx = canvas.getContext('2d');
@@ -1288,6 +1287,11 @@
           // 直接使用 canvas 作为缩略图节点（避免跨域导出 dataURL 的安全限制）
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
+          // 绝对居中到容器
+          canvas.style.position = 'absolute';
+          canvas.style.left = '50%';
+          canvas.style.top = '50%';
+          canvas.style.transform = 'translate(-50%, -50%)';
           canvas.style.display = 'block';
           // 幂等渲染
           thumb.replaceChildren();
