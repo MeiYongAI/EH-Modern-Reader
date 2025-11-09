@@ -1238,76 +1238,51 @@
     }
 
     function loadThumbnail(thumb, imageData, pageNum) {
-      if (!imageData || !imageData.t || typeof imageData.t !== 'string') {
-        console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 数据无效`);
-        thumb.replaceChildren();
-        thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
-        return;
-      }
+      const idx = pageNum - 1;
+      const title = (imageData && imageData.n) ? imageData.n : `Page ${pageNum}`;
+      const containerW = 100, containerH = 142;
+      // 使用真实图片生成缩略图，彻底消除雪碧图单元自带的底部留白，保证居中
+      ensureRealImageUrl(idx)
+        .then(({ url }) => new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = (e) => reject(e);
+          img.src = url;
+        }))
+        .then((img) => {
+          const iw = img.naturalWidth || img.width;
+          const ih = img.naturalHeight || img.height;
+          const scale = Math.min(containerW / iw, containerH / ih);
+          const dw = Math.max(1, Math.floor(iw * scale));
+          const dh = Math.max(1, Math.floor(ih * scale));
+          const dx = Math.floor((containerW - dw) / 2);
+          const dy = Math.floor((containerH - dh) / 2);
 
-      try {
-        const match = imageData.t.match(/\(?([^)]+)\)?\s+(-?\d+)(?:px)?\s+(-?\d+)(?:px)?/);
-        if (!match) {
-          console.warn(`[EH Modern Reader] 缩略图 ${pageNum} 格式错误:`, imageData.t);
-          thumb.replaceChildren();
-          thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
-          return;
-        }
-        let [, rawUrl, xStr, yStr] = match;
-        const url = rawUrl.replace(/^url\(['"]?|['"]?\)$/g, '').trim();
-        const sx = Math.abs(parseInt(xStr, 10)) || 0; // 源起点x（背景偏移为负，这里取绝对值）
-        const sy = Math.abs(parseInt(yStr, 10)) || 0; // 源起点y
-        const title = imageData.n || `Page ${pageNum}`;
-
-        const maxW = 100, maxH = 142;
-        getSpriteMeta(url).then(meta => {
-          const { img, tileW, tileH } = meta;
-          // 源裁剪区域
-          const srcX = sx;
-          const srcY = sy;
-          const srcW = tileW;
-          const srcH = tileH;
-          // 目标缩放（contain），并让容器尺寸==缩放后尺寸
-          const scale = Math.min(maxW / srcW, maxH / srcH);
-          const dw = Math.max(1, Math.floor(srcW * scale));
-          const dh = Math.max(1, Math.floor(srcH * scale));
-          // 绘制到canvas（0,0 无需偏移），canvas实际像素=缩放后尺寸
           const canvas = document.createElement('canvas');
-          canvas.width = dw;
-          canvas.height = dh;
+          canvas.width = containerW;
+          canvas.height = containerH;
           const ctx = canvas.getContext('2d');
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
-          try {
-            ctx.clearRect(0,0,dw,dh);
-            ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, dw, dh);
-          } catch (e) {
-            console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
-          }
-          // 直接使用 canvas 作为缩略图节点（避免跨域导出 dataURL 的安全限制）
+          ctx.clearRect(0,0,containerW,containerH);
+          ctx.drawImage(img, dx, dy, dw, dh);
+
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
           canvas.style.display = 'block';
-          // 容器尺寸 = 缩放后尺寸，实现真正的“内容大小就是容器大小”
-          thumb.style.width = `${dw}px`;
-          thumb.style.height = `${dh}px`;
-          // 幂等渲染
+
           thumb.replaceChildren();
           thumb.appendChild(canvas);
           const badge = document.createElement('div');
           badge.className = 'eh-thumbnail-number';
           badge.textContent = String(pageNum);
           thumb.appendChild(badge);
-        }).catch(err => {
-          console.warn('[EH Modern Reader] 缩略图sprite加载失败，使用占位:', err);
+        })
+        .catch(err => {
+          console.warn('[EH Modern Reader] 缩略图加载失败（真实图）:', err);
           thumb.replaceChildren();
           thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
         });
-      } catch (err) {
-        console.error(`[EH Modern Reader] 缩略图 ${pageNum} 处理失败:`, err);
-        thumb.replaceChildren();
-        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
-      }
     }
 
     // 事件监听
