@@ -358,15 +358,15 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
 
 /* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
 .eh-thumbnail > img {
-  width: 100px;
-  height: 142px;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
 }
-/* Canvas 缩略图等同于 img 尺寸与居中展示 */
+/* Canvas 缩略图等同于 img 的自适应显示，由容器 flex 居中 */
 .eh-thumbnail > canvas {
-  width: 100px !important;
-  height: 142px !important;
+  max-width: 100%;
+  max-height: 100%;
   display: block;
 }
 

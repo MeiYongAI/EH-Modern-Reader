@@ -71,7 +71,6 @@
 
     Element.prototype.appendChild = function(child) {
       if (child && child.tagName === 'SCRIPT' && shouldBlockScript(child)) {
-        // 可能是内联脚本，尽量从其文本提取
         try { captureFromScriptText(child.textContent || ''); } catch {}
         return child; // 丢弃
       }
@@ -86,7 +85,6 @@
       return originalInsertBefore.call(this, newNode, referenceNode);
     };
 
-    // 观察动态添加的脚本并移除
     const mo = new MutationObserver((mutations) => {
       for (const m of mutations) {
         m.addedNodes && m.addedNodes.forEach((n) => {
@@ -1275,14 +1273,15 @@
           const dy = Math.floor((containerH - dh) / 2);
           // 绘制到canvas
           const canvas = document.createElement('canvas');
-          canvas.width = containerW;
-          canvas.height = containerH;
+          // 画布尺寸等于目标图像尺寸，由容器flex居中
+          canvas.width = dw;
+          canvas.height = dh;
           const ctx = canvas.getContext('2d');
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           try {
-            ctx.clearRect(0,0,containerW,containerH);
-            ctx.drawImage(img, srcX, srcY, srcW, srcH, dx, dy, dw, dh);
+            ctx.clearRect(0,0,dw,dh);
+            ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, dw, dh);
           } catch (e) {
             console.warn('[EH Modern Reader] 绘制缩略图失败，回退为直接居中显示', e);
           }
