@@ -114,6 +114,34 @@
    * 从原页面提取必要数据
    */
   function extractPageData() {
+    // 优先检查 sessionStorage 中的画廊模式数据
+    const galleryData = sessionStorage.getItem('ehReaderData');
+    if (galleryData) {
+      try {
+        const parsed = JSON.parse(galleryData);
+        console.log('[EH Modern Reader] 使用画廊模式数据:', parsed);
+        
+        // 清除 sessionStorage 避免重复使用
+        sessionStorage.removeItem('ehReaderData');
+        
+        // 数据验证
+        if (parsed.mode === 'gallery' && parsed.imagelist && Array.isArray(parsed.imagelist)) {
+          return {
+            imagelist: parsed.imagelist,
+            gid: parsed.gid,
+            mpvkey: parsed.token, // 使用 token 代替 mpvkey
+            pagecount: parsed.pagecount || parsed.imagelist.length,
+            gallery_url: parsed.gallery_url,
+            title: parsed.title,
+            mode: 'gallery'
+          };
+        }
+      } catch (e) {
+        console.error('[EH Modern Reader] 解析画廊数据失败:', e);
+      }
+    }
+
+    // 原有的 MPV 页面数据提取逻辑
     const scriptTags = document.querySelectorAll('script');
     const captured = window.__ehCaptured || {};
     let pageData = {

@@ -1,0 +1,27 @@
+/**
+ * Gallery Page Styles - 画廊页面样式
+ */
+
+#eh-mpv-button {
+  color: #34353b;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: color 0.2s;
+}
+
+#eh-mpv-button:hover {
+  color: #f00;
+  text-decoration: underline;
+}
+
+/* ExHentai 站点样式调整 */
+body[style*="background-color:#34353b"] #eh-mpv-button,
+body[style*="background-color: #34353b"] #eh-mpv-button {
+  color: #edeff1;
+}
+
+body[style*="background-color:#34353b"] #eh-mpv-button:hover,
+body[style*="background-color: #34353b"] #eh-mpv-button:hover {
+  color: #f8b551;
+}
