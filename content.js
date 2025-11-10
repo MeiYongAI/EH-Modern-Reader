@@ -12,6 +12,33 @@
   }
   window.ehModernReaderInjected = true;
 
+  // 检测是否在画廊页面（非 MPV 页面）
+  const isGalleryPage = window.location.pathname.match(/^\/g\/\d+\/[a-f0-9]+\//);
+  
+  // 如果在画廊页面，等待 gallery.js 的初始化事件
+  if (isGalleryPage) {
+    console.log('[EH Modern Reader] 在画廊页面，等待初始化事件...');
+    
+    // 监听画廊模式启动事件
+    window.addEventListener('ehReaderInit', (event) => {
+      console.log('[EH Modern Reader] 收到初始化事件，启动阅读器');
+      // 数据已经在 window.__ehCaptured 中，继续执行后续逻辑
+      initReader();
+    });
+    
+    // 如果数据已经存在（刷新页面的情况），直接初始化
+    if (window.__ehCaptured && window.__ehCaptured.fromGallery) {
+      console.log('[EH Modern Reader] 检测到画廊数据，立即初始化');
+      setTimeout(() => initReader(), 100);
+    } else {
+      // 否则等待 gallery.js 的事件，不继续执行
+      return;
+    }
+  }
+
+  // MPV 页面或已触发画廊模式的初始化
+  function initReader() {
+
   // 早期脚本拦截：阻止原站 MPV 脚本注入与执行
   try {
     // 提前捕获页面变量（imagelist / pagecount / gid / mpvkey / gallery_url）
@@ -2398,4 +2425,12 @@
   }
 
   init();
+  
+  } // 结束 initReader 函数
+
+  // 如果不在画廊页面，直接执行初始化
+  if (!isGalleryPage) {
+    initReader();
+  }
+
 })();
