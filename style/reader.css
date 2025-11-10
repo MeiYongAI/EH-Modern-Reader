@@ -196,14 +196,16 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   display: flex;
   overflow: hidden;
   position: relative;
-  padding-top: 56px; /* 为header预留空间 */
-  transition: padding-top 0.3s ease;
+  /* 移除 padding-top，因为 header 是 absolute 定位，不占据空间 */
+  /* padding-top: 56px; */
+  /* 不需要过渡效果，避免切换时图片位移 */
+  /* transition: padding-top 0.3s ease; */
 }
 
-/* header隐藏时，main占据全部空间 */
-#eh-main.eh-fullheight {
+/* 删除这个规则，不再需要 */
+/* #eh-main.eh-fullheight {
   padding-top: 0;
-}
+} */
 
 /* 隐藏横向连续模式容器的原生滚动条（使用自定义进度条） */
 #eh-continuous-horizontal {
@@ -224,6 +226,14 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   align-items: center;
   justify-content: center;
   position: relative;
+}
+
+/* 连续横向模式图片：填满包装容器，保持比例，消除内侧大留白 */
+.eh-ch-wrapper > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .eh-ch-skeleton::before {
@@ -599,7 +609,9 @@ body.eh-dark-mode #eh-image-container {
 #eh-current-image {
   max-width: 100%;
   max-height: 100%;
-  object-fit: contain;
+  width: 100%; /* 填充容器宽度，避免小图片留空白 */
+  height: 100%; /* 填充容器高度，避免小图片留空白 */
+  object-fit: contain; /* 保持比例，不裁剪 */
   opacity: 0;
   transition: opacity 0.25s ease, transform 0.25s ease;
   cursor: pointer;

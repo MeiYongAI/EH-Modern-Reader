@@ -819,7 +819,7 @@
           }
         }
 
-        // Gallery 模式：通过 API 获取图片 URL
+        // Gallery 模式：获取单页 URL，然后像 MPV 一样抓取 HTML
         if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
           console.log('[EH Modern Reader] Gallery 模式加载图片:', pageIndex);
           
@@ -828,20 +828,26 @@
             throw new Error('fetchPageImageUrl 函数不存在');
           }
 
-          // 获取图片数据
+          // 获取单页 URL
           const pageData = await fetchFn(pageIndex);
-          console.log('[EH Modern Reader] Gallery 图片数据:', pageData);
+          console.log('[EH Modern Reader] Gallery 页面数据:', pageData);
 
-          const imageUrl = pageData.imageUrl || pageData.fullUrl;
-          if (!imageUrl) {
-            throw new Error('无法获取图片 URL');
+          const pageUrl = pageData.pageUrl;
+          if (!pageUrl) {
+            throw new Error('无法获取页面 URL');
           }
 
-          // 更新 imagelist 中的 key（用于后续访问）
+          // 更新 imagelist 中的 key
           if (window.__ehReaderData && window.__ehReaderData.imagelist[pageIndex]) {
             window.__ehReaderData.imagelist[pageIndex].k = pageData.imgkey || '';
           }
 
+          // 使用和 MPV 相同的方式：抓取单页 HTML 提取图片 URL
+          const abortController = new AbortController();
+          state.imageRequests.set(pageIndex, abortController);
+
+          const imageUrl = await fetchRealImageUrl(pageUrl, abortController.signal);
+          
           // 加载图片
           const pending = new Promise((resolve, reject) => {
             const img = new Image();
@@ -851,6 +857,7 @@
               clearTimeout(timeoutId);
               console.log('[EH Modern Reader] Gallery 图片加载成功:', imageUrl);
               state.imageCache.set(pageIndex, { status: 'loaded', img });
+              state.imageRequests.delete(pageIndex);
               resolve(img);
             };
 
@@ -858,6 +865,7 @@
               clearTimeout(timeoutId);
               console.error('[EH Modern Reader] Gallery 图片加载失败:', imageUrl, e);
               state.imageCache.delete(pageIndex);
+              state.imageRequests.delete(pageIndex);
               reject(new Error(`图片加载失败: ${imageUrl}`));
             };
 
@@ -866,6 +874,7 @@
             timeoutId = setTimeout(() => {
               if (!img.complete) {
                 state.imageCache.delete(pageIndex);
+                state.imageRequests.delete(pageIndex);
                 reject(new Error('图片加载超时'));
               }
             }, TIMEOUT);
@@ -1135,6 +1144,11 @@
 
     // 预加载相邻页面（提升切换体验）
     function preloadAdjacentPages(currentPage) {
+      // Gallery 模式：禁用预加载，避免风控
+      if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+        return;
+      }
+      
       const indices = [];
       const ahead = state.settings.prefetchAhead || 0;
       for (let i = 1; i <= ahead; i++) {
@@ -1165,8 +1179,41 @@
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
-        // 平滑滚动到当前缩略图（scrollIntoView 自动适配 flex-direction）
-        currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        
+        // 检查缩略图是否已在可视区域
+        const container = elements.thumbnails;
+        if (container) {
+          const thumbRect = currentThumb.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const isVisible = (
+            thumbRect.left >= containerRect.left &&
+            thumbRect.right <= containerRect.right &&
+            thumbRect.top >= containerRect.top &&
+            thumbRect.bottom <= containerRect.bottom
+          );
+          
+          // 程序化跳转时：滚动到目标并锁定观察器，随后“手动”批量加载可见范围（含两侧少量）
+          if (!isVisible) {
+            thumbnailLoadQueue.setScrollLock();
+            currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          }
+
+          // 无论是否已在可视区，均在短暂延迟后手动加载：目标缩略图 + 当前视口内的其他缩略图
+          // 这样既不依赖 IntersectionObserver（被锁定），也避免滚动过程触发洪水请求
+          const isGalleryMode = window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled;
+          if (isGalleryMode) {
+            setTimeout(() => {
+              // 1) 目标页缩略图
+              if (currentThumb.dataset.loaded === 'false') {
+                currentThumb.dataset.loaded = 'true';
+                const imageData = state.imagelist[pageNum - 1];
+                thumbnailLoadQueue.add(currentThumb, imageData, pageNum);
+              }
+              // 2) 视口内其余缩略图（含两侧少量缓冲），最多加载 10 个，避免洪水
+              manualLoadVisibleThumbnails(10, 120);
+            }, 160); // 等滚动定位稳定后再取可见范围
+          }
+        }
       }
     }
 
@@ -1229,6 +1276,78 @@
       setupThumbnailLazyLoad();
     }
     
+    // 请求队列管理（防止风控）
+    const thumbnailLoadQueue = {
+      queue: [],
+      loading: new Set(),
+      maxConcurrent: 3, // 最大并发数
+      requestDelay: 250, // 每个请求间隔（毫秒），略微提速但保持安全
+      isProgrammaticScroll: false, // 标记是否为程序触发的滚动
+      scrollLockTimer: null, // 锁定计时器
+      
+      setScrollLock() {
+        this.isProgrammaticScroll = true;
+        
+        // 清除之前的计时器，避免重复设置
+        if (this.scrollLockTimer) {
+          clearTimeout(this.scrollLockTimer);
+        }
+        
+        // Gallery 模式：延长锁定时间到 2 秒（滚动动画可能很长）
+        // MPV 模式：300ms 即可
+        const isGalleryMode = window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled;
+        const lockDuration = isGalleryMode ? 2000 : 300;
+        
+        this.scrollLockTimer = setTimeout(() => {
+          this.isProgrammaticScroll = false;
+          this.scrollLockTimer = null;
+        }, lockDuration);
+      },
+      
+      add(thumb, imageData, pageNum) {
+        if (this.loading.has(pageNum)) return;
+        
+        this.queue.push({ thumb, imageData, pageNum });
+        this.process();
+      },
+      
+      async process() {
+        if (this.loading.size >= this.maxConcurrent) return;
+        if (this.queue.length === 0) return;
+        
+        const item = this.queue.shift();
+        if (!item || this.loading.has(item.pageNum)) {
+          this.process();
+          return;
+        }
+        
+        this.loading.add(item.pageNum);
+        
+        try {
+          await loadThumbnail(item.thumb, item.imageData, item.pageNum);
+        } catch (err) {
+          console.warn('[EH Modern Reader] 缩略图加载失败:', item.pageNum, err);
+        } finally {
+          this.loading.delete(item.pageNum);
+          
+          // 延迟后处理下一个
+          setTimeout(() => {
+            this.process();
+          }, this.requestDelay);
+        }
+      },
+      
+      clear() {
+        this.queue = [];
+        this.loading.clear();
+        if (this.scrollLockTimer) {
+          clearTimeout(this.scrollLockTimer);
+          this.scrollLockTimer = null;
+        }
+        this.isProgrammaticScroll = false;
+      }
+    };
+    
     // 设置缩略图懒加载
     function setupThumbnailLazyLoad() {
       // 如果已有观察器，先断开
@@ -1236,21 +1355,33 @@
         state.thumbnailObserver.disconnect();
       }
       
+      // Gallery 模式：极小范围，只加载真正可见的缩略图
+      const isGalleryMode = window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled;
+      const rootMargin = isGalleryMode ? '200px' : '800px'; // Gallery 模式：200px，MPV 模式：800px
+      
       const options = {
         root: elements.thumbnails,
-        rootMargin: '600px', // 提前 600px 加载，提升滚动时的感知速度
+        rootMargin: rootMargin,
         threshold: 0.01
       };
       
       state.thumbnailObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
+            // 程序触发的滚动（跳页）时，忽略 IntersectionObserver 的触发
+            if (thumbnailLoadQueue.isProgrammaticScroll) {
+              return;
+            }
+            
             const thumb = entry.target;
             if (thumb.dataset.loaded === 'false') {
               thumb.dataset.loaded = 'true';
               const pageNum = parseInt(thumb.dataset.page);
               const imageData = state.imagelist[pageNum - 1];
-              loadThumbnail(thumb, imageData, pageNum);
+              
+              // 加入队列而非立即加载
+              thumbnailLoadQueue.add(thumb, imageData, pageNum);
+              
               // 加载后停止观察该元素
               state.thumbnailObserver.unobserve(thumb);
             }
@@ -1262,6 +1393,117 @@
       const thumbnails = elements.thumbnails.querySelectorAll('.eh-thumbnail');
       thumbnails.forEach(thumb => {
         state.thumbnailObserver.observe(thumb);
+      });
+      
+      // Gallery 模式：禁用缩略图容器的滚轮监听
+      // 原因：主图片区滚轮翻页时，缩略图自动滚动到对应位置
+      // 如果缩略图容器也监听滚轮，会触发批量加载导致大量请求
+      // isGalleryMode 已在函数开头声明，这里直接使用
+      
+      let scrollTimeout = null;
+      
+      if (!isGalleryMode) {
+        // MPV 模式：保留滚轮响应
+        elements.thumbnails.addEventListener('wheel', (e) => {
+          clearTimeout(scrollTimeout);
+          scrollTimeout = setTimeout(() => {
+            triggerBatchLoad();
+          }, 200);
+        }, { passive: true });
+      }
+      
+      // 所有模式：保留拖动滚动条的响应
+      elements.thumbnails.addEventListener('scroll', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          triggerBatchLoad();
+        }, 200);
+      }, { passive: true });
+    }
+    
+    // 批量触发可视区域及周围缩略图加载
+    function triggerBatchLoad() {
+      // 如果是程序触发的滚动（跳页），不执行批量加载
+      if (thumbnailLoadQueue.isProgrammaticScroll) {
+        return;
+      }
+      
+      if (!elements.thumbnails) return;
+      
+      const container = elements.thumbnails;
+      const scrollTop = container.scrollTop;
+      const clientHeight = container.clientHeight;
+      const visibleStart = scrollTop;
+      const visibleEnd = scrollTop + clientHeight;
+      
+      // Gallery 模式：极小范围，只加载可见+少量周围
+      const isGalleryMode = window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled;
+      const loadMargin = isGalleryMode ? 300 : 1200; // Gallery: 300px, MPV: 1200px
+      const maxBatchSize = isGalleryMode ? 5 : 15; // Gallery: 5张, MPV: 15张
+      
+      const loadStart = Math.max(0, visibleStart - loadMargin);
+      const loadEnd = visibleEnd + loadMargin;
+      
+      const thumbnails = container.querySelectorAll('.eh-thumbnail');
+      let count = 0;
+      
+      thumbnails.forEach(thumb => {
+        if (thumb.dataset.loaded === 'true') return;
+        if (count >= maxBatchSize) return;
+        
+        const rect = thumb.getBoundingClientRect();
+        const thumbTop = scrollTop + rect.top - container.getBoundingClientRect().top;
+        const thumbBottom = thumbTop + rect.height;
+        
+        // 检查是否在扩展范围内
+        if (thumbBottom >= loadStart && thumbTop <= loadEnd) {
+          thumb.dataset.loaded = 'true';
+          const pageNum = parseInt(thumb.dataset.page);
+          const imageData = state.imagelist[pageNum - 1];
+          
+          // 加入队列
+          thumbnailLoadQueue.add(thumb, imageData, pageNum);
+          count++;
+          
+          if (state.thumbnailObserver) {
+            state.thumbnailObserver.unobserve(thumb);
+          }
+        }
+      });
+    }
+
+    // 手动加载当前缩略图容器“视口内”的缩略图，附带少量左右缓冲，忽略 programmatic scroll 锁
+    // maxBatch：本次最多加载多少张；extraMargin：在上下文基础上扩展的像素缓冲
+    function manualLoadVisibleThumbnails(maxBatch = 10, extraMargin = 120) {
+      if (!elements.thumbnails) return;
+
+      const container = elements.thumbnails;
+      const containerRect = container.getBoundingClientRect();
+      const start = containerRect.top - extraMargin;
+      const end = containerRect.bottom + extraMargin;
+
+      const thumbs = container.querySelectorAll('.eh-thumbnail');
+      let loaded = 0;
+
+      thumbs.forEach(thumb => {
+        if (loaded >= maxBatch) return;
+        if (thumb.dataset.loaded === 'true') return;
+
+        const r = thumb.getBoundingClientRect();
+        // 判断是否在扩展后的可见区域内（纵向和横向均需有交集）
+        const verticalIn = r.bottom >= start && r.top <= end;
+        const horizontalIn = r.right >= containerRect.left && r.left <= containerRect.right;
+        if (!(verticalIn && horizontalIn)) return;
+
+        thumb.dataset.loaded = 'true';
+        const pageNum = parseInt(thumb.dataset.page);
+        const imageData = state.imagelist[pageNum - 1];
+        thumbnailLoadQueue.add(thumb, imageData, pageNum);
+        loaded++;
+
+        if (state.thumbnailObserver) {
+          state.thumbnailObserver.unobserve(thumb);
+        }
       });
     }
 
@@ -1321,9 +1563,27 @@
       const idx = pageNum - 1;
       const title = (imageData && imageData.n) ? imageData.n : `Page ${pageNum}`;
       const containerW = 100, containerH = 142;
-      // 使用真实图片生成缩略图，彻底消除雪碧图单元自带的底部留白，保证居中
-      ensureRealImageUrl(idx)
-        .then(({ url }) => new Promise((resolve, reject) => {
+      
+      // Gallery 模式：使用 fetchPageImageUrl 获取单页 URL
+      let imageUrlPromise;
+      if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+        const fetchFn = window.__ehGalleryBootstrap.fetchPageImageUrl;
+        if (!fetchFn) {
+          console.warn('[EH Modern Reader] fetchPageImageUrl not available');
+          thumb.innerHTML = `<div class="eh-thumbnail-number">${pageNum}</div>`;
+          return;
+        }
+        
+        imageUrlPromise = fetchFn(idx)
+          .then(pageData => fetchRealImageUrl(pageData.pageUrl, new AbortController().signal));
+      } else {
+        // MPV 模式：使用 ensureRealImageUrl
+        imageUrlPromise = ensureRealImageUrl(idx).then(({ url }) => url);
+      }
+      
+      // 使用真实图片生成缩略图
+      imageUrlPromise
+        .then(url => new Promise((resolve, reject) => {
           const img = new Image();
           img.onload = () => resolve(img);
           img.onerror = (e) => reject(e);
@@ -1871,9 +2131,11 @@
   // 仅处理横向模式容器
       // 若已存在则直接显示
       if (!continuous.container) {
-        continuous.container = document.createElement('div');
-        continuous.container.id = 'eh-continuous-horizontal';
-        continuous.container.style.cssText = 'display:flex; flex-direction:row; align-items:center; gap:16px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 16px;';
+  continuous.container = document.createElement('div');
+  continuous.container.id = 'eh-continuous-horizontal';
+  const CH_GAP = 8; // 替换原 16px 间距
+  const CH_PAD = 12; // 替换原 16px 左右内边距
+  continuous.container.style.cssText = `display:flex; flex-direction:row; align-items:center; gap:${CH_GAP}px; overflow-x:auto; overflow-y:hidden; height:100%; width:100%; padding:0 ${CH_PAD}px;`;
         
         // 反向模式下整体镜像翻转
         if (state.settings.reverse) {
@@ -1890,11 +2152,13 @@
         for (let i = 0; i < state.pageCount; i++) {
           const card = document.createElement('div');
           card.className = 'eh-ch-card';
-          card.style.cssText = 'flex:0 0 auto; height:100%; position:relative; display:flex; align-items:center; justify-content:center;';
+          // 卡片取消层级 gap 留白由容器统一控制，避免内部再加额外对齐导致多层嵌套间距感加大
+          card.style.cssText = 'flex:0 0 auto; height:100%; position:relative; display:flex;';
 
           const wrapper = document.createElement('div');
           wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
-          wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); display:flex; align-items:center; justify-content:center; position:relative; min-width:120px;';
+          // wrapper 仅负责比例占位与 img 自适应，移除内部再次居中造成的视觉间距
+          wrapper.style.cssText = 'height:100%; aspect-ratio: var(--eh-aspect, 0.7); position:relative; min-width:120px; display:flex;';
           // 反向模式下每个图片也要翻转回来
           if (state.settings.reverse) {
             wrapper.style.transform = 'scaleX(-1)';
@@ -1904,7 +2168,8 @@
           wrapper.style.setProperty('--eh-aspect', String(cachedR || baseRatio));
 
           const img = document.createElement('img');
-          img.style.cssText = 'max-height:100%; max-width:100%; display:block; object-fit:contain;';
+          // 使用宽高100%以便 object-fit:contain 真实填充 wrapper
+          img.style.cssText = 'width:100%; height:100%; display:block; object-fit:contain;';
           img.setAttribute('data-page-index', String(i));
 
           wrapper.appendChild(img);
@@ -2133,11 +2398,11 @@
             const allWrappers = Array.from(c.querySelectorAll('.eh-ch-wrapper'));
             const targetIndex = allWrappers.indexOf(wrapper);
             let cumulativeLeft = 0;
-            const gap = 16;
+            const gap = 8; // 与容器 gap 保持一致
             for (let i = 0; i < targetIndex; i++) {
               cumulativeLeft += allWrappers[i].clientWidth + gap;
             }
-            const leftPadding = 16;
+            const leftPadding = 12; // 与容器左右 padding 保持一致
             cumulativeLeft += leftPadding;
             
             const centerOffset = Math.max(0, (c.clientWidth - basisWidth) / 2);

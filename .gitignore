@@ -22,9 +22,9 @@ yarn-error.log*
 node_modules/
 bower_components/
 
-# 构建输出（发布包由 build.ps1 生成）
-# dist/ 目录保留用于 Release 附件
-*.tmp
+# 构建输出
+dist/test-extract/
+dist/*.tmp
 build/
 temp_build/
 

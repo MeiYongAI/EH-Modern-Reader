@@ -132,47 +132,119 @@
     }
   }
 
+  // 缓存正在进行的 Gallery 分页抓取请求，避免重复抓取
+  const galleryPageFetchCache = new Map(); // galleryPageIndex -> Promise
+
   /**
-   * 通过 showpage API 获取图片页面信息
+   * 从 Gallery 分页抓取指定范围的 imgkey
+   * Gallery 每页显示的缩略图数量取决于用户设置（通常是 20、40 等）
+   */
+  async function fetchImgkeysFromGallery(startPage, endPage) {
+    try {
+      // 检测当前页面每页显示多少张缩略图（从初始加载的缩略图数量推断）
+      const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
+      const thumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20; // 默认 20
+      
+      // 计算需要抓取哪个 Gallery 分页
+      const galleryPageIndex = Math.floor(startPage / thumbsPerPage);
+      
+      // 检查是否已有进行中的请求
+      if (galleryPageFetchCache.has(galleryPageIndex)) {
+        console.log(`[EH Reader] Gallery page ${galleryPageIndex} fetch already in progress, reusing...`);
+        return galleryPageFetchCache.get(galleryPageIndex);
+      }
+      
+      const galleryUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${galleryPageIndex}`;
+      
+      console.log(`[EH Reader] Fetching imgkeys from gallery page ${galleryPageIndex} (${thumbsPerPage} thumbs/page):`, galleryUrl);
+      
+      const fetchPromise = (async () => {
+        const response = await fetch(galleryUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch gallery page: ${response.status}`);
+        }
+        
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // 从缩略图链接提取 imgkey
+        const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
+        console.log(`[EH Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${galleryPageIndex}`);
+        
+        let updatedCount = 0;
+        thumbnailLinks.forEach((link, index) => {
+          const href = link.getAttribute('href');
+          const match = href.match(/\/s\/([a-f0-9]+)\/\d+-(\d+)/);
+          if (match) {
+            const imgkey = match[1];
+            const pageNum = parseInt(match[2]) - 1; // 转换为 0-based index
+            
+            if (window.__ehReaderData?.imagelist[pageNum]) {
+              window.__ehReaderData.imagelist[pageNum].k = imgkey;
+              updatedCount++;
+            }
+          }
+        });
+        
+        console.log(`[EH Reader] Updated ${updatedCount} imgkeys for gallery page ${galleryPageIndex}`);
+        
+        // 完成后从缓存中移除
+        galleryPageFetchCache.delete(galleryPageIndex);
+      })();
+      
+      // 将 Promise 加入缓存
+      galleryPageFetchCache.set(galleryPageIndex, fetchPromise);
+      
+      return fetchPromise;
+    } catch (error) {
+      console.error(`[EH Reader] Failed to fetch imgkeys:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 构造单页 URL（不使用 API，让 content.js 去抓取 HTML）
+   * Gallery 模式下，直接返回单页 URL，让 MPV 模式的 fetchRealImageUrl 处理
    */
   async function fetchPageImageUrl(page) {
     try {
-      const response = await fetch(pageData.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          method: 'showpage',
-          gid: pageData.gid,
-          page: page,
-          imgkey: '', // 首次请求不需要 imgkey
-          showkey: pageData.token
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      // 从 imagelist 获取该页的 imgkey
+      let imgkey = window.__ehReaderData?.imagelist[page]?.k || '';
+      
+      // 如果 imgkey 不存在，动态从 Gallery 页面抓取
+      if (!imgkey) {
+        console.log(`[EH Reader] Page ${page} imgkey not cached, fetching from gallery...`);
+        
+        // 检测每页缩略图数量
+        const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
+        const thumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20;
+        
+        // 只获取当前页所在的 Gallery 页面（不预加载，避免风控）
+        const currentGalleryPage = Math.floor(page / thumbsPerPage);
+        await fetchImgkeysFromGallery(currentGalleryPage * thumbsPerPage, (currentGalleryPage + 1) * thumbsPerPage);
+        
+        // 获取后检查 imgkey
+        imgkey = window.__ehReaderData?.imagelist[page]?.k || '';
+        
+        if (!imgkey) {
+          throw new Error(`Page ${page} imgkey not found after fetching`);
+        }
       }
 
-      const data = await response.json();
-      console.log(`[EH Reader] Page ${page} data:`, data);
+      // 构造单页 URL: https://e-hentai.org/s/{imgkey}/{gid}-{page}
+      const pageUrl = `${window.location.origin}/s/${imgkey}/${pageData.gid}-${page + 1}`;
       
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      console.log(`[EH Reader] Page ${page} URL:`, pageUrl);
       
-      // 返回图片 URL（i3 是 780px 宽度的版本，i7 是原图）
+      // 返回单页 URL，content.js 会自动抓取 HTML 提取图片
       return {
         pageNumber: page + 1,
-        imageUrl: data.i3, // 初始加载使用压缩版
-        fullUrl: data.i7,  // 原图 URL
-        imgkey: data.k,
-        width: data.xres,
-        height: data.yres
+        pageUrl: pageUrl,  // 返回单页 URL 而不是图片 URL
+        imgkey: imgkey
       };
     } catch (error) {
-      console.error(`[EH Reader] Failed to fetch page ${page}:`, error);
+      console.error(`[EH Reader] Failed to construct page URL for ${page}:`, error);
       throw error;
     }
   }
@@ -192,13 +264,46 @@
       
       // 2. 构建图片列表（类似 MPV 的 imagelist 格式）
       const imagelist = [];
+      
+      // 初始化所有页面，imgkey 暂时为空
       for (let i = 0; i < pageCount; i++) {
         imagelist.push({
           n: (i + 1).toString(),
-          k: '', // 将在加载时填充
-          t: ''  // 缩略图 URL（稍后从 Gallery 页面获取）
+          k: '',  // 图片的 key，稍后按需加载
+          t: ''   // 缩略图 URL
         });
       }
+      
+      // 从 Gallery 第 0 页提取前几张图片的 imgkey（确保第一页能正常加载）
+      console.log('[EH Reader] Fetching initial imgkeys from Gallery page 0...');
+      
+      try {
+        const firstPageUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=0`;
+        const response = await fetch(firstPageUrl);
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
+        console.log(`[EH Reader] Found ${thumbnailLinks.length} thumbnail links in first page`);
+        
+        thumbnailLinks.forEach((link) => {
+          const href = link.getAttribute('href');
+          // URL 格式: https://e-hentai.org/s/{imgkey}/{gid}-{page}
+          const match = href.match(/\/s\/([a-f0-9]+)\/\d+-(\d+)/);
+          if (match) {
+            const imgkey = match[1];
+            const pageNum = parseInt(match[2]) - 1; // 转换为 0-based index
+            if (imagelist[pageNum]) {
+              imagelist[pageNum].k = imgkey;
+            }
+          }
+        });
+      } catch (error) {
+        console.error('[EH Reader] Failed to fetch initial imgkeys:', error);
+      }
+      
+      console.log('[EH Reader] Imagelist sample:', imagelist.slice(0, 3));
       
       // 3. 构建 pageData（与 content.js 格式兼容）
       const readerPageData = {
@@ -254,20 +359,21 @@
       // 这里我们仍然添加，作为备选方案
     }
 
-    // 创建按钮容器
-    const buttonContainer = document.createElement('p');
-    buttonContainer.className = 'g2 gsp';
-    buttonContainer.style.cssText = 'background: linear-gradient(90deg, #4568dc, #b06ab3); padding: 8px; border-radius: 4px;';
+  // 创建按钮容器（保持与页面原生风格一致，不加自定义背景）
+  const buttonContainer = document.createElement('p');
+  buttonContainer.className = 'g2 gsp';
+  // 不设置额外样式，避免破坏布局对齐
 
     // 创建图标
     const icon = document.createElement('img');
     icon.src = 'https://ehgt.org/g/mr.gif';
     
     // 创建按钮
-    const button = document.createElement('a');
+  const button = document.createElement('a');
     button.href = '#';
     button.textContent = 'EH Modern Reader';
-    button.style.cssText = 'color: #fff; font-weight: bold; text-decoration: none;';
+  // 使用站点默认链接样式，避免突兀
+  button.style.cssText = '';
     button.onclick = (e) => {
       e.preventDefault();
       launchReader();
