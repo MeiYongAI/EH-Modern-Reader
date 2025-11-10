@@ -114,34 +114,6 @@
    * 从原页面提取必要数据
    */
   function extractPageData() {
-    // 优先检查 sessionStorage 中的画廊模式数据
-    const galleryData = sessionStorage.getItem('ehReaderData');
-    if (galleryData) {
-      try {
-        const parsed = JSON.parse(galleryData);
-        console.log('[EH Modern Reader] 使用画廊模式数据:', parsed);
-        
-        // 清除 sessionStorage 避免重复使用
-        sessionStorage.removeItem('ehReaderData');
-        
-        // 数据验证
-        if (parsed.mode === 'gallery' && parsed.imagelist && Array.isArray(parsed.imagelist)) {
-          return {
-            imagelist: parsed.imagelist,
-            gid: parsed.gid,
-            mpvkey: parsed.token, // 使用 token 代替 mpvkey
-            pagecount: parsed.pagecount || parsed.imagelist.length,
-            gallery_url: parsed.gallery_url,
-            title: parsed.title,
-            mode: 'gallery'
-          };
-        }
-      } catch (e) {
-        console.error('[EH Modern Reader] 解析画廊数据失败:', e);
-      }
-    }
-
-    // 原有的 MPV 页面数据提取逻辑
     const scriptTags = document.querySelectorAll('script');
     const captured = window.__ehCaptured || {};
     let pageData = {
@@ -2295,6 +2267,26 @@
    */
   function init() {
     try {
+      // 如果来自画廊页的回退启动，优先直接使用 __ehCaptured 注入阅读器
+      try {
+        const cap0 = window.__ehCaptured || {};
+        if (cap0 && cap0.fromGallery && Array.isArray(cap0.imagelist) && cap0.imagelist.length > 0) {
+          const directData = {
+            imagelist: cap0.imagelist,
+            gid: cap0.gid,
+            mpvkey: cap0.mpvkey || null,
+            pagecount: cap0.pagecount || (Array.isArray(cap0.imagelist) ? cap0.imagelist.length : 0),
+            gallery_url: cap0.gallery_url || window.location.href,
+            title: cap0.title || (document.title ? document.title.replace(/ - E-Hentai.*/, '') : '未知画廊')
+          };
+          console.log('[EH Modern Reader] 来自画廊回退，直接注入，pages=', directData.pagecount);
+          injectModernReader(directData);
+          return; // 终止后续 MPV 提取流程
+        }
+      } catch (e) {
+        console.warn('[EH Modern Reader] 画廊回退直注检测失败:', e);
+      }
+
       // 简单等待器：等待早期捕获拿到 imagelist
       const waitForImagelist = (timeoutMs = 6000) => new Promise((resolve) => {
         const start = Date.now();

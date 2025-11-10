@@ -136,6 +136,20 @@
 			fromGallery: true
 		};
 
+		// 若已经存在我们的阅读器根节点，避免重复注入
+		if (document.getElementById('eh-modern-reader-root')) {
+			log('检测到已在阅读器中，忽略重复注入');
+			return;
+		}
+
+		// 清理明显的缩略图容器，避免视觉干扰（非必须）
+		try {
+			const gdt = document.getElementById('gdt');
+			if (gdt) gdt.innerHTML = '';
+		} catch (e) {
+			console.warn('[EH Modern Reader][gallery] 清理缩略图失败:', e);
+		}
+
 		// 动态加载 content.js，让其接管页面
 		const s = document.createElement('script');
 		s.src = chrome.runtime.getURL('content.js');
@@ -155,12 +169,12 @@
 		document.body.appendChild(overlay);
 
 		try {
-				const imagelist = await buildImageList(info);
-				console.log('[EH Modern Reader][gallery] buildImageList 返回', imagelist.length);
-				if (!imagelist.length) throw new Error('无法获取图片列表');
-				overlay.remove();
-				console.log('[EH Modern Reader][gallery] 开始注入 content.js');
-				injectReader({ ...info, imagelist });
+			  const imagelist = await buildImageList(info);
+			  console.log('[EH Modern Reader][gallery] buildImageList 返回', imagelist.length);
+			  if (!imagelist.length) throw new Error('无法获取图片列表');
+			  overlay.remove();
+			  console.log('[EH Modern Reader][gallery] 准备注入 content.js');
+			  injectReader({ ...info, imagelist });
 		} catch (e) {
 			overlay.remove();
 			alert('启动失败：' + (e?.message || e));
