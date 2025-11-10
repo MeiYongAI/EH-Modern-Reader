@@ -35,17 +35,20 @@
 	}
 
 		function collectThumbAnchors(root = document) {
-			// 更鲁棒：优先精确选择 /s/ 链接，其次选择 #gdt 下所有 a
-			const precise = Array.from(root.querySelectorAll('#gdt a[href*="/s/"], .gm #gdt a[href*="/s/"]'));
-			if (precise.length > 0) return precise;
-			return Array.from(root.querySelectorAll('#gdt a, .gm #gdt a'));
+			// 1. 精确 /s/ 链接
+			let nodes = Array.from(root.querySelectorAll('#gdt a[href*="/s/"], .gm #gdt a[href*="/s/"]'));
+			if (nodes.length === 0) nodes = Array.from(root.querySelectorAll('#gdt a, .gm #gdt a'));
+			// 2. 只保留符合 token/gid-page 的链接
+			const filtered = nodes.filter(a => /\/s\//i.test(a.href) && /\/(\d+)-(\d+)(?:[?#].*)?$/i.test(a.href));
+			console.log('[EH Modern Reader][gallery] collectThumbAnchors raw=', nodes.length, 'filtered=', filtered.length);
+			return filtered;
 		}
 
 	function parsePageLink(a) {
 		// 典型格式: /s/{token}/{gid}-{page}
 		const href = a?.href || '';
 		// 允许结尾带 query/hash
-		const m = href.match(/\/s\/([a-z0-9]+)\/(\d+)-(\d+)(?:[?#].*)?$/i);
+		const m = href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)(?:[?#].*)?$/i);
 		if (!m) return null;
 		const img = a.querySelector('img');
 		return {
@@ -59,7 +62,9 @@
 
 	async function fetchAdditionalThumbs(info, fromPageIdx /* 0-based */) {
 		const out = [];
-		const perFirst = collectThumbAnchors().length || 0; // 当前页缩略图数量
+		const homeAnchors = collectThumbAnchors();
+		const perFirst = homeAnchors.length || 0; // 当前页缩略图数量
+		if (perFirst === 0) console.warn('[EH Modern Reader][gallery] 首页未找到缩略图 anchors, url=', info.gallery_url);
 		const perPage = perFirst > 0 ? perFirst : 40; // 估一个保守值
 		const totalPages = Math.ceil((info.pagecount || 0) / Math.max(1, perPage));
 		for (let p = fromPageIdx; p < totalPages; p++) {
@@ -84,6 +89,7 @@
 
 	async function buildImageList(info) {
 			let anchors = collectThumbAnchors();
+			if (anchors.length === 0) console.warn('[EH Modern Reader][gallery] 初始 anchors=0, 尝试兜底查询');
 			// 兜底：全局再搜一次 /s/ 链接
 			if (anchors.length === 0) {
 				anchors = Array.from(document.querySelectorAll(`a[href*="/s/"][href*="/${info.gid}-"]`));
@@ -96,10 +102,16 @@
 				seenHref.add(h);
 				return true;
 			});
-		const first = anchors.map(parsePageLink).filter(Boolean);
+		const first = anchors.map(a => {
+			const parsed = parsePageLink(a);
+			if (!parsed) console.warn('[EH Modern Reader][gallery] parsePageLink 失败 href=', a.href);
+			return parsed;
+		}).filter(Boolean);
+		if (first.length === 0) console.warn('[EH Modern Reader][gallery] 解析后无有效缩略图 anchorsLen=', anchors.length);
 		let links = first;
 		if ((info.pagecount || 0) > first.length) {
 			const extra = await fetchAdditionalThumbs(info, 1); // 从第 2 页开始
+			if (extra.length === 0) console.warn('[EH Modern Reader][gallery] 分页抓取没有新增缩略图');
 			links = [...first, ...extra];
 		}
 		// 去重 + 排序
@@ -107,7 +119,9 @@
 		links.forEach(it => { map.set(it.page, it); });
 		const ordered = Array.from(map.values()).sort((a, b) => a.page - b.page);
 		// 转换为与 MPV 兼容的 imagelist 结构
-		return ordered.map(it => ({ k: it.pageToken, n: `page_${it.page}`, t: it.thumb, page: it.page, pageUrl: it.pageUrl }));
+		const imagelist = ordered.map(it => ({ k: it.pageToken, n: `page_${it.page}`, t: it.thumb, page: it.page, pageUrl: it.pageUrl }));
+		console.log('[EH Modern Reader][gallery] imagelist 构建完成 count=', imagelist.length);
+		return imagelist;
 	}
 
 	function injectReader(readerData) {
@@ -141,10 +155,12 @@
 		document.body.appendChild(overlay);
 
 		try {
-			const imagelist = await buildImageList(info);
-			if (!imagelist.length) throw new Error('无法获取图片列表');
-			overlay.remove();
-			injectReader({ ...info, imagelist });
+				const imagelist = await buildImageList(info);
+				console.log('[EH Modern Reader][gallery] buildImageList 返回', imagelist.length);
+				if (!imagelist.length) throw new Error('无法获取图片列表');
+				overlay.remove();
+				console.log('[EH Modern Reader][gallery] 开始注入 content.js');
+				injectReader({ ...info, imagelist });
 		} catch (e) {
 			overlay.remove();
 			alert('启动失败：' + (e?.message || e));
