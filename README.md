@@ -1,15 +1,23 @@
 # EH Modern Reader
 
-> 现代化的 E-Hentai 阅读器浏览器扩展
+> 现代化的 E-Hentai 阅读器浏览器扩展 - **普通账号也能用 MPV！**
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## 📖 简介
 
 EH Modern Reader 是一个为 E-Hentai / ExHentai 站点设计的现代化阅读器扩展，完全替代原版 MPV 阅读器，提供流畅、优雅的阅读体验。
 
+**🎉 v1.3.0 重大更新：无需 300 Hath 解锁，普通账号也能在画廊页面直接启动 Multi-Page Viewer！**
+
 ### ✨ 核心特性
+
+#### 🚀 画廊直接启动（v1.3.0 新增）
+- **Multi-Page Viewer 按钮** - 在任何画廊页面添加 MPV 入口
+- **无需 Hath 解锁** - 普通账号也能使用多页查看功能
+- **完整功能支持** - 所有阅读器功能在画廊模式下同样可用
+- **智能数据提取** - 自动获取画廊信息和图片列表
 
 #### 🎨 界面与交互
 - **现代化 UI 设计** - 简洁优雅的深色/浅色主题自动适配
@@ -101,6 +109,19 @@ EH Modern Reader 是一个为 E-Hentai / ExHentai 站点设计的现代化阅读
 ---
 
 ## 📋 使用指南
+
+### 方式一：画廊页面直接启动（v1.3.0）
+
+1. 在 E-Hentai/ExHentai 打开任意画廊页面（`/g/xxxxx/xxxxx/`）
+2. 找到画廊信息区域的 **"Multi-Page Viewer"** 按钮（在 "Report Gallery" 附近）
+3. 点击按钮，阅读器将在新标签页打开
+4. **无需 300 Hath 解锁** - 所有账号均可使用！
+
+### 方式二：传统 MPV 页面（需要解锁）
+
+1. 在画廊页面点击原有的 MPV 按钮（需要 300 Hath 解锁）
+2. 扩展将自动替换原版 MPV 阅读器
+3. 享受现代化阅读体验
 
 ### 界面布局
 

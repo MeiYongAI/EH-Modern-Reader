@@ -5,6 +5,34 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-10
+
+### 🚀 重大更新
+
+#### 画廊直接启动 MPV
+- **无需 Hath 解锁** - 普通账号也能使用 Multi-Page Viewer 功能
+- **画廊页面入口** - 在任意画廊页面（`/g/xxxxx/xxxxx/`）添加 "Multi-Page Viewer" 按钮
+- **智能数据提取** - 自动从画廊页面获取标题、页数、缩略图信息
+- **完整功能支持** - 所有阅读器功能在画廊模式下同样可用
+
+### ✨ 新增
+- 新增 `gallery.js` 注入脚本 - 在普通画廊页面添加 MPV 入口按钮
+- 新增 `style/gallery.css` - 画廊页面按钮样式（支持深色/浅色主题）
+- content.js 支持 sessionStorage 数据传递 - 从画廊模式接收数据
+- manifest.json 添加画廊页面权限（`/g/*/*`）
+
+### 🎨 改进
+- MPV 按钮自动适配站点主题（E-Hentai 浅色 / ExHentai 深色）
+- 按钮位置优化 - 放置在 "Report Gallery" 附近，便于发现
+- 点击按钮在新标签页打开阅读器，保留原画廊页面
+
+### 📝 文档更新
+- README 添加画廊直接启动使用说明
+- 更新版本徽章到 1.3.0
+- 添加"普通账号也能用 MPV"亮点说明
+
+---
+
 ## [1.2.0] - 2025-01-09
 
 ### ✨ 新增
