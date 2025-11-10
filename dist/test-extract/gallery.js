@@ -74,29 +74,48 @@
 
     console.log('[EH Modern Reader] 画廊信息:', galleryInfo);
 
-    // 查找插入位置 - 在 "Report Gallery" 附近
-    const reportLink = document.querySelector('#gd5 p.g2 a[onclick*="report"]');
-    if (!reportLink || !reportLink.parentElement) {
-      console.warn('[EH Modern Reader] 找不到插入位置');
+    // 查找插入位置 - 在 gd5 容器中创建新的段落
+    const gd5 = document.querySelector('#gd5');
+    if (!gd5) {
+      console.warn('[EH Modern Reader] 找不到 #gd5 容器');
       return;
     }
 
-    // 创建按钮
+    // 创建新段落，样式与 Archive Download 一致
+    const mpvParagraph = document.createElement('p');
+    mpvParagraph.className = 'g2 gsp';
+    
+    // 创建图标
+    const icon = document.createElement('img');
+    icon.src = 'https://ehgt.org/g/mr.gif';
+    icon.style.marginRight = '4px';
+    
+    // 创建按钮链接
     const mpvButton = document.createElement('a');
     mpvButton.href = '#';
     mpvButton.id = 'eh-mpv-button';
     mpvButton.textContent = 'Multi-Page Viewer';
-    mpvButton.title = '使用 EH Modern Reader 打开多页查看器';
+    mpvButton.title = '使用 EH Modern Reader 打开多页查看器（无需 Hath 解锁）';
     
     mpvButton.addEventListener('click', (e) => {
       e.preventDefault();
       launchReader(galleryInfo);
     });
 
-    // 插入按钮
-    const separator = document.createTextNode(' - ');
-    reportLink.parentElement.appendChild(separator);
-    reportLink.parentElement.appendChild(mpvButton);
+    // 组装段落
+    mpvParagraph.appendChild(icon);
+    mpvParagraph.appendChild(document.createTextNode(' '));
+    mpvParagraph.appendChild(mpvButton);
+    
+    // 插入到 Report Gallery 之后
+    const reportParagraph = gd5.querySelector('p a[href*="report"]');
+    if (reportParagraph && reportParagraph.parentElement) {
+      // 插入到 Report Gallery 段落之后
+      reportParagraph.parentElement.insertAdjacentElement('afterend', mpvParagraph);
+    } else {
+      // 如果找不到 Report，就插入到最前面
+      gd5.insertBefore(mpvParagraph, gd5.firstChild);
+    }
 
     console.log('[EH Modern Reader] MPV 按钮已添加');
   }
