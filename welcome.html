@@ -1,590 +1,253 @@
-<!DOCTYPE html><!DOCTYPE html>
-
-<html lang="zh-CN"><html lang="zh-CN">
-
-<head><head>
-
-  <meta charset="UTF-8">  <meta charset="UTF-8">
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>欢迎使用 EH Modern Reader</title>  <title>欢迎使用 EH Modern Reader</title>
-
-  <style>  <style>
-
-    * {    * {
-
-      margin: 0;      margin: 0;
-
-      padding: 0;      padding: 0;
-
-      box-sizing: border-box;      box-sizing: border-box;
-
-    }    }
-
-
-
-    body {    body {
-
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-
-      min-height: 100vh;      min-height: 100vh;
-
-      display: flex;      display: flex;
-
-      align-items: center;      align-items: center;
-
-      justify-content: center;      justify-content: center;
-
-      padding: 20px;      padding: 20px;
-
-    }    }
-
-
-
-    .container {    .container {
-
-      max-width: 900px;      max-width: 800px;
-
-      background: white;      background: white;
-
-      border-radius: 20px;      border-radius: 20px;
-
-      padding: 48px;      padding: 48px;
-
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-
-    }    }
-
-
-
-    .header {    .header {
-
-      text-align: center;      text-align: center;
-
-      margin-bottom: 40px;      margin-bottom: 40px;
-
-    }    }
-
-
-
-    .logo {    .logo {
-
-      font-size: 64px;      font-size: 64px;
-
-      margin-bottom: 16px;      margin-bottom: 16px;
-
-    }    }
-
-
-
-    h1 {    h1 {
-
-      font-size: 32px;      font-size: 32px;
-
-      color: #333;      color: #333;
-
-      margin-bottom: 12px;      margin-bottom: 12px;
-
-    }    }
-
-
-
-    .version {    .subtitle {
-
-      display: inline-block;      font-size: 16px;
-
-      background: #667eea;      color: #666;
-
-      color: white;    }
-
-      padding: 4px 12px;
-
-      border-radius: 12px;    .features {
-
-      font-size: 14px;      display: grid;
-
-      margin-left: 12px;      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-
-    }      gap: 24px;
-
-      margin: 40px 0;
-
-    .subtitle {    }
-
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>欢迎使用 EH Modern Reader</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      background: white;
+      border-radius: 20px;
+      padding: 48px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 32px;
+      color: #333;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
       font-size: 16px;
+      color: #666;
+    }
 
-      color: #666;    .feature {
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin: 40px 0;
+    }
 
-      margin-top: 12px;      padding: 24px;
-
-    }      background: #f8f9fa;
-
+    .feature {
+      padding: 24px;
+      background: #f8f9fa;
       border-radius: 12px;
-
-    .features {      transition: transform 0.2s;
-
-      display: grid;    }
-
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-
-      gap: 20px;    .feature:hover {
-
-      margin: 40px 0;      transform: translateY(-4px);
-
-    }    }
-
-
-
-    .feature {    .feature-icon {
-
-      padding: 20px;      font-size: 32px;
-
-      background: #f8f9fa;      margin-bottom: 12px;
-
-      border-radius: 12px;    }
-
       transition: transform 0.2s;
+    }
 
-    }    .feature h3 {
+    .feature:hover {
+      transform: translateY(-4px);
+    }
 
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .feature h3 {
       font-size: 18px;
-
-    .feature:hover {      color: #333;
-
-      transform: translateY(-4px);      margin-bottom: 8px;
-
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);    }
-
+      color: #333;
+      margin-bottom: 8px;
     }
 
     .feature p {
-
-    .feature-icon {      font-size: 14px;
-
-      font-size: 28px;      color: #666;
-
-      margin-bottom: 10px;      line-height: 1.6;
-
-    }    }
-
-
-
-    .feature h3 {    .shortcuts {
-
-      font-size: 16px;      background: #f8f9fa;
-
-      color: #333;      border-radius: 12px;
-
-      margin-bottom: 8px;      padding: 24px;
-
-    }      margin: 32px 0;
-
+      font-size: 14px;
+      color: #666;
+      line-height: 1.6;
     }
 
-    .feature p {
-
-      font-size: 13px;    .shortcuts h2 {
-
-      color: #666;      font-size: 20px;
-
-      line-height: 1.5;      color: #333;
-
-    }      margin-bottom: 16px;
-
+    .shortcuts {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 32px 0;
     }
 
-    .usage {
+    .shortcuts h2 {
+      font-size: 20px;
+      color: #333;
+      margin-bottom: 16px;
+    }
 
-      background: #e8f4f8;    .shortcut-list {
-
-      border-left: 4px solid #667eea;      display: grid;
-
-      border-radius: 8px;      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-
-      padding: 20px 24px;      gap: 12px;
-
-      margin: 32px 0;    }
-
+    .shortcut-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
     }
 
     .shortcut-item {
-
-    .usage h2 {      display: flex;
-
-      font-size: 18px;      align-items: center;
-
-      color: #333;      gap: 12px;
-
-      margin-bottom: 12px;      font-size: 14px;
-
-    }    }
-
-
-
-    .usage-item {    .key {
-
-      margin: 16px 0;      background: white;
-
-    }      padding: 4px 12px;
-
-      border-radius: 6px;
-
-    .usage-item strong {      font-weight: 600;
-
-      color: #667eea;      color: #667eea;
-
-      font-size: 14px;      border: 2px solid #667eea;
-
-    }      min-width: 60px;
-
-      text-align: center;
-
-    .usage-item p {    }
-
+      display: flex;
+      align-items: center;
+      gap: 12px;
       font-size: 14px;
+    }
 
-      color: #555;    .cta {
+    .key {
+      background: white;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      color: #667eea;
+      border: 2px solid #667eea;
+      min-width: 60px;
+      text-align: center;
+    }
 
-      margin-top: 4px;      text-align: center;
+    .cta {
+      text-align: center;
+      margin-top: 40px;
+    }
 
-      line-height: 1.6;      margin-top: 40px;
-
-    }    }
-
-
-
-    .shortcuts {    .btn {
-
-      background: #f8f9fa;      display: inline-block;
-
-      border-radius: 12px;      padding: 16px 32px;
-
-      padding: 24px;      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-
-      margin: 32px 0;      color: white;
-
-    }      text-decoration: none;
-
+    .btn {
+      display: inline-block;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
       border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
 
-    .shortcuts h2 {      font-size: 16px;
-
-      font-size: 18px;      font-weight: 600;
-
-      color: #333;      transition: transform 0.2s, box-shadow 0.2s;
-
-      margin-bottom: 16px;      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-
-    }    }
-
-
-
-    .shortcut-grid {    .btn:hover {
-
-      display: grid;      transform: translateY(-2px);
-
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-
-      gap: 12px;    }
-
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
     }
 
     .footer {
-
-    .shortcut {      text-align: center;
-
-      display: flex;      margin-top: 32px;
-
-      align-items: center;      padding-top: 24px;
-
-      gap: 8px;      border-top: 1px solid #e0e0e0;
-
-      font-size: 13px;      font-size: 14px;
-
-    }      color: #666;
-
-    }
-
-    .key {  </style>
-
-      background: white;</head>
-
-      padding: 4px 10px;<body>
-
-      border-radius: 6px;  <div class="container">
-
-      font-weight: 600;    <div class="header">
-
-      color: #667eea;      <div class="logo">📖</div>
-
-      border: 1px solid #ddd;      <h1>欢迎使用 EH Modern Reader</h1>
-
-      font-family: 'Courier New', monospace;      <p class="subtitle">现代化的 E-Hentai 阅读体验 v1.2.0</p>
-
-      min-width: 40px;    </div>
-
       text-align: center;
-
-    }    <div class="features">
-
-      <div class="feature">
-
-    .warning {        <div class="feature-icon">🎨</div>
-
-      background: #fff3cd;        <h3>现代化设计</h3>
-
-      border-left: 4px solid #ff9800;        <p>简洁优雅的界面，深浅双主题自动适配</p>
-
-      padding: 16px 20px;      </div>
-
-      border-radius: 8px;
-
-      margin: 24px 0;      <div class="feature">
-
-    }        <div class="feature-icon">🖼️</div>
-
-        <h3>完美居中缩略图</h3>
-
-    .warning h3 {        <p>真实图片预览，垂直水平双向居中，零延迟占位</p>
-
-      font-size: 16px;      </div>
-
-      color: #856404;
-
-      margin-bottom: 8px;      <div class="feature">
-
-    }        <div class="feature-icon">⚡</div>
-
-        <h3>智能预加载</h3>
-
-    .warning p {        <p>预测性预加载 + 600px 提前触发，流畅滚动</p>
-
-      font-size: 13px;      </div>
-
-      color: #856404;
-
-      line-height: 1.6;      <div class="feature">
-
-    }        <div class="feature-icon">💾</div>
-
-        <h3>进度记忆</h3>
-
-    .cta {        <p>自动保存阅读位置，随时继续上次阅读</p>
-
-      text-align: center;      </div>
-
-      margin-top: 40px;
-
-    }      <div class="feature">
-
-        <div class="feature-icon">🖱️</div>
-
-    .btn {        <h3>三区点击导航</h3>
-
-      display: inline-block;        <p>左右 1/3 翻页，中间 1/3 切换顶栏</p>
-
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);      </div>
-
-      color: white;
-
-      padding: 14px 32px;      <div class="feature">
-
-      border-radius: 25px;        <div class="feature-icon">�</div>
-
-      text-decoration: none;        <h3>横向连续模式</h3>
-
-      font-weight: 600;        <p>滚轮自动映射，懒加载优化，自动播放支持</p>
-
-      transition: transform 0.2s, box-shadow 0.2s;      </div>
-
-      margin: 0 8px;    </div>
-
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #e0e0e0;
+      font-size: 14px;
+      color: #666;
     }
-
-    <div class="shortcuts">
-
-    .btn:hover {      <h2>⌨️ 快捷键说明</h2>
-
-      transform: translateY(-2px);      <div class="shortcut-list">
-
-      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);        <div class="shortcut-item">
-
-    }          <span class="key">← / →</span>
-
-          <span>翻页/滚动</span>
-
-    .btn-secondary {        </div>
-
-      background: white;        <div class="shortcut-item">
-
-      color: #667eea;          <span class="key">Home</span>
-
-      border: 2px solid #667eea;          <span>首页</span>
-
-    }        </div>
-
-        <div class="shortcut-item">
-
-    .footer {          <span class="key">End</span>
-
-      text-align: center;          <span>末页</span>
-
-      margin-top: 40px;        </div>
-
-      padding-top: 24px;        <div class="shortcut-item">
-
-      border-top: 1px solid #eee;          <span class="key">P</span>
-
-      color: #999;          <span>自动播放</span>
-
-      font-size: 13px;        </div>
-
-    }        <div class="shortcut-item">
-
-          <span class="key">F11</span>
-
-    .footer a {          <span>全屏</span>
-
-      color: #667eea;        </div>
-
-      text-decoration: none;        <div class="shortcut-item">
-
-    }          <span class="key">Esc</span>
-
-          <span>退出/关闭</span>
-
-    .footer a:hover {        </div>
-
-      text-decoration: underline;      </div>
-
-    }    </div>
-
   </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">📚</div>
+      <h1>欢迎使用 EH Modern Reader</h1>
+      <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器 v2.0.0</p>
+    </div>
 
-</head>    <div class="cta">
-
-<body>      <a href="https://e-hentai.org" class="btn" target="_blank">
-
-  <div class="container">        开始使用 ✨
-
-    <div class="header">      </a>
-
-      <div class="logo">📚</div>    </div>
-
-      <h1>
-
-        EH Modern Reader    <div class="footer">
-
-        <span class="version">v2.0.0</span>      <p>访问 E-Hentai MPV 页面时，阅读器将自动启用</p>
-
-      </h1>      <p style="margin-top: 8px; font-size: 12px;">v1.2.0 | Made with ❤️</p>
-
-      <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器</p>    </div>
-
-    </div>  </div>
-
-</body>
-
-    <div class="features"></html>
-
+    <div class="features">
       <div class="feature">
         <div class="feature-icon">🚀</div>
         <h3>双模式支持</h3>
         <p>MPV 自动启动 + Gallery 手动启动，无需 300 Hath 也能使用</p>
       </div>
+
       <div class="feature">
         <div class="feature-icon">🎨</div>
         <h3>流畅阅读</h3>
         <p>单页翻页 / 横向滚动，三区点击，智能预加载</p>
       </div>
+
       <div class="feature">
         <div class="feature-icon">🛡️</div>
         <h3>安全限速</h3>
-        <p>智能请求节流，滚动锁保护，避免 IP 封禁</p>
+        <p>智能请求节流（3并发+250ms），滚动锁保护，避免 IP 封禁</p>
       </div>
+
       <div class="feature">
         <div class="feature-icon">💾</div>
         <h3>进度记忆</h3>
         <p>自动保存阅读进度，下次继续阅读</p>
       </div>
-    </div>
 
-    <div class="usage">
-      <h2>📖 使用方法</h2>
-      <div class="usage-item">
-        <strong>MPV 模式（自动）</strong>
-        <p>访问 <code>/mpv/</code> 页面，扩展自动替换原版阅读器</p>
+      <div class="feature">
+        <div class="feature-icon">🖼️</div>
+        <h3>完美缩略图</h3>
+        <p>居中对齐 + 批量懒加载，快速跳页无延迟</p>
       </div>
-      <div class="usage-item">
-        <strong>Gallery 模式（手动）</strong>
-        <p>访问 <code>/g/</code> 画廊页面，点击右侧"EH Modern Reader"按钮启动</p>
+
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>性能优化</h3>
+        <p>600px 提前触发，IntersectionObserver，取消滞后请求</p>
       </div>
     </div>
 
     <div class="shortcuts">
-      <h2>⌨️ 快捷键</h2>
-      <div class="shortcut-grid">
-        <div class="shortcut">
-          <span class="key">← →</span>
-          <span>翻页</span>
+      <h2>⌨️ 快捷键说明</h2>
+      <div class="shortcut-list">
+        <div class="shortcut-item">
+          <span class="key">← / →</span>
+          <span>翻页/滚动</span>
         </div>
-        <div class="shortcut">
-          <span class="key">A D</span>
-          <span>翻页</span>
+        <div class="shortcut-item">
+          <span class="key">A / D</span>
+          <span>翻页/滚动</span>
         </div>
-        <div class="shortcut">
+        <div class="shortcut-item">
           <span class="key">Home</span>
-          <span>首页</span>
+          <span>跳到首页</span>
         </div>
-        <div class="shortcut">
+        <div class="shortcut-item">
           <span class="key">End</span>
-          <span>末页</span>
+          <span>跳到末页</span>
         </div>
-        <div class="shortcut">
-          <span class="key">H</span>
-          <span>横向模式</span>
+        <div class="shortcut-item">
+          <span class="key">H / S</span>
+          <span>切换模式</span>
         </div>
-        <div class="shortcut">
-          <span class="key">S</span>
-          <span>单页模式</span>
-        </div>
-        <div class="shortcut">
+        <div class="shortcut-item">
           <span class="key">P</span>
           <span>自动播放</span>
         </div>
-        <div class="shortcut">
+        <div class="shortcut-item">
           <span class="key">F11</span>
-          <span>全屏</span>
+          <span>全屏模式</span>
+        </div>
+        <div class="shortcut-item">
+          <span class="key">Esc</span>
+          <span>退出/隐藏</span>
         </div>
       </div>
     </div>
 
-    <div class="warning">
-      <h3>⚠️ Gallery 模式风控提示</h3>
-      <p>
-        扩展已内置请求节流机制（3并发 + 250ms间隔），正常使用不会触发封禁。
-        如遇"Excessive request rate"错误，请等待解封（通常几分钟），避免频繁大幅跳页。
-      </p>
-    </div>
-
     <div class="cta">
       <a href="https://github.com/MeiYongAI/eh-reader-extension" class="btn" target="_blank">
-        查看 GitHub
-      </a>
-      <a href="https://github.com/MeiYongAI/eh-reader-extension/blob/main/docs/TROUBLESHOOTING.md" class="btn btn-secondary" target="_blank">
-        故障排除
+        查看 GitHub 项目 →
       </a>
     </div>
 
     <div class="footer">
-      <p>
-        开源协议：<a href="https://github.com/MeiYongAI/eh-reader-extension/blob/main/LICENSE" target="_blank">MIT License</a> | 
-        文档：<a href="https://github.com/MeiYongAI/eh-reader-extension/blob/main/README.md" target="_blank">README</a>
-      </p>
-      <p style="margin-top: 8px;">享受更流畅的阅读体验！ 📚✨</p>
+      <p><strong>MPV 模式</strong>：访问 /mpv/ 页面自动启用 | <strong>Gallery 模式</strong>：在 /g/ 页面点击右侧按钮启动</p>
+      <p style="margin-top: 8px; font-size: 12px;">v2.0.0 | Made with ❤️ by MeiYongAI</p>
     </div>
   </div>
 </body>
