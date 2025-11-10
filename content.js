@@ -114,6 +114,15 @@
    * 从原页面提取必要数据
    */
   function extractPageData() {
+    // 检查是否从 Gallery 页面启动
+    if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+      console.log('[EH Modern Reader] 从 Gallery 页面启动');
+      const galleryData = window.__ehReaderData;
+      if (galleryData) {
+        return galleryData;
+      }
+    }
+
     const scriptTags = document.querySelectorAll('script');
     const captured = window.__ehCaptured || {};
     let pageData = {
@@ -810,6 +819,63 @@
           }
         }
 
+        // Gallery 模式：通过 API 获取图片 URL
+        if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+          console.log('[EH Modern Reader] Gallery 模式加载图片:', pageIndex);
+          
+          const fetchFn = window.__ehGalleryBootstrap.fetchPageImageUrl;
+          if (!fetchFn) {
+            throw new Error('fetchPageImageUrl 函数不存在');
+          }
+
+          // 获取图片数据
+          const pageData = await fetchFn(pageIndex);
+          console.log('[EH Modern Reader] Gallery 图片数据:', pageData);
+
+          const imageUrl = pageData.imageUrl || pageData.fullUrl;
+          if (!imageUrl) {
+            throw new Error('无法获取图片 URL');
+          }
+
+          // 更新 imagelist 中的 key（用于后续访问）
+          if (window.__ehReaderData && window.__ehReaderData.imagelist[pageIndex]) {
+            window.__ehReaderData.imagelist[pageIndex].k = pageData.imgkey || '';
+          }
+
+          // 加载图片
+          const pending = new Promise((resolve, reject) => {
+            const img = new Image();
+            let timeoutId;
+
+            img.onload = () => {
+              clearTimeout(timeoutId);
+              console.log('[EH Modern Reader] Gallery 图片加载成功:', imageUrl);
+              state.imageCache.set(pageIndex, { status: 'loaded', img });
+              resolve(img);
+            };
+
+            img.onerror = (e) => {
+              clearTimeout(timeoutId);
+              console.error('[EH Modern Reader] Gallery 图片加载失败:', imageUrl, e);
+              state.imageCache.delete(pageIndex);
+              reject(new Error(`图片加载失败: ${imageUrl}`));
+            };
+
+            img.src = imageUrl;
+
+            timeoutId = setTimeout(() => {
+              if (!img.complete) {
+                state.imageCache.delete(pageIndex);
+                reject(new Error('图片加载超时'));
+              }
+            }, TIMEOUT);
+          });
+
+          state.imageCache.set(pageIndex, { status: 'loading', promise: pending });
+          return pending;
+        }
+
+        // MPV 模式：原有逻辑
         const pageUrl = getImageUrl(pageIndex);
         if (!pageUrl) {
           throw new Error('图片 URL 不存在');
@@ -2267,26 +2333,6 @@
    */
   function init() {
     try {
-      // 如果来自画廊页的回退启动，优先直接使用 __ehCaptured 注入阅读器
-      try {
-        const cap0 = window.__ehCaptured || {};
-        if (cap0 && cap0.fromGallery && Array.isArray(cap0.imagelist) && cap0.imagelist.length > 0) {
-          const directData = {
-            imagelist: cap0.imagelist,
-            gid: cap0.gid,
-            mpvkey: cap0.mpvkey || null,
-            pagecount: cap0.pagecount || (Array.isArray(cap0.imagelist) ? cap0.imagelist.length : 0),
-            gallery_url: cap0.gallery_url || window.location.href,
-            title: cap0.title || (document.title ? document.title.replace(/ - E-Hentai.*/, '') : '未知画廊')
-          };
-          console.log('[EH Modern Reader] 来自画廊回退，直接注入，pages=', directData.pagecount);
-          injectModernReader(directData);
-          return; // 终止后续 MPV 提取流程
-        }
-      } catch (e) {
-        console.warn('[EH Modern Reader] 画廊回退直注检测失败:', e);
-      }
-
       // 简单等待器：等待早期捕获拿到 imagelist
       const waitForImagelist = (timeoutMs = 6000) => new Promise((resolve) => {
         const start = Date.now();
@@ -2333,6 +2379,17 @@
       // 等待 DOM 加载完成
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
+          // Gallery 模式：直接启动
+          if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+            console.log('[EH Modern Reader] Gallery 模式启动');
+            const galleryData = window.__ehReaderData;
+            if (galleryData && galleryData.imagelist) {
+              injectModernReader(galleryData);
+              return;
+            }
+          }
+
+          // MPV 模式：原有逻辑
           try {
             const pageData = extractPageData();
             if (pageData.imagelist && pageData.imagelist.length > 0) {
@@ -2362,6 +2419,17 @@
           }
         });
       } else {
+        // Gallery 模式：直接启动
+        if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
+          console.log('[EH Modern Reader] Gallery 模式启动 (readyState=complete)');
+          const galleryData = window.__ehReaderData;
+          if (galleryData && galleryData.imagelist) {
+            injectModernReader(galleryData);
+            return;
+          }
+        }
+
+        // MPV 模式：原有逻辑
         const pageData = extractPageData();
         if (pageData.imagelist && pageData.imagelist.length > 0) {
           injectModernReader(pageData);
