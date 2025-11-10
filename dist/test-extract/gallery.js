@@ -37,7 +37,11 @@
 
       // 提取缩略图列表
       const thumbnails = [];
-      document.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach((link, index) => {
+  // 支持多种缩略图模式：.gdtm (Minimal), .gdtl (Large)
+  const thumbLinks = document.querySelectorAll('#gdt .gdtm a, #gdt .gdtl a, .gm #gdt .gdtm a, .gm #gdt .gdtl a');
+  console.log('[EH Modern Reader] 缩略图选择器找到', thumbLinks.length, '个链接');
+      
+  thumbLinks.forEach((link, index) => {
         const img = link.querySelector('img');
         if (img) {
           thumbnails.push({
@@ -221,10 +225,16 @@
 
       // 从缩略图链接中提取页面信息
       // E-Hentai 缩略图链接格式: /s/{pageToken}/{gid}-{pageNum}
+  // 支持多种缩略图模式：.gdtm (Minimal), .gdtl (Large)
       const pageLinks = [];
-      document.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach((link, index) => {
+  const thumbLinks = document.querySelectorAll('#gdt .gdtm a, #gdt .gdtl a, .gm #gdt .gdtm a, .gm #gdt .gdtl a');
+  console.log('[EH Modern Reader] fetchImageList: 找到', thumbLinks.length, '个缩略图链接');
+      
+  thumbLinks.forEach((link, index) => {
         const match = link.href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/);
         if (match) {
+        } else {
+          console.warn('[EH Modern Reader] 链接格式不匹配:', link.href);
           const pageToken = match[1];
           const pageGid = match[2];
           const pageNum = parseInt(match[3]);
@@ -297,7 +307,7 @@
         const doc = parser.parseFromString(html, 'text/html');
         
         // 提取缩略图链接
-        doc.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach(link => {
+  doc.querySelectorAll('#gdt .gdtm a, #gdt .gdtl a, .gm #gdt .gdtm a, .gm #gdt .gdtl a').forEach(link => {
           const match = link.href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/);
           if (match) {
             const pageToken = match[1];
