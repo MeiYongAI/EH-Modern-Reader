@@ -31,7 +31,9 @@
     {
       "matches": [
         "https://e-hentai.org/mpv/*",
-        "https://exhentai.org/mpv/*"
+        "https://exhentai.org/mpv/*",
+        "https://e-hentai.org/g/*/*",
+        "https://exhentai.org/g/*/*"
       ],
       "js": ["content.js"],
       "run_at": "document_start"

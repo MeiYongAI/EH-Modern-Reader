@@ -180,11 +180,11 @@
   /**
    * 在当前页面注入阅读器界面
    */
-  async function injectReaderInCurrentPage(readerData) {
-    console.log('[EH Modern Reader] 在当前页面注入阅读器');
+  function injectReaderInCurrentPage(readerData) {
+    console.log('[EH Modern Reader] 准备启动阅读器');
 
     // 将数据传递给 content.js
-    // 使用特殊的全局变量让 content.js 识别
+    // content.js 已经通过 manifest 注入，会检测这个全局变量
     window.__ehCaptured = {
       imagelist: readerData.imagelist,
       gid: readerData.gid,
@@ -195,22 +195,12 @@
       fromGallery: true  // 标记来自画廊页面
     };
 
-    try {
-      // 加载 content.js 代码
-      const contentScript = await fetch(chrome.runtime.getURL('content.js'));
-      const contentCode = await contentScript.text();
-      
-      // 在页面中执行 content.js
-      const script = document.createElement('script');
-      script.textContent = contentCode;
-      document.documentElement.appendChild(script);
-      script.remove();
+    // 触发自定义事件通知 content.js 初始化
+    window.dispatchEvent(new CustomEvent('ehReaderInit', { 
+      detail: readerData 
+    }));
 
-      console.log('[EH Modern Reader] 阅读器已注入');
-    } catch (error) {
-      console.error('[EH Modern Reader] 注入阅读器失败:', error);
-      alert('注入阅读器失败：' + error.message);
-    }
+    console.log('[EH Modern Reader] 数据已就绪，等待 content.js 初始化');
   }
 
   /**
