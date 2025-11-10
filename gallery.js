@@ -34,15 +34,18 @@
 		return { gid, token, title, pagecount, gallery_url: location.href };
 	}
 
-	function collectThumbAnchors(root = document) {
-		// 兼容 Minimal(.gdtm) 与 Large(.gdtl) 两种布局
-		return Array.from(root.querySelectorAll('#gdt .gdtm a, #gdt .gdtl a, .gm #gdt .gdtm a, .gm #gdt .gdtl a'));
-	}
+		function collectThumbAnchors(root = document) {
+			// 更鲁棒：优先精确选择 /s/ 链接，其次选择 #gdt 下所有 a
+			const precise = Array.from(root.querySelectorAll('#gdt a[href*="/s/"], .gm #gdt a[href*="/s/"]'));
+			if (precise.length > 0) return precise;
+			return Array.from(root.querySelectorAll('#gdt a, .gm #gdt a'));
+		}
 
 	function parsePageLink(a) {
 		// 典型格式: /s/{token}/{gid}-{page}
 		const href = a?.href || '';
-		const m = href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/i);
+		// 允许结尾带 query/hash
+		const m = href.match(/\/s\/([a-z0-9]+)\/(\d+)-(\d+)(?:[?#].*)?$/i);
 		if (!m) return null;
 		const img = a.querySelector('img');
 		return {
@@ -61,8 +64,9 @@
 		const totalPages = Math.ceil((info.pagecount || 0) / Math.max(1, perPage));
 		for (let p = fromPageIdx; p < totalPages; p++) {
 			try {
-				const url = `${info.gallery_url.replace(/\/$/, '')}?p=${p}`;
-				const res = await fetch(url, { credentials: 'same-origin' });
+			const url = `${info.gallery_url.replace(/\/$/, '')}?p=${p}`;
+			// 带上 cookie，避免匿名页导致结构不同
+			const res = await fetch(url, { credentials: 'include' });
 				if (!res.ok) throw new Error(`HTTP ${res.status}`);
 				const html = await res.text();
 				const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -79,7 +83,19 @@
 	}
 
 	async function buildImageList(info) {
-		const anchors = collectThumbAnchors();
+			let anchors = collectThumbAnchors();
+			// 兜底：全局再搜一次 /s/ 链接
+			if (anchors.length === 0) {
+				anchors = Array.from(document.querySelectorAll(`a[href*="/s/"][href*="/${info.gid}-"]`));
+			}
+			// 过滤重复 DOM 节点（某些布局可能含脚本克隆）
+			const seenHref = new Set();
+			anchors = anchors.filter(a => {
+				const h = a.href;
+				if (!h || seenHref.has(h)) return false;
+				seenHref.add(h);
+				return true;
+			});
 		const first = anchors.map(parsePageLink).filter(Boolean);
 		let links = first;
 		if ((info.pagecount || 0) > first.length) {
