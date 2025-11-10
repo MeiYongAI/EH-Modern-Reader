@@ -121,36 +121,96 @@
   }
 
   /**
-   * 启动阅读器
+   * 启动阅读器 - 直接在当前页面注入
    */
   async function launchReader(galleryInfo) {
     console.log('[EH Modern Reader] 启动阅读器...');
 
-    // 获取完整图片列表
-    const imageList = await fetchImageList(galleryInfo);
-    if (!imageList || imageList.length === 0) {
-      alert('无法获取图片列表，请稍后重试');
-      return;
-    }
+    // 显示加载提示
+    const loadingMsg = document.createElement('div');
+    loadingMsg.id = 'eh-loading-overlay';
+    loadingMsg.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+                  background: rgba(0,0,0,0.8); z-index: 999999; 
+                  display: flex; align-items: center; justify-content: center;
+                  color: white; font-size: 18px;">
+        <div>
+          <div style="margin-bottom: 20px;">正在加载图片列表...</div>
+          <div style="text-align: center; font-size: 14px; color: #aaa;">
+            EH Modern Reader v1.3.0
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(loadingMsg);
 
-    // 存储数据到 sessionStorage 供 content.js 使用
-    const readerData = {
-      gid: galleryInfo.gid,
-      token: galleryInfo.token,
-      title: galleryInfo.title,
-      pagecount: galleryInfo.pagecount,
-      imagelist: imageList,
-      gallery_url: galleryInfo.gallery_url,
-      mode: 'gallery' // 标记为画廊模式
+    try {
+      // 获取完整图片列表
+      const imageList = await fetchImageList(galleryInfo);
+      if (!imageList || imageList.length === 0) {
+        throw new Error('无法获取图片列表');
+      }
+
+      console.log('[EH Modern Reader] 图片列表获取成功，共', imageList.length, '页');
+
+      // 准备阅读器数据
+      const readerData = {
+        gid: galleryInfo.gid,
+        token: galleryInfo.token,
+        title: galleryInfo.title,
+        pagecount: galleryInfo.pagecount,
+        imagelist: imageList,
+        gallery_url: galleryInfo.gallery_url,
+        mode: 'gallery'
+      };
+
+      // 移除加载提示
+      loadingMsg.remove();
+
+      // 直接在当前页面注入阅读器
+      injectReaderInCurrentPage(readerData);
+
+    } catch (error) {
+      console.error('[EH Modern Reader] 启动失败:', error);
+      loadingMsg.remove();
+      alert('启动阅读器失败：' + error.message + '\n\n可能原因：\n1. 网络连接问题\n2. 画廊数据获取失败\n\n请刷新页面后重试');
+    }
+  }
+
+  /**
+   * 在当前页面注入阅读器界面
+   */
+  async function injectReaderInCurrentPage(readerData) {
+    console.log('[EH Modern Reader] 在当前页面注入阅读器');
+
+    // 将数据传递给 content.js
+    // 使用特殊的全局变量让 content.js 识别
+    window.__ehCaptured = {
+      imagelist: readerData.imagelist,
+      gid: readerData.gid,
+      mpvkey: readerData.token,
+      pagecount: readerData.pagecount,
+      gallery_url: readerData.gallery_url,
+      title: readerData.title,
+      fromGallery: true  // 标记来自画廊页面
     };
 
-    sessionStorage.setItem('ehReaderData', JSON.stringify(readerData));
+    try {
+      // 加载 content.js 代码
+      const contentScript = await fetch(chrome.runtime.getURL('content.js'));
+      const contentCode = await contentScript.text();
+      
+      // 在页面中执行 content.js
+      const script = document.createElement('script');
+      script.textContent = contentCode;
+      document.documentElement.appendChild(script);
+      script.remove();
 
-    // 构造 MPV URL（即使没有真实的 mpvkey，我们也可以用 token 代替）
-    const mpvUrl = `${window.location.origin}/mpv/${galleryInfo.gid}/${galleryInfo.token}/`;
-    
-    // 在新标签页打开
-    window.open(mpvUrl, '_blank');
+      console.log('[EH Modern Reader] 阅读器已注入');
+    } catch (error) {
+      console.error('[EH Modern Reader] 注入阅读器失败:', error);
+      alert('注入阅读器失败：' + error.message);
+    }
   }
 
   /**
@@ -163,34 +223,54 @@
       const imageList = [];
       const { gid, token, pagecount, thumbnails } = galleryInfo;
 
-      // 方案1: 如果缩略图已经包含所有页面，直接使用
-      if (thumbnails.length === pagecount) {
-        console.log('[EH Modern Reader] 使用缩略图数据');
-        return thumbnails.map(t => ({
-          page: t.page,
-          thumb: t.thumb,
-          url: '' // URL需要通过API获取
-        }));
+      // 从缩略图链接中提取页面信息
+      // E-Hentai 缩略图链接格式: /s/{pageToken}/{gid}-{pageNum}
+      const pageLinks = [];
+      document.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach((link, index) => {
+        const match = link.href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/);
+        if (match) {
+          const pageToken = match[1];
+          const pageGid = match[2];
+          const pageNum = parseInt(match[3]);
+          const imgThumb = link.querySelector('img');
+          
+          pageLinks.push({
+            page: pageNum,
+            pageUrl: link.href,
+            pageToken: pageToken,
+            thumb: imgThumb ? imgThumb.src : '',
+            gid: pageGid
+          });
+        }
+      });
+
+      console.log('[EH Modern Reader] 提取到', pageLinks.length, '个页面链接');
+
+      // 如果页数不够，需要翻页获取更多
+      if (pageLinks.length < pagecount) {
+        console.log('[EH Modern Reader] 检测到多页缩略图，开始获取剩余页面...');
+        const additionalLinks = await fetchAdditionalThumbnails(galleryInfo, pageLinks.length);
+        pageLinks.push(...additionalLinks);
       }
 
-      // 方案2: 通过E-Hentai API获取图片信息
-      // 注意: 这需要知道每页的 page token
-      // 我们可以从缩略图页面的链接中提取
-      console.log('[EH Modern Reader] 通过API获取图片列表');
-      
-      // 分批获取所有页面的token
-      const pageTokens = await fetchAllPageTokens(galleryInfo);
-      
-      // 使用API获取图片URLs
-      if (pageTokens && pageTokens.length > 0) {
-        return await fetchImagesFromAPI(gid, token, pageTokens);
+      // 构建 imagelist 格式（与 MPV 兼容）
+      // 格式: {k: pageToken, n: imageFilename, t: timestamp}
+      for (const link of pageLinks) {
+        imageList.push({
+          k: link.pageToken,  // 页面 token
+          n: `page_${link.page}`,  // 图片文件名（占位）
+          t: '', // 缩略图 URL
+          page: link.page,
+          pageUrl: link.pageUrl,
+          thumb: link.thumb
+        });
       }
 
-      return thumbnails.map(t => ({
-        page: t.page,
-        thumb: t.thumb,
-        url: ''
-      }));
+      // 按页码排序
+      imageList.sort((a, b) => a.page - b.page);
+
+      console.log('[EH Modern Reader] 图片列表构建完成:', imageList.length, '页');
+      return imageList;
 
     } catch (error) {
       console.error('[EH Modern Reader] 获取图片列表失败:', error);
@@ -199,67 +279,55 @@
   }
 
   /**
-   * 获取所有页面的token
+   * 获取额外的缩略图页面
    */
-  async function fetchAllPageTokens(galleryInfo) {
-    const tokens = [];
-    
-    // 从当前页面的缩略图链接提取token
-    document.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach(link => {
-      const match = link.href.match(/\/s\/([a-f0-9]+)\/\d+-(\d+)/);
-      if (match) {
-        const pageToken = match[1];
-        const page = parseInt(match[2]);
-        tokens.push({ page, token: pageToken });
-      }
-    });
-
-    // 如果需要更多页面，需要翻页获取
+  async function fetchAdditionalThumbnails(galleryInfo, currentCount) {
+    const additionalLinks = [];
     const thumbnailPages = Math.ceil(galleryInfo.pagecount / 40);
-    if (thumbnailPages > 1) {
-      console.log('[EH Modern Reader] 需要获取更多缩略图页面...');
-      // TODO: 实现翻页获取逻辑
-    }
+    
+    console.log('[EH Modern Reader] 总缩略图页数:', thumbnailPages);
 
-    return tokens;
-  }
+    // 从第2页开始获取（第1页已经在当前页面）
+    for (let page = 1; page < thumbnailPages; page++) {
+      try {
+        const pageUrl = `${galleryInfo.gallery_url}?p=${page}`;
+        console.log('[EH Modern Reader] 获取缩略图页', page + 1, ':', pageUrl);
+        
+        const response = await fetch(pageUrl);
+        const html = await response.text();
+        
+        // 解析 HTML
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // 提取缩略图链接
+        doc.querySelectorAll('#gdt .gdtm a, .gm #gdt .gdtm a').forEach(link => {
+          const match = link.href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/);
+          if (match) {
+            const pageToken = match[1];
+            const pageGid = match[2];
+            const pageNum = parseInt(match[3]);
+            const imgThumb = link.querySelector('img');
+            
+            additionalLinks.push({
+              page: pageNum,
+              pageUrl: link.href,
+              pageToken: pageToken,
+              thumb: imgThumb ? imgThumb.src : '',
+              gid: pageGid
+            });
+          }
+        });
 
-  /**
-   * 通过API获取图片URLs
-   */
-  async function fetchImagesFromAPI(gid, token, pageTokens) {
-    try {
-      const apiUrl = 'https://api.e-hentai.org/api.php';
-      
-      // E-Hentai API 请求格式
-      const request = {
-        method: 'gtoken',
-        pagelist: pageTokens.map((pt, idx) => [gid, pt.token, idx + 1])
-      };
+        // 添加延迟避免请求过快
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(request)
-      });
-
-      const data = await response.json();
-      
-      if (data.tokenlist) {
-        return data.tokenlist.map((item, idx) => ({
-          page: idx + 1,
-          thumb: item.thumb || '',
-          url: item.url || ''
-        }));
+      } catch (error) {
+        console.error('[EH Modern Reader] 获取缩略图页', page + 1, '失败:', error);
       }
-
-      return [];
-    } catch (error) {
-      console.error('[EH Modern Reader] API请求失败:', error);
-      return [];
     }
+
+    return additionalLinks;
   }
 
   /**
