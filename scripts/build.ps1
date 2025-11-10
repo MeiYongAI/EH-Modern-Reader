@@ -1,7 +1,12 @@
 # EH Modern Reader - Build Script
 # 用于打包浏览器扩展的发布文件
 
-Write-Host "🚀 EH Modern Reader - Build Script" -ForegroundColor Cyan
+# 强制使用 UTF-8 输出，避免控制台乱码（Windows PowerShell 5.1）
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = $utf8NoBom
+$OutputEncoding = $utf8NoBom
+
+Write-Host "EH Modern Reader - Build Script" -ForegroundColor Cyan
 Write-Host "====================================`n" -ForegroundColor Cyan
 
 # 读取 manifest.json 获取版本号
@@ -9,19 +14,19 @@ $manifestPath = Join-Path $PSScriptRoot "..\manifest.json"
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 $version = "v$($manifest.version)"
 
-Write-Host "📌 版本: $version`n" -ForegroundColor Magenta
+Write-Host "Version: $version`n" -ForegroundColor Magenta
 
 # 创建 dist 目录
 $distDir = Join-Path $PSScriptRoot "..\dist"
 
 if (Test-Path $distDir) {
-    Write-Host "🗑️  清理旧的构建文件..." -ForegroundColor Yellow
+    Write-Host "Clean old build artifacts..." -ForegroundColor Yellow
     Get-ChildItem $distDir -Filter "*.zip" | Remove-Item -Force
 }
 else {
     New-Item -ItemType Directory -Path $distDir -Force | Out-Null
 }
-Write-Host "✅ dist 目录准备完成`n" -ForegroundColor Green
+Write-Host "dist folder ready`n" -ForegroundColor Green
 
 # 定义需要打包的文件和文件夹
 $includeItems = @(
@@ -47,7 +52,7 @@ if (Test-Path $tempDir) {
 }
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
-Write-Host "📦 复制文件到临时目录..." -ForegroundColor Yellow
+Write-Host "Copy files to temp folder..." -ForegroundColor Yellow
 
 # 复制文件
 foreach ($item in $includeItems) {
@@ -55,40 +60,40 @@ foreach ($item in $includeItems) {
     if (Test-Path $sourcePath) {
         if (Test-Path $sourcePath -PathType Container) {
             Copy-Item -Path $sourcePath -Destination $tempDir -Recurse -Force
-            Write-Host "  ✓ $item/" -ForegroundColor Gray
+            Write-Host "  + $item/" -ForegroundColor Gray
         } else {
             Copy-Item -Path $sourcePath -Destination $tempDir -Force
-            Write-Host "  ✓ $item" -ForegroundColor Gray
+            Write-Host "  + $item" -ForegroundColor Gray
         }
     }
 }
 
-Write-Host "`n📦 创建发布包..." -ForegroundColor Yellow
+Write-Host "`nCreate release zip..." -ForegroundColor Yellow
 
 # 统一发布包名称
 $releaseZip = Join-Path $distDir "eh-modern-reader-$version.zip"
-Write-Host "  📦 打包 $version 版本..." -ForegroundColor Cyan
+Write-Host "  Zipping $version ..." -ForegroundColor Cyan
 Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseZip -Force
-Write-Host "  ✅ 已创建: eh-modern-reader-$version.zip" -ForegroundColor Green
+Write-Host "  Created: eh-modern-reader-$version.zip" -ForegroundColor Green
 
 # 清理临时目录
-Write-Host "`n🧹 清理临时文件..." -ForegroundColor Yellow
+Write-Host "`nClean temp files..." -ForegroundColor Yellow
 Remove-Item -Path $tempDir -Recurse -Force
-Write-Host "✅ 清理完成" -ForegroundColor Green
+Write-Host "Cleaned" -ForegroundColor Green
 
 # 显示构建结果
-Write-Host "`n🎉 构建完成！" -ForegroundColor Green
+Write-Host "`nBuild finished" -ForegroundColor Green
 Write-Host "====================================`n" -ForegroundColor Cyan
 
-Write-Host "📦 发布文件:" -ForegroundColor Yellow
+Write-Host "Artifacts:" -ForegroundColor Yellow
 $zipFile = Get-Item $releaseZip
 $size = [math]::Round($zipFile.Length / 1KB, 2)
-Write-Host "  • $($zipFile.Name) - ${size} KB" -ForegroundColor White
+Write-Host "  * $($zipFile.Name) - ${size} KB" -ForegroundColor White
 
-Write-Host "`n📝 下一步操作:" -ForegroundColor Yellow
-Write-Host "  1. 测试安装扩展包" -ForegroundColor White
-Write-Host "  2. 创建 GitHub Release" -ForegroundColor White
-Write-Host "  3. 上传发布包并添加 Release Notes" -ForegroundColor White
+Write-Host "`nNext steps:" -ForegroundColor Yellow
+Write-Host "  1. Test install the unpacked extension" -ForegroundColor White
+Write-Host "  2. Create GitHub Release and upload the ZIP" -ForegroundColor White
+Write-Host "  3. Paste release notes from RELEASE_NOTES.md" -ForegroundColor White
 
-Write-Host "`n✨ Build complete!" -ForegroundColor Cyan
+Write-Host "`nBuild complete!" -ForegroundColor Cyan
 
