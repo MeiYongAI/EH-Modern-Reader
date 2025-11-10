@@ -11,14 +11,15 @@ Write-Host ""
 $requiredFiles = @(
     "manifest.json",
     "content.js",
+    "gallery.js",
     "background.js",
     "popup.html",
     "popup.js",
     "icons/icon16.png",
     "icons/icon48.png",
     "icons/icon128.png",
-    "js/reader.js",
-    "style/reader.css"
+    "style/reader.css",
+    "welcome.html"
 )
 
 $allGood = $true

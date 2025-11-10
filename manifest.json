@@ -47,7 +47,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["js/reader.js", "style/reader.css", "content.js"],
+      "resources": ["style/reader.css", "content.js"],
       "matches": ["https://e-hentai.org/*", "https://exhentai.org/*"]
     }
   ]
