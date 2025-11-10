@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "EH Modern Reader",
   "version": "1.3.0",
-  "description": "现代化的 E-Hentai 阅读器扩展，完美居中缩略图 | 快速预览 | 智能加载 | 横向连续模式 | 普通账号也能用 MPV",
+  "description": "现代化的 E-Hentai 阅读器扩展，完美居中缩略图 | 快速预览 | 智能加载 | 横向连续模式 | Gallery 页面直接启动",
   "permissions": [
     "storage",
     "activeTab"
@@ -42,7 +42,6 @@
         "https://exhentai.org/g/*/*"
       ],
       "js": ["gallery.js"],
-      "css": ["style/gallery.css"],
       "run_at": "document_end"
     }
   ],

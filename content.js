@@ -2332,6 +2332,23 @@
    * 初始化
    */
   function init() {
+    // 监听 Gallery 模式的启动事件
+    document.addEventListener('ehGalleryReaderReady', (e) => {
+      console.log('[EH Modern Reader] Gallery reader ready event received');
+      const galleryData = e.detail || window.__ehReaderData;
+      if (galleryData && galleryData.imagelist) {
+        console.log('[EH Modern Reader] Starting from Gallery mode with', galleryData.pagecount, 'pages');
+        injectModernReader(galleryData);
+      }
+    });
+
+    // 如果不是 MPV 页面，等待 Gallery 事件
+    if (!window.location.pathname.includes('/mpv/')) {
+      console.log('[EH Modern Reader] Waiting for Gallery bootstrap...');
+      return;
+    }
+
+    // MPV 模式初始化
     try {
       // 简单等待器：等待早期捕获拿到 imagelist
       const waitForImagelist = (timeoutMs = 6000) => new Promise((resolve) => {

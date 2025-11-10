@@ -14,17 +14,63 @@
 
   console.log('[EH Reader] Gallery bootstrap script loaded');
 
-  // 捕获页面变量
-  const pageData = {
-    gid: window.gid || null,
-    token: window.token || null,
-    apiUrl: window.api_url || 'https://api.e-hentai.org/api.php',
-    apiuid: window.apiuid || null,
-    apikey: window.apikey || null,
-    title: document.querySelector('#gn')?.textContent || document.title,
-    baseUrl: window.base_url || 'https://e-hentai.org/'
-  };
+  // 从页面脚本中捕获变量
+  function extractPageVariables() {
+    const data = {
+      gid: null,
+      token: null,
+      apiUrl: 'https://api.e-hentai.org/api.php',
+      apiuid: null,
+      apikey: null,
+      title: document.querySelector('#gn')?.textContent || document.title,
+      baseUrl: 'https://e-hentai.org/'
+    };
 
+    // 遍历所有 script 标签
+    const scripts = document.querySelectorAll('script');
+    for (let script of scripts) {
+      const content = script.textContent;
+      if (!content) continue;
+
+      // 提取 gid
+      if (!data.gid) {
+        const gidMatch = content.match(/var\s+gid\s*=\s*(\d+);/);
+        if (gidMatch) data.gid = parseInt(gidMatch[1]);
+      }
+
+      // 提取 token
+      if (!data.token) {
+        const tokenMatch = content.match(/var\s+token\s*=\s*"([^"]+)";/);
+        if (tokenMatch) data.token = tokenMatch[1];
+      }
+
+      // 提取 api_url
+      if (!data.apiUrl) {
+        const apiMatch = content.match(/var\s+api_url\s*=\s*"([^"]+)";/);
+        if (apiMatch) data.apiUrl = apiMatch[1];
+      }
+
+      // 提取 apiuid
+      if (!data.apiuid) {
+        const uidMatch = content.match(/var\s+apiuid\s*=\s*(\d+);/);
+        if (uidMatch) data.apiuid = parseInt(uidMatch[1]);
+      }
+
+      // 提取 apikey
+      if (!data.apikey) {
+        const keyMatch = content.match(/var\s+apikey\s*=\s*"([^"]+)";/);
+        if (keyMatch) data.apikey = keyMatch[1];
+      }
+
+      // 提取 base_url
+      const baseMatch = content.match(/var\s+base_url\s*=\s*"([^"]+)";/);
+      if (baseMatch) data.baseUrl = baseMatch[1];
+    }
+
+    return data;
+  }
+
+  const pageData = extractPageVariables();
   console.log('[EH Reader] Page data captured:', pageData);
 
   // 检查是否已经有 MPV 链接（有权限的用户）
@@ -168,29 +214,21 @@
       // 4. 挂载到 window（供 content.js 使用）
       window.__ehReaderData = readerPageData;
       
-      // 5. 注入 content.js（复用现有阅读器）
+      // 5. 创建标记，让 content.js 知道是从 Gallery 启动的
       console.log('[EH Reader] Injecting reader UI...');
       
-      // 创建一个标记，让 content.js 知道是从 Gallery 启动的
       window.__ehGalleryBootstrap = {
         enabled: true,
         fetchPageImageUrl: fetchPageImageUrl
       };
       
-      // 触发 content.js 初始化（如果已经加载）或等待加载
-      if (window.ehModernReaderInjected) {
-        console.log('[EH Reader] Reader already injected, triggering bootstrap');
-        // 直接启动阅读器
-        window.location.href = `#__eh_gallery_reader_start`;
-      } else {
-        // 加载 content.js
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL('content.js');
-        script.onload = () => {
-          console.log('[EH Reader] content.js loaded from Gallery');
-        };
-        document.documentElement.appendChild(script);
-      }
+      // 6. 通知 content.js 启动（content.js 已经通过 manifest 加载）
+      // 触发自定义事件
+      const event = new CustomEvent('ehGalleryReaderReady', { 
+        detail: readerPageData 
+      });
+      document.dispatchEvent(event);
+      console.log('[EH Reader] Gallery reader ready event dispatched');
       
     } catch (error) {
       console.error('[EH Reader] Failed to launch reader:', error);
