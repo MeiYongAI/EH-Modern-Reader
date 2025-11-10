@@ -181,10 +181,9 @@
    * 在当前页面注入阅读器界面
    */
   function injectReaderInCurrentPage(readerData) {
-    console.log('[EH Modern Reader] 准备启动阅读器');
+    console.log('[EH Modern Reader] 在当前页面注入阅读器');
 
-    // 将数据传递给 content.js
-    // content.js 已经通过 manifest 注入，会检测这个全局变量
+    // 将数据设置为全局变量，供 content.js 使用
     window.__ehCaptured = {
       imagelist: readerData.imagelist,
       gid: readerData.gid,
@@ -192,15 +191,22 @@
       pagecount: readerData.pagecount,
       gallery_url: readerData.gallery_url,
       title: readerData.title,
-      fromGallery: true  // 标记来自画廊页面
+      fromGallery: true
     };
 
-    // 触发自定义事件通知 content.js 初始化
-    window.dispatchEvent(new CustomEvent('ehReaderInit', { 
-      detail: readerData 
-    }));
-
-    console.log('[EH Modern Reader] 数据已就绪，等待 content.js 初始化');
+    // 动态创建并注入 content.js 脚本
+    const script = document.createElement('script');
+    script.src = chrome.runtime.getURL('content.js');
+    script.onload = () => {
+      console.log('[EH Modern Reader] content.js 已加载并执行');
+    };
+    script.onerror = (error) => {
+      console.error('[EH Modern Reader] 加载 content.js 失败:', error);
+      alert('加载阅读器失败，请刷新页面重试');
+    };
+    
+    // 注入到页面
+    (document.head || document.documentElement).appendChild(script);
   }
 
   /**
