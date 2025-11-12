@@ -1367,7 +1367,23 @@
             // 拖动进度条过程中不触发缩略图滚动，避免抖动与性能问题
             if (!state.draggingProgress) {
               thumbnailLoadQueue.setScrollLock();
-              currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              // 首次进入阅读器且有 startAt/恢复页时，使用瞬移定位，避免从 1 平滑滚到高页
+              const instantFirstScroll = !state._thumbsInitialPositioned;
+              if (instantFirstScroll) {
+                state._thumbsInitialPositioned = true;
+                // 计算居中的 scrollLeft（比 scrollIntoView 更稳定）
+                try {
+                  const container = elements.thumbnails;
+                  const cRect = container.getBoundingClientRect();
+                  const tRect = currentThumb.getBoundingClientRect();
+                  const deltaLeft = (tRect.left - cRect.left) + (tRect.width - cRect.width) / 2;
+                  container.scrollLeft += deltaLeft;
+                } catch {
+                  currentThumb.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+                }
+              } else {
+                currentThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+              }
             }
           }
 
