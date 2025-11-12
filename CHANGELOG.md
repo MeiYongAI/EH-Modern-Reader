@@ -88,6 +88,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.5] - 2025-11-13
+
+### 🛠️ 优化与修复
+- 连续横向模式：统一滚动定位的 gap 与左右 padding（8px / 12px）以匹配进入模式时的布局，避免高页码下的细微偏差；新增定位调试日志。
+- 防止图片被误选中：为阅读视图、横向容器和图片增加 `user-select: none`、禁拖拽与禁 tap 高亮，消除选择时的“蓝色滤镜”。
+
+---
+
 ## [2.0.0] - 2025-11-10
 
 ### 🎉 正式发行版

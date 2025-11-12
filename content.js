@@ -1149,17 +1149,18 @@
           const allWrappers = Array.from(horizontalContainer.querySelectorAll('.eh-ch-wrapper'));
           const targetIndex = allWrappers.indexOf(wrapper);
           let cumulativeLeft = 0;
-          const gap = 16; // 与容器 gap 保持一致
+          const gap = 8; // 与容器 gap 保持一致（enterContinuousHorizontalMode 使用 8px）
           for (let i = 0; i < targetIndex; i++) {
             cumulativeLeft += allWrappers[i].clientWidth + gap;
           }
-          const leftPadding = 16; // 容器左右 padding 16px
-            cumulativeLeft += leftPadding;
+          const leftPadding = 12; // enterContinuousHorizontalMode 使用左右 12px padding
+          cumulativeLeft += leftPadding;
           const basisWidth = wrapper.clientWidth || img.clientWidth || 0;
           const centerOffset = Math.max(0, (horizontalContainer.clientWidth - basisWidth) / 2);
           let targetScroll = cumulativeLeft - centerOffset;
           const maxScroll = Math.max(0, horizontalContainer.scrollWidth - horizontalContainer.clientWidth);
           targetScroll = Math.max(0, Math.min(maxScroll, targetScroll));
+          console.log('[EH Modern Reader] 连续模式滚动定位 -> page=', pageNum, 'idx=', idx, 'targetIndex=', targetIndex, 'scroll=', targetScroll);
           if (options.instant) {
             scrollJumping = true;
             horizontalContainer.scrollLeft = targetScroll;
