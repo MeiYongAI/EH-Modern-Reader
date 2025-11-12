@@ -252,7 +252,7 @@
   /**
    * 启动阅读器
    */
-  async function launchReader() {
+  async function launchReader(startPage /* 1-based, optional */) {
     console.log('[EH Reader] Launching reader from Gallery page...');
     
     try {
@@ -313,7 +313,8 @@
         mpvkey: pageData.token,
         gallery_url: `${pageData.baseUrl}g/${pageData.gid}/${pageData.token}/`,
         title: metadata.title,
-        source: 'gallery' // 标记数据来源
+        source: 'gallery', // 标记数据来源
+        startAt: (typeof startPage === 'number' && startPage >= 1 && startPage <= pageCount) ? startPage : undefined
       };
       
       // 4. 挂载到 window（供 content.js 使用）
@@ -399,6 +400,391 @@
     document.addEventListener('DOMContentLoaded', addLaunchButton);
   } else {
     addLaunchButton();
+  }
+
+  // 拦截缩略图点击，直接用我们的阅读器打开并跳转到对应页
+  function interceptThumbnailClicks() {
+    const grid = document.getElementById('gdt');
+    if (!grid) return;
+    // 放行组合键/中键等原生行为
+    const shouldBypass = (ev) => ev.ctrlKey || ev.shiftKey || ev.metaKey || ev.altKey || ev.button === 1;
+
+    grid.addEventListener('auxclick', (e) => {
+      // 中键点击等，直接放行
+    }, true);
+
+    grid.addEventListener('click', (e) => {
+      if (e.defaultPrevented) return;
+      if (shouldBypass(e)) return; // 保留原站行为（新标签、打开等）
+      const a = e.target && (e.target.closest ? e.target.closest('a[href*="/s/"]') : null);
+      if (!a) return;
+      const href = a.getAttribute('href') || '';
+      const m = href.match(/\/s\/([a-f0-9]+)\/(\d+)-(\d+)/i);
+      if (!m) return; // 非预期链接，放行
+      e.preventDefault();
+      const pageNum = parseInt(m[3], 10); // 1-based
+      const now = Date.now();
+      const cooldownUntil = window.__ehReaderCooldown || 0;
+      if (cooldownUntil > now || window.__ehReaderLaunching) return;
+      window.__ehReaderLaunching = true;
+      window.__ehReaderCooldown = now + 1200; // 1.2s 冷却避免重复触发
+      launchReader(pageNum).catch(() => { window.__ehReaderLaunching = false; });
+    }, true); // 捕获阶段优先，减少站内脚本干预
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', interceptThumbnailClicks);
+  } else {
+    interceptThumbnailClicks();
+  }
+
+  // —— 展开所有缩略图：抓取所有分页并合并到当前页 ——
+  async function fetchGalleryPageDom(pageIndex) {
+    const url = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${pageIndex}`;
+    const resp = await fetch(url, { credentials: 'same-origin' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const html = await resp.text();
+    const parser = new DOMParser();
+    return parser.parseFromString(html, 'text/html');
+  }
+
+  // 旧版“展开所有缩略图”按钮已废弃（改为静默自动展开）
+
+  async function expandAllThumbnails() {
+    const grid = document.getElementById('gdt');
+    if (!grid) return;
+    // 估算每页缩略图数
+    const firstPageThumbs = grid.querySelectorAll('a[href*="/s/"]').length || 20;
+    // 获取总页数
+    let totalImages = null;
+    try {
+      const meta = await fetchGalleryMetadata();
+      totalImages = parseInt(meta.filecount);
+    } catch {}
+    if (!totalImages || !Number.isFinite(totalImages)) {
+      // 兜底：从 .gpc 文本解析 “Showing 1 - 20 of N images”
+      const gpc = document.querySelector('.gpc');
+      if (gpc && /of\s+(\d+)/i.test(gpc.textContent)) {
+        totalImages = parseInt(gpc.textContent.match(/of\s+(\d+)/i)[1], 10);
+      }
+    }
+    if (!totalImages) return;
+    const totalPages = Math.ceil(totalImages / firstPageThumbs);
+    if (totalPages <= 1) return;
+
+    // 静默展开：不显示任何进度或提示，避免视觉干扰
+
+    // 并发抓取 pageIndex: 1..totalPages-1（第0页当前已在）
+    const indexes = [];
+    for (let i = 1; i < totalPages; i++) indexes.push(i);
+    const concurrency = 2;
+    let inFlight = 0, cursor = 0, done = 0;
+    const results = [];
+
+    await new Promise((resolve) => {
+      const next = () => {
+        if (cursor >= indexes.length && inFlight === 0) { resolve(); return; }
+        while (inFlight < concurrency && cursor < indexes.length) {
+          const idx = indexes[cursor++];
+          inFlight++;
+          fetchGalleryPageDom(idx)
+            .then((doc) => {
+              const links = doc.querySelectorAll('#gdt a[href*="/s/"]');
+              const frag = document.createDocumentFragment();
+              links.forEach(a => {
+                const wrapper = document.createElement('a');
+                wrapper.href = a.getAttribute('href');
+                // 子 div 作为缩略图容器
+                const div = a.querySelector('div');
+                wrapper.appendChild(div ? div.cloneNode(true) : document.createTextNode(''));
+                frag.appendChild(wrapper);
+              });
+              results[idx] = frag;
+            })
+            .catch(() => { results[idx] = document.createDocumentFragment(); })
+            .finally(() => { inFlight--; done++; setTimeout(next, 150); });
+        }
+      };
+      next();
+    });
+
+    // 追加到当前网格
+    for (let i = 1; i < results.length; i++) {
+      const frag = results[i];
+      if (frag) grid.appendChild(frag);
+    }
+    // 展开后补充缩略图占位样式
+    applyThumbnailPlaceholders();
+
+    // 移除分页条
+    document.querySelectorAll('.ptt, .ptb').forEach(el => el.remove());
+    // 更新显示范围文字
+    const gpcTop = document.querySelector('.gpc');
+    if (gpcTop) gpcTop.textContent = `Showing 1 - ${totalImages} of ${totalImages} images`;
+  }
+
+  // 移除“展开所有缩略图”按钮的自动插入（默认自动展开，无需额外按钮）
+
+  // 自动展开所有缩略图（仿 JHenTai 默认行为）
+  async function autoExpandIfNeeded() {
+    try {
+      if (window.__ehAutoExpanded) return;
+      const grid = document.getElementById('gdt');
+      if (!grid) return;
+      // 判断是否存在分页元素（.ptt 或 .ptb 中是否有 >1 页）
+      const pageTable = document.querySelector('.ptt, .ptb');
+      if (!pageTable) return; // 无分页无需展开
+      const pageLinks = pageTable.querySelectorAll('a');
+      if (pageLinks.length <= 2) return; // 只有 1 页
+      window.__ehAutoExpanded = true;
+      await expandAllThumbnails();
+    } catch (e) {
+      console.warn('[EH Reader] 自动展开缩略图失败', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(autoExpandIfNeeded, 300));
+  } else {
+    setTimeout(autoExpandIfNeeded, 50);
+  }
+
+  // ================= 评论预览与弹窗 =================
+  function isDarkTheme() {
+    try {
+      const bg = getComputedStyle(document.body).backgroundColor;
+      const m = bg && bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (m) {
+        const r = parseInt(m[1], 10), g = parseInt(m[2], 10), b = parseInt(m[3], 10);
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        return luma < 140;
+      }
+    } catch {}
+    return document.body.classList.contains('dark') || document.body.classList.contains('eh-dark-mode');
+  }
+
+  function getThemeColors() {
+    const dark = isDarkTheme();
+    const sample = document.querySelector('#cdiv .c1') || document.querySelector('#gd5') || document.body;
+    const cs = getComputedStyle(sample);
+    const border = cs.borderTopColor || (dark ? '#444' : '#ccc');
+    const bodyCs = getComputedStyle(document.body);
+    const bodyBg = bodyCs.backgroundColor || (dark ? '#1b1b1b' : '#ffffff');
+    const text = bodyCs.color || (dark ? '#ddd' : '#222');
+    return { dark, border, bodyBg, text };
+  }
+
+  function buildCommentsPreview() {
+    const commentRoot = document.getElementById('cdiv');
+    if (!commentRoot) return;
+    if (document.getElementById('eh-comment-preview')) return; // 已构建
+    const grid = document.getElementById('gdt');
+    if (!grid) return;
+
+    // 提取评论块
+    const comments = Array.from(commentRoot.querySelectorAll('.c1'));
+    if (!comments.length) return;
+    const PREVIEW_COUNT = 4;
+
+    // 创建预览容器
+    const preview = document.createElement('div');
+    preview.id = 'eh-comment-preview';
+    const theme = getThemeColors();
+    preview.style.cssText = `border:1px solid ${theme.border}; padding:8px 10px; margin:12px 0 16px; font-size:12px; line-height:1.4; background:transparent; color:${theme.text};`;
+    const title = document.createElement('div');
+    title.textContent = '最新评论预览';
+    title.style.cssText = 'font-weight:600; margin-bottom:6px; font-size:13px;';
+    preview.appendChild(title);
+
+    const list = document.createElement('div');
+    list.style.maxHeight = 'none';
+    comments.slice(0, PREVIEW_COUNT).forEach(c => {
+      const item = c.cloneNode(true);
+      // 精简：移除投票按钮、隐藏冗余
+      item.querySelectorAll('.c4, .c5').forEach(el => el.remove());
+      // 预览克隆移除所有 id，避免与弹窗内真实评论产生冲突（站点脚本可能按 id 定位）
+      item.removeAttribute('id');
+      item.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
+      item.style.background = 'transparent';
+      item.style.borderColor = theme.border;
+      item.style.color = theme.text;
+      item.style.margin = '4px 0';
+      // 预览区禁用交互，防止事件穿透或站点脚本联动
+      item.style.pointerEvents = 'none';
+      preview.appendChild(item);
+    });
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'margin-top:6px; display:flex; gap:8px;';
+    const openBtn = document.createElement('button');
+    openBtn.textContent = '展开全部评论';
+    openBtn.style.cssText = 'cursor:pointer;padding:4px 10px;font-size:12px;';
+    const collapseOrig = () => { commentRoot.style.display = 'none'; };
+    collapseOrig(); // 默认隐藏原始整块
+    openBtn.onclick = (e) => { e.preventDefault(); showCommentsModal(commentRoot); };
+    btnRow.appendChild(openBtn);
+    if (comments.length > PREVIEW_COUNT) {
+      const moreSpan = document.createElement('span');
+      moreSpan.textContent = `其余 ${comments.length - PREVIEW_COUNT} 条…`;
+      moreSpan.style.cssText = 'align-self:center;color:#999;';
+      btnRow.appendChild(moreSpan);
+    }
+    preview.appendChild(btnRow);
+
+    // 让预览容器与缩略图区域同宽并居中
+    const adjustPreviewWidth = () => {
+      const w = grid.clientWidth || grid.getBoundingClientRect().width;
+      if (w && Number.isFinite(w)) {
+        preview.style.maxWidth = w + 'px';
+        preview.style.margin = '12px auto 16px';
+        preview.style.borderRadius = '6px';
+        preview.style.boxSizing = 'border-box';
+      }
+    };
+    adjustPreviewWidth();
+    window.addEventListener('resize', adjustPreviewWidth);
+
+    // 插入位置：缩略图上方
+    grid.parentNode.insertBefore(preview, grid);
+  }
+
+  function showCommentsModal(originalRoot) {
+    if (document.getElementById('eh-comment-modal')) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'eh-comment-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:40px;';
+    const panel = document.createElement('div');
+    const theme = getThemeColors();
+    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};max-width:900px;width:100%;max-height:100%;overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;`;
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+    const hTitle = document.createElement('div');
+    hTitle.textContent = '全部评论';
+    hTitle.style.fontWeight = '600';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '关闭';
+    closeBtn.style.cssText = 'cursor:pointer;padding:4px 10px;font-size:12px;';
+
+    // 占位符用于恢复评论区原位
+    const placeholderId = 'eh-comment-placeholder';
+    let placeholder = document.getElementById(placeholderId);
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.id = placeholderId;
+      placeholder.style.display = 'none';
+      originalRoot.parentNode.insertBefore(placeholder, originalRoot.nextSibling);
+    }
+    const restoreRoot = () => {
+      if (placeholder && placeholder.parentNode) {
+        originalRoot.style.display = 'none';
+        placeholder.parentNode.insertBefore(originalRoot, placeholder);
+        placeholder.remove();
+      }
+    };
+    closeBtn.onclick = () => { restoreRoot(); overlay.remove(); };
+
+    header.appendChild(hTitle);
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    // 将原始评论树移动进弹窗，避免背景响应
+    originalRoot.style.display = 'block';
+    originalRoot.querySelectorAll('.c1').forEach(el => {
+      el.style.background = 'transparent';
+      el.style.borderColor = theme.border;
+      el.style.color = theme.text;
+    });
+    panel.appendChild(originalRoot);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    // 锁定背景滚动，仅允许弹窗内部滚动
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const restore = () => { document.body.style.overflow = prevOverflow || ''; };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) { restoreRoot(); overlay.remove(); restore(); } });
+    const escHandler = (e) => { if (e.key === 'Escape') { restoreRoot(); overlay.remove(); document.removeEventListener('keydown', escHandler); restore(); } };
+    document.addEventListener('keydown', escHandler);
+    const cleanupOnRemove = new MutationObserver(() => {
+      if (!document.body.contains(overlay)) { restore(); cleanupOnRemove.disconnect(); }
+    });
+    cleanupOnRemove.observe(document.body, { childList: true });
+    // 防滚动穿透
+    panel.addEventListener('wheel', (ev) => { ev.stopPropagation(); }, { passive: false });
+    // 阻断 hover 事件向上传播，避免影响页面上方的评论预览
+    const stopHover = (ev) => ev.stopPropagation();
+    panel.addEventListener('mouseover', stopHover, true);
+    panel.addEventListener('mouseout', stopHover, true);
+    panel.addEventListener('mouseenter', stopHover, true);
+    panel.addEventListener('mouseleave', stopHover, true);
+
+    // 将“悬停显示分数详情”改为“点击分数开关详情（仅在弹窗内部生效）”
+    panel.addEventListener('click', (ev) => {
+      const target = ev.target;
+      if (!target) return;
+      const comment = target.closest && target.closest('.c1');
+      if (!comment) return;
+      // 识别“分数”元素：优先匹配 c6，其次包含“分数”的文本节点容器
+      const scoreEl = target.closest('.c6, .score, span, a');
+      if (!scoreEl) return;
+      const text = (scoreEl.textContent || '').trim();
+      if (!/(分数|score)/i.test(text)) return;
+
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      let box = comment.querySelector('.eh-vote-details');
+      if (box) {
+        // 二次点击直接移除元素，避免 display 被站点样式覆盖导致无法收起
+        box.remove();
+        return;
+      }
+      // 新建详情面板
+      box = document.createElement('div');
+      const theme2 = getThemeColors();
+      box.className = 'eh-vote-details';
+      box.style.cssText = `margin:6px 0 2px; padding:6px 8px; border:1px solid ${theme2.border}; border-radius:4px; background:transparent; color:${theme2.text}; font-size:12px; line-height:1.4;`;
+
+      // 尝试来源1：title 提示
+      const titleTip = scoreEl.getAttribute('title');
+      if (titleTip) {
+        box.textContent = titleTip;
+      } else {
+        // 尝试来源2：同条评论内可能存在的投票详情块（类名猜测）
+        const candidate = comment.querySelector('.cvote, .cvotes, .c7');
+        if (candidate) {
+          box.appendChild(candidate.cloneNode(true));
+        } else {
+          box.textContent = '投票详情';
+        }
+      }
+      comment.appendChild(box);
+    }, true);
+  }
+
+  // 为缩略图添加占位背景，减轻加载抖动
+  function applyThumbnailPlaceholders() {
+    const theme = getThemeColors();
+    const placeholder = theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const thumbs = document.querySelectorAll('#gdt a[href*="/s/"] > div');
+    thumbs.forEach(div => {
+      // 保留原始背景图，仅增加底色与边框，且若无高度则给一个最小高度
+      div.style.backgroundColor = placeholder;
+      if (!div.style.border) div.style.border = `1px solid ${theme.border}`;
+      if (!div.style.borderRadius) div.style.borderRadius = '4px';
+      if (!div.style.height) div.style.minHeight = '220px';
+    });
+  }
+
+  function initCommentsFeature() {
+    buildCommentsPreview();
+    applyThumbnailPlaceholders();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(initCommentsFeature, 200));
+  } else {
+    setTimeout(initCommentsFeature, 50);
   }
 
 })();

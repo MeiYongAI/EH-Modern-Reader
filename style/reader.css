@@ -40,9 +40,7 @@ body.eh-dark-mode #eh-image-container {
   background: #1a1a1a;
 }
 
-body.eh-dark-mode .eh-loading {
-  color: #e0e0e0;
-}
+/* 旧 .eh-loading 已移除 */
 
 /* ==================== 容器布局 ==================== */
 
@@ -142,7 +140,11 @@ body.eh-dark-mode #eh-page-info {
   align-items: center;
   justify-content: center;
   transition: background-color 0.2s;
-  color: inherit;
+  color: #222;
+}
+
+body.eh-dark-mode .eh-icon-btn {
+  color: #e0e0e0;
 }
 
 .eh-icon-btn:hover {
@@ -178,7 +180,11 @@ body.eh-dark-mode .eh-icon-btn.eh-active {
   align-items: center;
   justify-content: center;
   transition: background-color 0.2s;
-  color: inherit;
+  color: #222;
+}
+
+body.eh-dark-mode .eh-icon-btn-small {
+  color: #e0e0e0;
 }
 
 .eh-icon-btn-small:hover {
@@ -315,19 +321,13 @@ body:not(.eh-dark-mode) .eh-thumbnails-container { border-bottom-color: rgba(0,0
 }
 
 .eh-thumbnails-horizontal::-webkit-scrollbar {
-  height: 6px;
+  display: none; /* 隐藏滚动条 */
 }
 
-.eh-thumbnails-horizontal::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 3px;
-}
-.eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-.eh-thumbnails-horizontal::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+/* 保留滚动功能，但隐藏滚动条轨道和滑块 */
+.eh-thumbnails-horizontal {
+  -ms-overflow-style: none;  /* IE和Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 /* 浅色模式滚动条颜色 */
 body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-track {
@@ -392,6 +392,20 @@ body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
   width: 100px !important;
   height: 142px !important;
   display: block;
+  /* 🎯 淡入效果（参考JHenTai的fadeIn） */
+  animation: ehThumbnailFadeIn 0.3s ease-out;
+}
+
+/* 🎯 缩略图淡入动画 */
+@keyframes ehThumbnailFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .eh-thumbnail:hover { transform: scale(1.04); }
@@ -633,36 +647,7 @@ body.eh-dark-mode #eh-image-container {
   opacity: 1;
 }
 
-/* ==================== 加载动画 ==================== */
-
-#eh-loading {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  z-index: 10;
-}
-
-.eh-loading {
-  color: #666;
-}
-
-.eh-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(255, 107, 157, 0.2);
-  border-top-color: #FF6B9D;
-  border-radius: 50%;
-  animation: eh-spin 1s linear infinite;
-}
-
-@keyframes eh-spin {
-  to { transform: rotate(360deg); }
-}
+/* 旧加载动画已移除，统一使用环形进度覆盖层 */
 
 /* ==================== 翻页按钮 ==================== */
 
@@ -1109,6 +1094,7 @@ body.eh-dark-mode .eh-setting-inline label {
   font-size: 14px;
   font-weight: 600;
   background: #fff;
+  color: #222;
   appearance: textfield; /* 标准属性 */
   -moz-appearance: textfield; /* Firefox */
 }
@@ -1137,6 +1123,18 @@ body.eh-dark-mode .eh-setting-inline input[type="number"]:focus {
   background: #2a2a2a;
 }
 
+/* 禁用态可读性提升 */
+.eh-setting-inline input[type="number"]:disabled {
+  background: #f8f8f8;
+  color: #777;
+  border-color: #e5e5e5;
+}
+body.eh-dark-mode .eh-setting-inline input[type="number"]:disabled {
+  background: #2f2f2f;
+  color: #9a9a9a;
+  border-color: #3f3f3f;
+}
+
 .eh-setting-item select {
   width: 100%;
   height: 36px;
@@ -1162,7 +1160,7 @@ body.eh-dark-mode .eh-setting-item select {
   accent-color: #FF6B9D;
 }
 
-/* 单选按钮组样式 */
+/* 单选按钮组样式（修复双圈与对比度） */
 .eh-radio-group {
   display: flex;
   gap: 10px;
@@ -1173,10 +1171,10 @@ body.eh-dark-mode .eh-setting-item select {
 .eh-radio-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
+  gap: 10px;
+  padding: 10px 16px;
   border: 2px solid #e0e0e0;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   font-size: 14px;
@@ -1193,11 +1191,43 @@ body.eh-dark-mode .eh-setting-item select {
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
+/* 自定义单选圆点，避免原生与自定义叠加导致“两个圈” */
 .eh-radio-label input[type="radio"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 2px solid #FF6B9D;
+  border-radius: 50%;
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+}
+body.eh-dark-mode .eh-radio-label input[type="radio"] {
+  background: #2a2a2a;
+  border-color: #FF6B9D;
+}
+.eh-radio-label input[type="radio"]::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FF6B9D;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.12s ease;
+}
+.eh-radio-label input[type="radio"]:checked::after {
+  transform: translate(-50%, -50%) scale(1);
+}
 
-.eh-radio-label input[type="radio"]:checked + span {
-  color: #e91e63;
-  font-weight: 600;
+.eh-radio-label span {
+  color: #555;
+}
+body.eh-dark-mode .eh-radio-label span {
+  color: #e0e0e0;
 }
 
 .eh-radio-label:has(input[type="radio"]:checked) {
@@ -1205,49 +1235,20 @@ body.eh-dark-mode .eh-setting-item select {
   background: #fff;
   box-shadow: 0 2px 8px rgba(255,107,157,0.25);
 }
-
 body.eh-dark-mode .eh-radio-label {
   border-color: #484848;
   background: #2a2a2a;
   color: #e0e0e0;
 }
-
 body.eh-dark-mode .eh-radio-label:hover {
   border-color: #ffb3d1;
   background: #333;
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
-
 body.eh-dark-mode .eh-radio-label:has(input[type="radio"]:checked) {
   border-color: #FF6B9D;
   background: #333;
   box-shadow: 0 2px 8px rgba(255,107,157,0.3);
-}
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: #FF6B9D;
-}
-
-.eh-radio-label input[type="radio"]:checked + span {
-  font-weight: 600;
-  color: #FF6B9D;
-}
-
-body.eh-dark-mode .eh-radio-label {
-  background: #3a3a3a;
-  border-color: #505050;
-  color: #bbb;
-}
-
-body.eh-dark-mode .eh-radio-label:hover {
-  border-color: #FF6B9D;
-  background: rgba(255, 107, 157, 0.1);
-}
-
-body.eh-dark-mode .eh-radio-label input[type="radio"]:checked + span {
-  color: #FF6B9D;
 }
 
 /* Toggle Switch Styles */
@@ -1435,6 +1436,116 @@ body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-
   outline-offset: 2px;
 }
 
+/* ==================== 图片加载进度指示器 ==================== */
+
+/* 进度覆盖层容器 */
+.eh-image-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.eh-image-loading-overlay.eh-fade-out {
+  opacity: 0;
+}
+
+/* 环形进度条容器 */
+.eh-circular-progress {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+}
+
+/* 环形进度条背景 */
+.eh-circular-progress-bg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* 环形进度条前景（动态更新） */
+.eh-circular-progress-fill {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from -90deg,
+    #FF6B9D 0%,
+    #FF6B9D var(--progress, 0%),
+    transparent var(--progress, 0%),
+    transparent 100%
+  );
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: --progress 0.15s ease;
+}
+
+/* 进度百分比文字 */
+.eh-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Loading 提示文字 */
+.eh-loading-hint {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 页码提示 */
+.eh-loading-page-number {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  margin-top: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 暗色模式适配 */
+body.eh-dark-mode .eh-image-loading-overlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+body.eh-dark-mode .eh-circular-progress-fill {
+  background: conic-gradient(
+    from -90deg,
+    #FF6B9D 0%,
+    #FF6B9D var(--progress, 0%),
+    transparent var(--progress, 0%),
+    transparent 100%
+  );
+}
+
 /* ==================== 性能优化 ==================== */
 
 #eh-current-image {
@@ -1448,4 +1559,8 @@ body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-
 
 .eh-nav-btn {
   will-change: opacity, transform;
+}
+
+.eh-circular-progress-fill {
+  will-change: background;
 }

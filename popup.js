@@ -54,6 +54,17 @@
     // 绑定按钮事件
     document.getElementById('reload-tab').addEventListener('click', reloadTab);
     document.getElementById('open-options').addEventListener('click', openOptions);
+
+    // 显示扩展版本号（从 manifest 读取，避免手写）
+    try {
+      const verEl = document.getElementById('ext-version');
+      if (verEl) {
+        const manifest = chrome.runtime.getManifest?.();
+        if (manifest?.version) {
+          verEl.textContent = `v${manifest.version}`;
+        }
+      }
+    } catch {}
   });
 
 })();
