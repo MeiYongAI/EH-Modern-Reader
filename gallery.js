@@ -760,6 +760,40 @@
       }
       comment.appendChild(box);
     }, true);
+
+    // 在弹窗内拦截“展开全部评论”点击，防止跳转导致弹窗关闭，改为本地展开
+    panel.addEventListener('click', (ev) => {
+      const trigger = ev.target && ev.target.closest && ev.target.closest('a,button');
+      if (!trigger) return;
+      const txt = (trigger.textContent || '').trim();
+      if (!/(展开全部|展开|expand all|show all)/i.test(txt)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      try {
+        // 解除内联 max-height 折叠
+        panel.querySelectorAll('[style*="max-height"]').forEach(n => { n.style.maxHeight = 'none'; });
+        // 显示被隐藏的评论项
+        panel.querySelectorAll('.c1, .c2, .c3').forEach(n => {
+          if (n.style && /display\s*:\s*none/i.test(n.style.cssText)) {
+            n.style.display = 'block';
+          }
+        });
+        // 去除常见折叠类名
+        panel.querySelectorAll('.collapsed, .folded, .hide, .noshow').forEach(n => {
+          n.classList.remove('collapsed');
+          n.classList.remove('folded');
+          n.classList.remove('hide');
+          n.classList.remove('noshow');
+        });
+        // 尝试调用原 onclick（若存在）以兼容站点逻辑，但不冒泡
+        if (typeof trigger.onclick === 'function') {
+          try { trigger.onclick.call(trigger, new Event('click', { bubbles: false, cancelable: true })); } catch {}
+        }
+        console.log('[EH Modern Reader] 已在弹窗内本地展开全部评论');
+      } catch (e) {
+        console.warn('[EH Modern Reader] 本地展开全部评论失败', e);
+      }
+    }, true);
   }
 
   // 为缩略图添加占位背景，减轻加载抖动

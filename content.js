@@ -2696,7 +2696,7 @@
           }
         }, { passive: false });
 
-        // 连续横向模式：左/中/右三分区点击
+        // 连续横向模式：左/中/右三分区点击（中间需同步隐藏/显示底部菜单与缩略图区）
         continuous.container.addEventListener('click', (e) => {
           // 排除底部菜单与按钮
           if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
@@ -2707,13 +2707,19 @@
           const width = rect.width;
           const leftThreshold = width / 3;
           const rightThreshold = width * 2 / 3;
-          // 中间切换顶栏
+          // 中间切换顶栏 + 底部菜单（与单页模式行为保持一致）
           if (clickX >= leftThreshold && clickX <= rightThreshold) {
             const header = document.getElementById('eh-header');
             const main = document.getElementById('eh-main');
+            const bottom = elements.bottomMenu;
             if (header) {
               const isHidden = header.classList.toggle('eh-hidden');
               if (main) main.classList.toggle('eh-fullheight', isHidden);
+              if (bottom) {
+                // 使用与单页模式一致的类名控制，可配合 CSS 动画
+                bottom.classList.toggle('eh-menu-hidden', isHidden);
+              }
+              console.log('[EH Modern Reader] 连续模式中间点击 -> 顶栏/底栏切换, hidden=', isHidden);
             }
             e.stopPropagation();
             return;
