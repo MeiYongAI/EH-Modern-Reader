@@ -1133,9 +1133,47 @@
     let lastRequestedPage = null;
     let loadToken = 0; // 用于竞态控制
     let scrollJumping = false; // 标记正在程序化跳转
+    let activeScrollAnim = null; // 横向模式自定义动画句柄
+
+    // 固定时长的 scrollLeft 动画，统一“翻页动画手感”（JHenTai 为 200ms 缓动）
+    function animateScrollLeft(el, target, opts = {}) {
+      const duration = typeof opts.duration === 'number' ? opts.duration : 200; // ms
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      const to = clamp(target, 0, maxScroll);
+      const from = el.scrollLeft;
+      const delta = to - from;
+      if (Math.abs(delta) < 0.5) {
+        el.scrollLeft = to;
+        return Promise.resolve();
+      }
+      // 取消之前的动画
+      if (activeScrollAnim && typeof activeScrollAnim.cancel === 'function') {
+        try { activeScrollAnim.cancel(); } catch {}
+      }
+      let rafId = 0;
+      let cancelled = false;
+      const easeInOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+      scrollJumping = true;
+      return new Promise((resolve) => {
+        const startTs = performance.now();
+        const step = (now) => {
+          if (cancelled) { scrollJumping = false; resolve(); return; }
+          const t = clamp((now - startTs) / duration, 0, 1);
+          const eased = easeInOutCubic(t);
+          el.scrollLeft = from + delta * eased;
+          if (t < 1) rafId = requestAnimationFrame(step); else { scrollJumping = false; resolve(); }
+        };
+        rafId = requestAnimationFrame(step);
+        activeScrollAnim = {
+          cancel() { cancelled = true; if (rafId) cancelAnimationFrame(rafId); }
+        };
+      });
+    }
 
     function scheduleShowPage(pageNum, options = {}) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
+      const immediate = !!options.immediate; // 用户点击等需要“立即响应”的场景（不走合并延时）
       // 连续横向模式：滚动居中目标页而不是直接替换单图
       const horizontalContainer = (state.settings.readMode === 'continuous-horizontal')
         ? document.getElementById('eh-continuous-horizontal')
@@ -1340,16 +1378,16 @@
       const idx = Math.max(0, Math.min(thumbnails.length - 1, pageNum - 1));
       const currentThumb = thumbnails[idx];
       const prevActiveThumb = document.querySelector('.eh-thumbnail.active');
-      
+
       // 移除旧的高亮
       if (prevActiveThumb && prevActiveThumb !== currentThumb) {
         prevActiveThumb.classList.remove('active');
       }
-      
+
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
-        
+
         // 检查缩略图是否已在可视区域
         const container = elements.thumbnails;
         if (container) {
@@ -1361,7 +1399,7 @@
             thumbRect.top >= containerRect.top &&
             thumbRect.bottom <= containerRect.bottom
           );
-          
+
           // 程序化跳转时：滚动到目标并锁定观察器，随后“手动”批量加载可见范围（含两侧少量）
           if (!isVisible) {
             // 拖动进度条过程中不触发缩略图滚动，避免抖动与性能问题
@@ -1373,7 +1411,6 @@
                 state._thumbsInitialPositioned = true;
                 // 计算居中的 scrollLeft（比 scrollIntoView 更稳定）
                 try {
-                  const container = elements.thumbnails;
                   const cRect = container.getBoundingClientRect();
                   const tRect = currentThumb.getBoundingClientRect();
                   const deltaLeft = (tRect.left - cRect.left) + (tRect.width - cRect.width) / 2;
@@ -1988,7 +2025,7 @@
   // 普通单页模式翻页
         
         if (target < 1 || target > state.pageCount) return;
-        scheduleShowPage(target);
+        scheduleShowPage(target, { immediate: true });
       };
     }
 
@@ -2001,7 +2038,7 @@
   // 普通单页模式翻页
         
         if (target < 1 || target > state.pageCount) return;
-        scheduleShowPage(target);
+        scheduleShowPage(target, { immediate: true });
       };
     }
 
@@ -2756,7 +2793,7 @@
             return;
           }
           const target = Math.max(1, Math.min(state.pageCount, state.currentPage + direction));
-          scheduleShowPage(target);
+          scheduleShowPage(target, { immediate: true });
           console.log('[EH Modern Reader] 连续模式点击区域:', clickX < leftThreshold ? 'LEFT' : 'RIGHT', 'reverse=', !!state.settings.reverse, '→ target=', target);
           e.stopPropagation();
         });
