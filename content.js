@@ -3019,6 +3019,14 @@
       };
       console.log('[EH Modern Reader] 恢复上次阅读页:', savedPage);
     } catch (e) { console.warn('[EH Modern Reader] 恢复阅读记忆失败', e); }
+    // 确保进入阅读器时，缩略图栏立即定位到起始页（无需等待图片加载）
+    try {
+      // 等待一帧，保证缩略图 DOM 与布局完成，再执行一次“瞬移定位”
+      requestAnimationFrame(() => {
+        try { updateThumbnailHighlight(savedPage); } catch {}
+      });
+    } catch {}
+
     internalShowPage(savedPage);
     // 底部菜单默认与头部一致（初始显示）。如需默认隐藏，可在此添加 .eh-menu-hidden
 
