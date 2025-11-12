@@ -813,6 +813,13 @@
   function initCommentsFeature() {
     buildCommentsPreview();
     applyThumbnailPlaceholders();
+    // 隐藏原站点的页码区（例如 “1 - 20，共 195 张图像”），避免与扩展的页码信息重复
+    try {
+      document.querySelectorAll('.gpc').forEach(el => {
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+      });
+    } catch {}
   }
 
   if (document.readyState === 'loading') {
