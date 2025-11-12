@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EH Modern Reader",
-  "version": "2.0.0",
-  "description": "现代化的 E-Hentai 阅读器扩展 | MPV + Gallery 双模式 | 智能节流防封禁 | 横向连续模式 | 进度记忆",
+  "version": "2.1.0",
+  "description": "Modern E-Hentai Reader with MPV/Gallery modes, smart throttling, progress indicator",
   "permissions": [
     "storage",
     "activeTab"
