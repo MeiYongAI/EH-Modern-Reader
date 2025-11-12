@@ -1,0 +1,11 @@
+/* EH Modern Reader – Gallery early styles
+	 目的：在 document_start 阶段隐藏原站分页条与页码信息，避免加载过程中闪一下。
+	 说明：.ptt 顶部分页条，.ptb 底部分页条，.gpc 为“1 - 20，共 N 张图像”文本区。
+*/
+
+.ptt,
+.ptb,
+.gpc {
+	display: none !important;
+}
+

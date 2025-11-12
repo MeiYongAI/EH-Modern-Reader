@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EH Modern Reader",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "description": "Modern E-Hentai Reader with MPV/Gallery modes, smart throttling, progress indicator",
   "permissions": [
     "storage",
@@ -28,6 +28,14 @@
     "service_worker": "background.js"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://e-hentai.org/g/*/*",
+        "https://exhentai.org/g/*/*"
+      ],
+      "css": ["style/gallery.css"],
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://e-hentai.org/mpv/*",

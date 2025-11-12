@@ -68,6 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.3] - 2025-11-13
+
+### 🐛 外观
+- 画廊页面：在 `document_start` 即注入隐藏 `.ptt`（顶部分页条）、`.ptb`（底部分页条）与 `.gpc`（页码统计文本），彻底消除刷新时页码区域闪现。
+
+### ⚙️ 技术
+- 新增早期 `content_script` 仅注入 `style/gallery.css`，不影响原有 `gallery.js` 的加载时机；避免脚本执行顺序改变导致的潜在副作用。
+
+---
+
 ## [2.0.0] - 2025-11-10
 
 ### 🎉 正式发行版
