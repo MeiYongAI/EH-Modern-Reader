@@ -2703,8 +2703,11 @@
             return;
           }
           const rect = continuous.container.getBoundingClientRect();
-          const clickX = e.clientX - rect.left;
+          const rawX = e.clientX - rect.left;
           const width = rect.width;
+          // 注意：反向阅读下容器使用了 scaleX(-1) 做视觉镜像，此时 DOM 坐标与视觉含义相反。
+          // 为了让“左/中/右”判断遵循视觉区域，这里在反向时将坐标镜像回来。
+          const clickX = state.settings.reverse ? (width - rawX) : rawX;
           const leftThreshold = width / 3;
           const rightThreshold = width * 2 / 3;
           // 中间切换顶栏 + 底部菜单（与单页模式行为保持一致）
@@ -2727,14 +2730,17 @@
           // 左右按页移动
           let direction = 0;
           if (clickX < leftThreshold) {
+            // 视觉左侧：正常为向前（-1），反向为向后（+1）
             direction = state.settings.reverse ? 1 : -1;
           } else if (clickX > rightThreshold) {
+            // 视觉右侧：正常为向后（+1），反向为向前（-1）
             direction = state.settings.reverse ? -1 : 1;
           } else {
             return;
           }
           const target = Math.max(1, Math.min(state.pageCount, state.currentPage + direction));
           scheduleShowPage(target);
+          console.log('[EH Modern Reader] 连续模式点击区域:', clickX < leftThreshold ? 'LEFT' : 'RIGHT', 'reverse=', !!state.settings.reverse, '→ target=', target);
           e.stopPropagation();
         });
 
