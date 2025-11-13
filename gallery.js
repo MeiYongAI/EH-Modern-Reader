@@ -605,6 +605,8 @@
     title.textContent = '最新评论预览';
     title.className = 'eh-comment-preview-title';
     preview.appendChild(title);
+    // 主题色采样（用于克隆评论项配色）
+    const theme = getThemeColors();
 
     const list = document.createElement('div');
     list.style.maxHeight = 'none';
