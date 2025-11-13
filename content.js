@@ -721,6 +721,7 @@
       const mpvkey = pageData.mpvkey || 'nokey';
       return `eh_mpv_realurl_${gid}_${mpvkey}`;
     };
+    const REALURL_TTL = 24 * 60 * 60 * 1000; // 24h，可视为长期缓存，直到手动清理
     function preconnectToOrigin(sampleUrl) {
       try {
         const origin = new URL(sampleUrl).origin;
@@ -734,19 +735,21 @@
         }
       } catch {}
     }
-    // 恢复会话缓存
+    // 恢复持久缓存（localStorage 优先，回退 sessionStorage），含 TTL
     try {
-      const raw = sessionStorage.getItem(persistentCacheKey());
-      if (raw) {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) {
-          arr.forEach((u, idx) => { if (typeof u === 'string' && u.startsWith('http')) realUrlCache.set(idx, u); });
+      let payload = null;
+      const ls = localStorage.getItem(persistentCacheKey());
+      if (ls) {
+        try { payload = JSON.parse(ls); } catch {}
+      } else {
+        const ss = sessionStorage.getItem(persistentCacheKey());
+        if (ss) { try { payload = { ts: Date.now(), arr: JSON.parse(ss) }; } catch {} }
+      }
+      if (payload && Array.isArray(payload.arr)) {
+        if (!payload.ts || (Date.now() - payload.ts) < REALURL_TTL) {
+          payload.arr.forEach((u, idx) => { if (typeof u === 'string' && u.startsWith('http')) realUrlCache.set(idx, u); });
           console.log('[EH Modern Reader] 恢复真实图片URL缓存数量:', realUrlCache.size);
-          // 从首个可用 URL 预连接，降低 TLS/握手耗时
-          for (let i = 0; i < arr.length; i++) {
-            const u = arr[i];
-            if (typeof u === 'string' && u.startsWith('http')) { preconnectToOrigin(u); break; }
-          }
+          for (let i = 0; i < payload.arr.length; i++) { const u = payload.arr[i]; if (typeof u === 'string' && u.startsWith('http')) { preconnectToOrigin(u); break; } }
         }
       }
     } catch (e) { console.warn('[EH Modern Reader] 恢复真实图片URL缓存失败', e); }
@@ -755,12 +758,15 @@
       if (persistRealUrlCacheLater.timer) clearTimeout(persistRealUrlCacheLater.timer);
       persistRealUrlCacheLater.timer = setTimeout(() => {
         try {
-          const maxSave = 3000; // 安全上限，避免超大画廊导致过大字符串
+          const maxSave = 1000; // 限制保存数量，减小体积
           const arr = [];
-            for (let i = 0; i < Math.min(state.pageCount, maxSave); i++) {
-              arr[i] = realUrlCache.get(i) || null;
-            }
-          sessionStorage.setItem(persistentCacheKey(), JSON.stringify(arr));
+          for (let i = 0; i < Math.min(state.pageCount, maxSave); i++) {
+            arr[i] = realUrlCache.get(i) || null;
+          }
+          const payload = { ts: Date.now(), arr };
+          try { localStorage.setItem(persistentCacheKey(), JSON.stringify(payload)); } catch {}
+          // 兼容旧版本：继续写 sessionStorage（不带 ts）
+          try { sessionStorage.setItem(persistentCacheKey(), JSON.stringify(arr)); } catch {}
         } catch (e) { console.warn('[EH Modern Reader] 持久化真实图片URL缓存失败', e); }
       }, 400); // 400ms 聚合
     }
@@ -3027,53 +3033,73 @@
     // 初始化
     generateThumbnails();
     
-    // 阅读记忆：优先使用外部启动指定页，其次恢复上次阅读页（同一 gid 范围）
+    // 阅读记忆：优先使用外部启动指定页，其次恢复“永久”进度（chrome.storage.local / localStorage）
     let savedPage = (typeof pageData.startAt === 'number' && pageData.startAt >= 1 && pageData.startAt <= state.pageCount)
       ? pageData.startAt
       : 1;
+    const gid = pageData.gid || 'nogid';
+    const LS_KEY = `eh_reader_lastpage_permanent_${gid}`;
+    const loadLastPagePermanent = () => new Promise((resolve) => {
+      // chrome.storage.local 优先
+      try {
+        if (chrome && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.get([LS_KEY], (res) => {
+            const val = res && res[LS_KEY];
+            resolve(typeof val === 'number' ? val : null);
+          });
+          return;
+        }
+      } catch {}
+      // 回退 localStorage
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        resolve(raw ? parseInt(raw, 10) : null);
+      } catch { resolve(null); }
+    });
+    const saveLastPagePermanent = (page) => {
+      try {
+        if (chrome && chrome.storage && chrome.storage.local) {
+          const obj = {}; obj[LS_KEY] = page;
+          chrome.storage.local.set(obj);
+        } else {
+          localStorage.setItem(LS_KEY, String(page));
+        }
+      } catch {}
+    };
     try {
-      const gid = pageData.gid || 'nogid';
-      const key = `eh_reader_lastpage_${gid}`;
-      const raw = sessionStorage.getItem(key);
-      if (raw && savedPage === 1) { // 仅当未指定 startAt 时才恢复历史
-        const v = parseInt(raw, 10);
-        if (v >= 1 && v <= state.pageCount) savedPage = v;
-      }
-      // 在 showPage 内已经会更新 state.currentPage，这里添加一个节流持久化
-      let persistTimer = null;
-      const persistLastPage = () => {
-        if (persistTimer) clearTimeout(persistTimer);
-        persistTimer = setTimeout(() => {
-          try { sessionStorage.setItem(key, String(state.currentPage)); } catch {}
-        }, 500);
-      };
-      // hook scheduleShowPage -> showPage 完成后执行
-      const _origShowPage = showPage;
-      showPage = async function(pageNum, tokenCheck){
-        const r = await _origShowPage(pageNum, tokenCheck);
-        persistLastPage();
-        return r;
-      };
-      console.log('[EH Modern Reader] 恢复上次阅读页:', savedPage);
-    } catch (e) { console.warn('[EH Modern Reader] 恢复阅读记忆失败', e); }
-    // 确保进入阅读器时，缩略图栏立即定位到起始页（无需等待图片加载）
-    try {
-      // 等待一帧，保证缩略图 DOM 与布局完成，再执行一次“瞬移定位”
-      requestAnimationFrame(() => {
-        try { updateThumbnailHighlight(savedPage); } catch {}
+      loadLastPagePermanent().then((v) => {
+        if (savedPage === 1 && typeof v === 'number' && v >= 1 && v <= state.pageCount) {
+          savedPage = v;
+        }
+        // hook showPage，在每次成功显示后写入永久存储
+        let persistTimer = null;
+        const persistLastPage = () => {
+          if (persistTimer) clearTimeout(persistTimer);
+          persistTimer = setTimeout(() => { saveLastPagePermanent(state.currentPage); }, 400);
+        };
+        const _origShowPage = showPage;
+        showPage = async function(pageNum, tokenCheck){
+          const r = await _origShowPage(pageNum, tokenCheck);
+          persistLastPage();
+          return r;
+        };
+        console.log('[EH Modern Reader] 恢复上次阅读页:', savedPage);
+        // 进入阅读器并定位
+        try { requestAnimationFrame(() => { try { updateThumbnailHighlight(savedPage); } catch {} }); } catch {}
+        internalShowPage(savedPage);
+        // 后续 UI 初始化（主题等）
+        if (state.settings.darkMode) { document.body.classList.add('eh-dark-mode'); }
+        try { (typeof updateThemeIcon === 'function') && updateThemeIcon(); } catch {}
+        console.log('[EH Modern Reader] 阅读器初始化完成，从第', savedPage, '页继续阅读');
       });
-    } catch {}
-
+      // 提前 return 避免下面重复执行
+      return;
+    } catch (e) { console.warn('[EH Modern Reader] 恢复阅读记忆失败', e); }
+    // 如果上面因异常未提前 return，这里执行默认路径
+    try { requestAnimationFrame(() => { try { updateThumbnailHighlight(savedPage); } catch {} }); } catch {}
     internalShowPage(savedPage);
-    // 底部菜单默认与头部一致（初始显示）。如需默认隐藏，可在此添加 .eh-menu-hidden
-
-    // 应用默认深色模式并更新主题图标
-    if (state.settings.darkMode) {
-      document.body.classList.add('eh-dark-mode');
-    }
-    // 初始化主题图标外观
+    if (state.settings.darkMode) { document.body.classList.add('eh-dark-mode'); }
     try { (typeof updateThemeIcon === 'function') && updateThemeIcon(); } catch {}
-
     console.log('[EH Modern Reader] 阅读器初始化完成，从第', savedPage, '页继续阅读');
   }
 

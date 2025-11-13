@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0] - 2025-11-13
 ## [2.2.1] - 2025-11-13
 ## [2.2.2] - 2025-11-13
+## [2.3.0] - 2025-11-13
+### Added
+- 持久图片缓存：
+  - MPV 主图真实 URL 缓存在 `localStorage`（带 24h TTL），并保留 `sessionStorage` 兼容；跨标签页返回时复用并预连接域名。
+  - 画廊展开结果缓存已在 2.2.2 引入，继续沿用。
+- 永久阅读记录：使用 `chrome.storage.local`（回退 `localStorage`）保存最后阅读页；除非手动清理，否则不会消失。
+
 ### Added
 - 画廊展开结果缓存（sessionStorage）：返回画廊页时直接恢复已展开的缩略图，避免二次抓取与等待。
 

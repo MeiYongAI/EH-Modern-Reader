@@ -1,5 +1,12 @@
 # Release Notes
 
+## v2.3.0 (2025-11-13)
+### Features
+- 永久阅读记录：最后阅读页保存在 `chrome.storage.local`（回退 `localStorage`），跨标签/重启浏览器仍保留。
+- 图片缓存增强：MPV 主图真实 URL 持久化到 `localStorage`（24h 过期），配合会话缓存提升二次进入速度。
+
+---
+
 ## v2.2.2 (2025-11-13)
 ### Improvement
 - 画廊缩略图展开结果会缓存于 `sessionStorage`，从单页返回画廊时可即时恢复，无需再次等待加载。
