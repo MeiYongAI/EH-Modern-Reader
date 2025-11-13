@@ -9,3 +9,77 @@
 	display: none !important;
 }
 
+/* ============ 居中评论容器（画廊页） ============ */
+#eh-comments-wrapper {
+	max-width: 900px;
+	margin: 42px auto 64px;
+	padding: 0 18px;
+	box-sizing: border-box;
+}
+@media (max-width: 860px) {
+	#eh-comments-wrapper { margin: 32px auto 48px; padding: 0 14px; }
+}
+@media (max-width: 600px) {
+	#eh-comments-wrapper { margin: 24px auto 40px; padding: 0 10px; }
+}
+
+#eh-comments-wrapper .eh-comment-preview-box {
+	border: 1px solid rgba(0,0,0,0.12);
+	background: rgba(255,255,255,0.65);
+	backdrop-filter: blur(4px);
+	-webkit-backdrop-filter: blur(4px);
+	border-radius: 8px;
+	padding: 14px 18px 16px;
+	box-sizing: border-box;
+	margin-bottom: 14px;
+}
+body.eh-dark-mode #eh-comments-wrapper .eh-comment-preview-box {
+	background: rgba(30,30,30,0.6);
+	border-color: rgba(255,255,255,0.12);
+}
+
+#eh-comments-wrapper .eh-comment-preview-title {
+	font-size: 15px;
+	font-weight: 600;
+	margin-bottom: 10px;
+}
+
+#eh-comments-wrapper .eh-comment-expand-btn {
+	display: inline-block;
+	margin-top: 10px;
+	font-size: 13px;
+	cursor: pointer;
+	padding: 6px 10px;
+	border-radius: 5px;
+	background: rgba(255,107,157,0.16);
+	color: #d6336c;
+	border: 1px solid rgba(255,107,157,0.38);
+	user-select: none;
+	text-decoration: none !important;
+}
+#eh-comments-wrapper .eh-comment-expand-btn:hover { background: rgba(255,107,157,0.22); }
+body.eh-dark-mode #eh-comments-wrapper .eh-comment-expand-btn { color:#ff96bb; background: rgba(255,107,157,0.18); border-color: rgba(255,107,157,0.45); }
+body.eh-dark-mode #eh-comments-wrapper .eh-comment-expand-btn:hover { background: rgba(255,107,157,0.28); }
+
+/* 全量评论列表（初始折叠） */
+#eh-comments-wrapper #cdiv.eh-collapsed { display: none; }
+#eh-comments-wrapper #cdiv {
+	border: 1px solid rgba(0,0,0,0.12);
+	border-radius: 8px;
+	padding: 16px 18px;
+	background: rgba(255,255,255,0.55);
+	box-sizing: border-box;
+}
+body.eh-dark-mode #eh-comments-wrapper #cdiv {
+	background: rgba(30,30,30,0.55);
+	border-color: rgba(255,255,255,0.14);
+}
+@media (max-width: 600px) {
+	#eh-comments-wrapper #cdiv { padding: 14px 14px; }
+}
+
+/* 单条评论基础微调（不破坏站点原有结构，只增强可读性） */
+#eh-comments-wrapper #cdiv .c1 { margin-bottom: 12px; }
+#eh-comments-wrapper #cdiv .c1:last-child { margin-bottom: 4px; }
+
+

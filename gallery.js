@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Gallery Script - Gallery 页面入口脚本
  * 为没有 MPV 权限的用户提供阅读器入口
  */
@@ -549,6 +549,13 @@
     setTimeout(autoExpandIfNeeded, 50);
   }
 
+  // 构建评论预览（放在缩略图上方）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(buildCommentsPreview, 120));
+  } else {
+    setTimeout(buildCommentsPreview, 80);
+  }
+
   // ================= 评论预览与弹窗 =================
   function isDarkTheme() {
     try {
@@ -577,7 +584,7 @@
   function buildCommentsPreview() {
     const commentRoot = document.getElementById('cdiv');
     if (!commentRoot) return;
-    if (document.getElementById('eh-comment-preview')) return; // 已构建
+    if (document.getElementById('eh-comments-wrapper')) return; // 已构建新的居中容器
     const grid = document.getElementById('gdt');
     if (!grid) return;
 
@@ -586,14 +593,17 @@
     if (!comments.length) return;
     const PREVIEW_COUNT = 4;
 
-    // 创建预览容器
+    // 创建外层居中包裹容器
+    const wrapper = document.createElement('div');
+    wrapper.id = 'eh-comments-wrapper';
+
+    // 创建预览容器（使用新类方便 CSS 管理）
     const preview = document.createElement('div');
     preview.id = 'eh-comment-preview';
-    const theme = getThemeColors();
-    preview.style.cssText = `border:1px solid ${theme.border}; padding:8px 10px; margin:12px 0 16px; font-size:12px; line-height:1.4; background:transparent; color:${theme.text};`;
+    preview.className = 'eh-comment-preview-box';
     const title = document.createElement('div');
     title.textContent = '最新评论预览';
-    title.style.cssText = 'font-weight:600; margin-bottom:6px; font-size:13px;';
+    title.className = 'eh-comment-preview-title';
     preview.appendChild(title);
 
     const list = document.createElement('div');
@@ -614,293 +624,59 @@
       preview.appendChild(item);
     });
 
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'margin-top:6px; display:flex; gap:8px;';
-    const openBtn = document.createElement('button');
-    openBtn.textContent = '展开全部评论';
-    openBtn.style.cssText = 'cursor:pointer;padding:4px 10px;font-size:12px;';
-    const collapseOrig = () => { commentRoot.style.display = 'none'; };
-    collapseOrig(); // 默认隐藏原始整块
-    openBtn.onclick = (e) => { e.preventDefault(); showCommentsModal(commentRoot); };
-    btnRow.appendChild(openBtn);
+    // 内联展开按钮（替代旧全屏弹窗默认行为）
+    const expandBtn = document.createElement('a');
+    expandBtn.textContent = '展开全部评论';
+    expandBtn.href = '#expand-comments';
+    expandBtn.className = 'eh-comment-expand-btn';
+    preview.appendChild(expandBtn);
     if (comments.length > PREVIEW_COUNT) {
       const moreSpan = document.createElement('span');
       moreSpan.textContent = `其余 ${comments.length - PREVIEW_COUNT} 条…`;
-      moreSpan.style.cssText = 'align-self:center;color:#999;';
-      btnRow.appendChild(moreSpan);
+      moreSpan.style.cssText = 'margin-left:8px;font-size:12px;color:#777;';
+      preview.appendChild(moreSpan);
     }
-    preview.appendChild(btnRow);
 
-    // 让预览容器与缩略图区域同宽并居中
-    const adjustPreviewWidth = () => {
-      const w = grid.clientWidth || grid.getBoundingClientRect().width;
-      if (w && Number.isFinite(w)) {
-        preview.style.maxWidth = w + 'px';
-        preview.style.margin = '12px auto 16px';
-        preview.style.borderRadius = '6px';
-        preview.style.boxSizing = 'border-box';
-      }
-    };
-    adjustPreviewWidth();
-    window.addEventListener('resize', adjustPreviewWidth);
+    // 初始折叠原始评论树
+    commentRoot.classList.add('eh-collapsed');
 
-    // 插入位置：缩略图上方
-    grid.parentNode.insertBefore(preview, grid);
-  }
-
-  function showCommentsModal(originalRoot) {
-    if (document.getElementById('eh-comment-modal')) return;
-    const overlay = document.createElement('div');
-    overlay.id = 'eh-comment-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;';
-    const panel = document.createElement('div');
-    panel.className = 'eh-comment-panel';
-    const theme = getThemeColors();
-    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);`;
-    
-    const isMobile = window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
-    
-    // 顶部拖拽指示条（移动端居中模式不显示，桌面仅作装饰）
-    const dragHandle = document.createElement('div');
-    dragHandle.className = 'eh-drag-handle';
-    
-    // 移动端不再需要拖拽逻辑（改为居中卡片，靠 CSS overflow 滚动）
-    // 仅保留视口高度自适应（软键盘弹出时收缩）
-    if (isMobile && window.visualViewport) {
-      const updateMaxH = () => {
-        const vh = window.visualViewport.height;
-        panel.style.maxHeight = (vh - 80) + 'px';
-      };
-      updateMaxH();
-      window.visualViewport.addEventListener('resize', updateMaxH);
-      
-      const cleanup = () => {
-        window.visualViewport.removeEventListener('resize', updateMaxH);
-      };
-      panel._mobileCleanup = cleanup;
-    }
-    // ============ History Back 支持：按系统/浏览器返回仅关闭弹窗 ============
-    let historyInjected = false;
-    let closingByPopstate = false;
-    try {
-      history.pushState({ ehCommentModal: true }, '', location.href);
-      historyInjected = true;
-    } catch (e) {
-      console.warn('[EH Modern Reader] pushState 评论弹窗失败', e);
-    }
-    const popHandler = (ev) => {
-      if (document.getElementById('eh-comment-modal')) {
-        closingByPopstate = true;
-        if (panel._mobileCleanup) panel._mobileCleanup();
-        restoreRoot();
-        overlay.remove();
-        window.removeEventListener('popstate', popHandler);
-      }
-    };
-    window.addEventListener('popstate', popHandler);
-  const header = document.createElement('div');
-  header.className = 'eh-comment-header';
-  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
-    const hTitle = document.createElement('div');
-    hTitle.textContent = '全部评论';
-    hTitle.style.fontWeight = '600';
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '关闭';
-    closeBtn.style.cssText = 'cursor:pointer;padding:4px 10px;font-size:12px;';
-
-    // 占位符用于恢复评论区原位
-    const placeholderId = 'eh-comment-placeholder';
-    let placeholder = document.getElementById(placeholderId);
-    if (!placeholder) {
-      placeholder = document.createElement('div');
-      placeholder.id = placeholderId;
-      placeholder.style.display = 'none';
-      originalRoot.parentNode.insertBefore(placeholder, originalRoot.nextSibling);
-    }
-    const restoreRoot = () => {
-      if (placeholder && placeholder.parentNode) {
-        originalRoot.style.display = 'none';
-        placeholder.parentNode.insertBefore(originalRoot, placeholder);
-        placeholder.remove();
-      }
-    };
-    closeBtn.onclick = () => {
-      if (panel._mobileCleanup) panel._mobileCleanup();
-      restoreRoot();
-      overlay.remove();
-      if (historyInjected && !closingByPopstate) {
-        window.removeEventListener('popstate', popHandler);
-        try { history.back(); } catch (_) {}
-      }
-    };
-
-  header.appendChild(hTitle);
-    header.appendChild(closeBtn);
-  panel.appendChild(dragHandle);
-  panel.appendChild(header);
-
-    // 将原始评论树移动进弹窗，避免背景响应
-    originalRoot.style.display = 'block';
-    originalRoot.querySelectorAll('.c1').forEach(el => {
-      el.style.background = 'transparent';
-      el.style.borderColor = theme.border;
-      el.style.color = theme.text;
-    });
-    panel.appendChild(originalRoot);
-    overlay.appendChild(panel);
-    document.body.appendChild(overlay);
-
-    // 锁定背景滚动，仅允许弹窗内部滚动
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const restore = () => { document.body.style.overflow = prevOverflow || ''; };
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) {
-        if (panel._mobileCleanup) panel._mobileCleanup();
-        restoreRoot();
-        overlay.remove();
-        if (historyInjected && !closingByPopstate) {
-          window.removeEventListener('popstate', popHandler);
-          try { history.back(); } catch (_) {}
-        }
-        restore();
-      }
-    });
-    const escHandler = (e) => {
-      if (e.key === 'Escape') {
-        if (panel._mobileCleanup) panel._mobileCleanup();
-        restoreRoot();
-        overlay.remove();
-        if (historyInjected && !closingByPopstate) {
-          window.removeEventListener('popstate', popHandler);
-          try { history.back(); } catch (_) {}
-        }
-        document.removeEventListener('keydown', escHandler);
-        restore();
-      }
-    };
-    document.addEventListener('keydown', escHandler);
-    const cleanupOnRemove = new MutationObserver(() => {
-      if (!document.body.contains(overlay)) { restore(); cleanupOnRemove.disconnect(); }
-    });
-    cleanupOnRemove.observe(document.body, { childList: true });
-    // 防滚动穿透
-    panel.addEventListener('wheel', (ev) => { ev.stopPropagation(); }, { passive: false });
-    // 阻断 hover 事件向上传播，避免影响页面上方的评论预览
-    const stopHover = (ev) => ev.stopPropagation();
-    panel.addEventListener('mouseover', stopHover, true);
-    panel.addEventListener('mouseout', stopHover, true);
-    panel.addEventListener('mouseenter', stopHover, true);
-    panel.addEventListener('mouseleave', stopHover, true);
-
-    // 将“悬停显示分数详情”改为“点击分数开关详情（仅在弹窗内部生效）”
-    panel.addEventListener('click', (ev) => {
-      const target = ev.target;
-      if (!target) return;
-      const comment = target.closest && target.closest('.c1');
-      if (!comment) return;
-      // 识别“分数”元素：优先匹配 c6，其次包含“分数”的文本节点容器
-      const scoreEl = target.closest('.c6, .score, span, a');
-      if (!scoreEl) return;
-      const text = (scoreEl.textContent || '').trim();
-      if (!/(分数|score)/i.test(text)) return;
-
-      ev.preventDefault();
-      ev.stopPropagation();
-
-      let box = comment.querySelector('.eh-vote-details');
-      if (box) {
-        // 二次点击直接移除元素，避免 display 被站点样式覆盖导致无法收起
-        box.remove();
-        return;
-      }
-      // 新建详情面板
-      box = document.createElement('div');
-      const theme2 = getThemeColors();
-      box.className = 'eh-vote-details';
-      box.style.cssText = `margin:6px 0 2px; padding:6px 8px; border:1px solid ${theme2.border}; border-radius:4px; background:transparent; color:${theme2.text}; font-size:12px; line-height:1.4;`;
-
-      // 尝试来源1：title 提示
-      const titleTip = scoreEl.getAttribute('title');
-      if (titleTip) {
-        box.textContent = titleTip;
+    expandBtn.onclick = (e) => {
+      e.preventDefault();
+      const collapsed = commentRoot.classList.contains('eh-collapsed');
+      if (collapsed) {
+        commentRoot.classList.remove('eh-collapsed');
+        expandBtn.textContent = '收起评论';
       } else {
-        // 尝试来源2：同条评论内可能存在的投票详情块（类名猜测）
-        const candidate = comment.querySelector('.cvote, .cvotes, .c7');
-        if (candidate) {
-          box.appendChild(candidate.cloneNode(true));
-        } else {
-          box.textContent = '投票详情';
-        }
+        commentRoot.classList.add('eh-collapsed');
+        expandBtn.textContent = '展开全部评论';
+        // 滚动回预览顶部，防止长列表末尾收起后用户位置迷失
+        try { preview.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_) {}
       }
-      comment.appendChild(box);
-    }, true);
+    };
 
-    // 在弹窗内拦截“展开全部评论”点击，防止跳转导致弹窗关闭，改为本地展开
-    panel.addEventListener('click', (ev) => {
-      const trigger = ev.target && ev.target.closest && ev.target.closest('a,button');
-      if (!trigger) return;
-      const txt = (trigger.textContent || '').trim();
-      if (!/(展开全部|展开|expand all|show all)/i.test(txt)) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-      try {
-        // 解除内联 max-height 折叠
-        panel.querySelectorAll('[style*="max-height"]').forEach(n => { n.style.maxHeight = 'none'; });
-        // 显示被隐藏的评论项
-        panel.querySelectorAll('.c1, .c2, .c3').forEach(n => {
-          if (n.style && /display\s*:\s*none/i.test(n.style.cssText)) {
-            n.style.display = 'block';
-          }
-        });
-        // 去除常见折叠类名
-        panel.querySelectorAll('.collapsed, .folded, .hide, .noshow').forEach(n => {
-          n.classList.remove('collapsed');
-          n.classList.remove('folded');
-          n.classList.remove('hide');
-          n.classList.remove('noshow');
-        });
-        // 尝试调用原 onclick（若存在）以兼容站点逻辑，但不冒泡
-        if (typeof trigger.onclick === 'function') {
-          try { trigger.onclick.call(trigger, new Event('click', { bubbles: false, cancelable: true })); } catch {}
-        }
-        console.log('[EH Modern Reader] 已在弹窗内本地展开全部评论');
-      } catch (e) {
-        console.warn('[EH Modern Reader] 本地展开全部评论失败', e);
-      }
-    }, true);
+    // 插入位置：缩略图上方（包裹容器包住预览 + 原始评论树）
+    wrapper.appendChild(preview);
+    wrapper.appendChild(commentRoot);
+    grid.parentNode.insertBefore(wrapper, grid);
   }
 
-  // 为缩略图添加占位背景，减轻加载抖动
+  // 移除旧全屏评论页方案（已用居中容器替代）
+  // ================= 占位样式补充（展开全部缩略图后） =================
   function applyThumbnailPlaceholders() {
+    const grid = document.getElementById('gdt');
+    if (!grid) return;
     const theme = getThemeColors();
-    const placeholder = theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-    const thumbs = document.querySelectorAll('#gdt a[href*="/s/"] > div');
-    thumbs.forEach(div => {
-      // 保留原始背景图，仅增加底色与边框，且若无高度则给一个最小高度
-      div.style.backgroundColor = placeholder;
-      if (!div.style.border) div.style.border = `1px solid ${theme.border}`;
-      if (!div.style.borderRadius) div.style.borderRadius = '4px';
-      if (!div.style.height) div.style.minHeight = '220px';
+    grid.querySelectorAll('a[href*="/s/"] div').forEach(div => {
+      if (!div.dataset.ehSkeletonApplied) {
+        div.dataset.ehSkeletonApplied = '1';
+        // 若图片尚未加载给一个淡背景，已加载则保持原样
+        if (!div.querySelector('img')) {
+          div.style.background = theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+          div.style.border = `1px solid ${theme.border}`;
+          div.style.borderRadius = '4px';
+          div.style.minHeight = '140px';
+        }
+      }
     });
   }
-
-  function initCommentsFeature() {
-    buildCommentsPreview();
-    applyThumbnailPlaceholders();
-    // 隐藏原站点的页码区（例如 “1 - 20，共 195 张图像”），避免与扩展的页码信息重复
-    try {
-      document.querySelectorAll('.gpc').forEach(el => {
-        el.style.display = 'none';
-        el.setAttribute('aria-hidden', 'true');
-      });
-    } catch {}
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(initCommentsFeature, 200));
-  } else {
-    setTimeout(initCommentsFeature, 50);
-  }
-
 })();
