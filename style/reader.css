@@ -262,7 +262,7 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
 /* ========== 评论弹窗响应式 ========== */
 #eh-comment-modal { padding: 40px; box-sizing: border-box; }
 #eh-comment-modal .eh-comment-panel {
-  max-width: 900px;
+  max-width: min(900px, 96vw);
   width: 100%;
   max-height: 100%;
   overflow: auto;
@@ -271,16 +271,36 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
   box-sizing: border-box;
 }
 @media (max-width: 860px) {
-  #eh-comment-modal { padding: 14px !important; }
-  #eh-comment-modal .eh-comment-panel { max-width: 100%; border-radius: 4px; padding: 12px 14px !important; max-height: calc(100vh - 28px); }
+  #eh-comment-modal { padding: 18px !important; }
+  #eh-comment-modal .eh-comment-panel {
+    max-width: calc(100% - 12px);
+    border-radius: 6px;
+    padding: 14px 16px !important;
+    max-height: calc(100vh - 36px);
+    border-width: 2px; /* 提升边界可见性 */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    font-size: 15px;
+    line-height: 1.6;
+  }
 }
 @media (max-width: 600px) {
-  #eh-comment-modal { padding: 12px 10px 12px 10px !important; }
-  #eh-comment-modal .eh-comment-panel { border-radius: 6px; max-height: calc(100vh - 24px); padding: 12px 14px !important; }
+  #eh-comment-modal { padding: 16px 12px 16px 12px !important; }
+  #eh-comment-modal .eh-comment-panel {
+    border-radius: 6px;
+    max-height: calc(100vh - 32px);
+    padding: 14px 16px !important;
+    border-width: 2px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.5);
+    font-size: 16px; /* 手机上略大些更可读 */
+    line-height: 1.65;
+  }
 }
 @supports(padding: max(0px)) { /* 刘海/安全区适配 */
-  #eh-comment-modal { padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)) !important; }
+  #eh-comment-modal { padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important; }
 }
+/* 提升边框可辨识度：浅色/深色模式给一个细 outline */
+body:not(.eh-dark-mode) #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(0,0,0,0.08); }
+body.eh-dark-mode #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(255,255,255,0.14); }
 
 .eh-ch-skeleton::before {
   content: '';
