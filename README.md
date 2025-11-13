@@ -2,7 +2,7 @@
 
 现代化的 E-Hentai / ExHentai 阅读器扩展，支持 MPV 与 Gallery 双模式、智能节流、持久缓存与永久阅读进度。
 
-![Version](https://img.shields.io/badge/version-2.3.0-blue)
+![Version](https://img.shields.io/badge/version-2.3.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
@@ -41,6 +41,9 @@ Chrome/Edge（开发者模式）
 ## 发布与下载
 
 - 最新版本与变更说明见 GitHub Releases：`https://github.com/MeiYongAI/EH-Modern-Reader/releases`
+- v2.3.1 要点：
+    - 修复 MPV 图片页链接域名在 e/ex 间不一致导致的抓取失败
+    - 为旧版 Chromium (116) 增加 `credentials/referrer` 以提升抓取稳定性
 - v2.3.0 要点：
     - MPV 主图真实 URL 持久化缓存（24h 过期）
     - 画廊展开结果会话缓存（返回即刻恢复）

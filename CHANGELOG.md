@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.2.0] - 2025-11-13
 ## [2.2.1] - 2025-11-13
 ## [2.2.2] - 2025-11-13
+## [2.3.1] - 2025-11-13
+### Fixed
+- MPV 图片页链接改为使用当前站点的 origin 构造 `/s/` URL，自动兼容 e-hentai 与 exhentai。
+- 为 `fetchRealImageUrl` 补充 `credentials: include` 与 `referrer`，修复 Chromium 116 环境下偶发获取失败。
+
 ## [2.3.0] - 2025-11-13
 ### Added
 - 持久图片缓存：

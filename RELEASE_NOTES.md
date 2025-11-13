@@ -1,5 +1,12 @@
 # Release Notes
 
+## v2.3.1 (2025-11-13)
+### Fixes
+- MPV 图片页链接域名修正：/s/ 链接改为基于当前站点 origin 构造，自动兼容 e-hentai.org 与 exhentai.org，解决抓取失败与异常重定向。
+- 旧版 Chromium 兼容性：为 `fetchRealImageUrl` 增加 `credentials: include` 与 `referrer`，修复 116.0.5845.97 环境下偶发获取失败。
+
+---
+
 ## v2.3.0 (2025-11-13)
 ### Features
 - 永久阅读记录：最后阅读页保存在 `chrome.storage.local`（回退 `localStorage`），跨标签/重启浏览器仍保留。
