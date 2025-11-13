@@ -660,6 +660,24 @@
   // 顶部拖拽指示条（仅移动端视觉辅助，不承载实际拖拽逻辑）
   const dragHandle = document.createElement('div');
   dragHandle.style.cssText = 'width:42px;height:5px;border-radius:3px;background:rgba(128,128,128,0.35);margin:4px auto 12px;';
+    // ============ History Back 支持：按系统/浏览器返回仅关闭弹窗 ============
+    let historyInjected = false;
+    let closingByPopstate = false;
+    try {
+      history.pushState({ ehCommentModal: true }, '', location.href);
+      historyInjected = true;
+    } catch (e) {
+      console.warn('[EH Modern Reader] pushState 评论弹窗失败', e);
+    }
+    const popHandler = (ev) => {
+      if (document.getElementById('eh-comment-modal')) {
+        closingByPopstate = true;
+        restoreRoot();
+        overlay.remove();
+        window.removeEventListener('popstate', popHandler);
+      }
+    };
+    window.addEventListener('popstate', popHandler);
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
     const hTitle = document.createElement('div');
@@ -685,7 +703,15 @@
         placeholder.remove();
       }
     };
-    closeBtn.onclick = () => { restoreRoot(); overlay.remove(); };
+    closeBtn.onclick = () => {
+      restoreRoot();
+      overlay.remove();
+      // 若我们曾 pushState，主动回退一次消费该历史；避免堆积虚假历史项
+      if (historyInjected && !closingByPopstate) {
+        window.removeEventListener('popstate', popHandler); // 先移除监听，避免重复关闭
+        try { history.back(); } catch (_) {}
+      }
+    };
 
   header.appendChild(hTitle);
     header.appendChild(closeBtn);
@@ -707,8 +733,29 @@
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const restore = () => { document.body.style.overflow = prevOverflow || ''; };
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) { restoreRoot(); overlay.remove(); restore(); } });
-    const escHandler = (e) => { if (e.key === 'Escape') { restoreRoot(); overlay.remove(); document.removeEventListener('keydown', escHandler); restore(); } };
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        restoreRoot();
+        overlay.remove();
+        if (historyInjected && !closingByPopstate) {
+          window.removeEventListener('popstate', popHandler);
+          try { history.back(); } catch (_) {}
+        }
+        restore();
+      }
+    });
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        restoreRoot();
+        overlay.remove();
+        if (historyInjected && !closingByPopstate) {
+          window.removeEventListener('popstate', popHandler);
+          try { history.back(); } catch (_) {}
+        }
+        document.removeEventListener('keydown', escHandler);
+        restore();
+      }
+    };
     document.addEventListener('keydown', escHandler);
     const cleanupOnRemove = new MutationObserver(() => {
       if (!document.body.contains(overlay)) { restore(); cleanupOnRemove.disconnect(); }
