@@ -383,23 +383,31 @@
     buttonContainer.appendChild(icon);
     buttonContainer.appendChild(document.createTextNode(' '));
     buttonContainer.appendChild(button);
-    // 分隔符与评论按钮（保持同一行，避免不美观换行）
-    buttonContainer.appendChild(document.createTextNode(' · '));
-    const commentBtn = document.createElement('a');
-    commentBtn.href = '#view-comments';
-    commentBtn.textContent = '查看评论';
-    commentBtn.onclick = (e) => { e.preventDefault(); openCommentsOverlay(); };
-    buttonContainer.appendChild(commentBtn);
+
+    // 单独的“查看评论”栏目
+    const commentContainer = document.createElement('p');
+    commentContainer.className = 'g2 gsp';
+    const commentLink = document.createElement('a');
+    commentLink.href = '#view-comments';
+    commentLink.textContent = '查看评论';
+    commentLink.onclick = (e) => { e.preventDefault(); openCommentsOverlay(); };
+    commentContainer.appendChild(commentLink);
 
     // 插入到 MPV 按钮下方（如果存在）或顶部
+    let insertAfterRef = null;
     if (mpvLink) {
-      const mpvParent = mpvLink.closest('p');
-      mpvParent.parentNode.insertBefore(buttonContainer, mpvParent.nextSibling);
+      insertAfterRef = mpvLink.closest('p');
+    }
+    if (insertAfterRef) {
+      insertAfterRef.parentNode.insertBefore(buttonContainer, insertAfterRef.nextSibling);
+      buttonContainer.parentNode.insertBefore(commentContainer, buttonContainer.nextSibling);
     } else {
-      actionPanel.insertBefore(buttonContainer, actionPanel.firstChild);
+      // 插入到面板顶部：先 Reader，再评论
+      actionPanel.insertBefore(commentContainer, actionPanel.firstChild);
+      actionPanel.insertBefore(buttonContainer, commentContainer);
     }
 
-    console.log('[EH Reader] Launch & comments buttons added to Gallery page');
+    console.log('[EH Reader] Launch button and separate comment entry added');
   }
 
   // 页面加载完成后添加按钮
