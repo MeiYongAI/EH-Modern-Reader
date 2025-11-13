@@ -656,10 +656,73 @@
     const panel = document.createElement('div');
     panel.className = 'eh-comment-panel';
     const theme = getThemeColors();
-  panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;-webkit-overflow-scrolling:touch;`;
-  // 顶部拖拽指示条（仅移动端视觉辅助，不承载实际拖拽逻辑）
-  const dragHandle = document.createElement('div');
-  dragHandle.style.cssText = 'width:42px;height:5px;border-radius:3px;background:rgba(128,128,128,0.35);margin:4px auto 12px;';
+    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;-webkit-overflow-scrolling:touch;`;
+    const isMobileSheet = window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
+    // 顶部拖拽指示条（移动端：可拖动改变高度；桌面仅作装饰）
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'eh-drag-handle';
+    if (isMobileSheet) {
+      panel.classList.add('eh-comment-sheet');
+      // 覆盖圆角为顶部圆角，宽度占满
+      panel.style.borderRadius = '12px 12px 0 0';
+      panel.style.maxWidth = '100vw';
+      panel.style.width = '100vw';
+      // 初始高度 82dvh（由 CSS 提供）；确保最大高度贴合可视窗口
+      const setPanelHeightVH = (vh) => {
+        vh = Math.max(50, Math.min(95, vh));
+        // 优先使用 dvh，降级到 vh
+        panel.style.height = (CSS && 'supports' in CSS && CSS.supports('height', '1dvh')) ? `${vh}dvh` : `${vh}vh`;
+      };
+      // 拖拽逻辑（仅 handle 区域生效）
+      let startY = 0, startH = 0, dragging = false;
+      const getViewportH = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+      const pxToVh = (px) => 100 * px / getViewportH();
+      const onPointerDown = (ev) => {
+        const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        startY = y;
+        const rect = panel.getBoundingClientRect();
+        startH = pxToVh(rect.height);
+        dragging = true;
+        ev.preventDefault();
+      };
+      const onPointerMove = (ev) => {
+        if (!dragging) return;
+        const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
+        const delta = y - startY; // 向下为正，降低高度
+        const next = startH - pxToVh(delta);
+        setPanelHeightVH(next);
+        ev.preventDefault();
+      };
+      const onPointerUp = (ev) => {
+        if (!dragging) return;
+        dragging = false;
+        const rect = panel.getBoundingClientRect();
+        const current = pxToVh(rect.height);
+        // 吸附到 55 / 80 / 95 三档
+        const snaps = [55, 80, 95];
+        let best = snaps[0], mind = 999;
+        for (const s of snaps) { const d = Math.abs(s - current); if (d < mind) { mind = d; best = s; } }
+        setPanelHeightVH(best);
+      };
+      dragHandle.addEventListener('touchstart', onPointerDown, { passive: false });
+      dragHandle.addEventListener('touchmove', onPointerMove, { passive: false });
+      dragHandle.addEventListener('touchend', onPointerUp, { passive: false });
+      dragHandle.addEventListener('mousedown', onPointerDown);
+      window.addEventListener('mousemove', onPointerMove);
+      window.addEventListener('mouseup', onPointerUp);
+      // 视口变化（地址栏显隐/软键盘）时更新最大高度
+      const updateMaxH = () => {
+        const vh = getViewportH();
+        panel.style.maxHeight = (vh - 12) + 'px';
+      };
+      updateMaxH();
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', updateMaxH);
+      overlay.addEventListener('remove', () => {
+        window.removeEventListener('mousemove', onPointerMove);
+        window.removeEventListener('mouseup', onPointerUp);
+        if (window.visualViewport) window.visualViewport.removeEventListener('resize', updateMaxH);
+      });
+    }
     // ============ History Back 支持：按系统/浏览器返回仅关闭弹窗 ============
     let historyInjected = false;
     let closingByPopstate = false;
@@ -678,8 +741,9 @@
       }
     };
     window.addEventListener('popstate', popHandler);
-    const header = document.createElement('div');
-    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  const header = document.createElement('div');
+  header.className = 'eh-comment-header';
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
     const hTitle = document.createElement('div');
     hTitle.textContent = '全部评论';
     hTitle.style.fontWeight = '600';

@@ -270,6 +270,20 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
   flex-direction: column;
   box-sizing: border-box;
 }
+/* 底部抽屉式（移动端） */
+#eh-comment-modal .eh-comment-sheet {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  width: 100vw;
+  max-height: calc(100dvh - 12px);
+  height: 82dvh; /* 初始高度，可被 JS 动态调整为 50~95dvh */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#eh-comment-modal .eh-comment-header { position: sticky; top: 0; z-index: 1; }
+#eh-comment-modal .eh-drag-handle { width: 44px; height: 5px; border-radius: 3px; background: rgba(128,128,128,0.35); margin: 8px auto 10px; touch-action: none; }
 @media (max-width: 860px) {
   #eh-comment-modal { padding: 18px !important; }
   #eh-comment-modal .eh-comment-panel {
