@@ -383,13 +383,12 @@
     buttonContainer.appendChild(icon);
     buttonContainer.appendChild(document.createTextNode(' '));
     buttonContainer.appendChild(button);
-    // 评论查看按钮（替代顶部预览区）
+    // 分隔符与评论按钮（保持同一行，避免不美观换行）
+    buttonContainer.appendChild(document.createTextNode(' · '));
     const commentBtn = document.createElement('a');
     commentBtn.href = '#view-comments';
     commentBtn.textContent = '查看评论';
-    commentBtn.style.cssText = 'margin-left:12px;';
     commentBtn.onclick = (e) => { e.preventDefault(); openCommentsOverlay(); };
-    buttonContainer.appendChild(document.createTextNode(' '));
     buttonContainer.appendChild(commentBtn);
 
     // 插入到 MPV 按钮下方（如果存在）或顶部
@@ -605,12 +604,29 @@
     closeBtn.textContent = '关闭';
     closeBtn.style.cssText = 'cursor:pointer;font-size:12px;padding:4px 10px;border:1px solid '+theme.border+';background:transparent;border-radius:4px;';
     header.appendChild(title); header.appendChild(closeBtn); panel.appendChild(header);
+    // 占位符用于关闭时恢复原位置
+    const placeholderId = 'eh-comment-overlay-placeholder';
+    let placeholder = document.getElementById(placeholderId);
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.id = placeholderId;
+      placeholder.style.display = 'none';
+      commentRoot.parentNode.insertBefore(placeholder, commentRoot.nextSibling);
+    }
     commentRoot.style.display = 'block';
     panel.appendChild(commentRoot);
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
-    const restore = () => { commentRoot.style.display = 'none'; overlay.remove(); document.body.style.overflow=''; };
-    closeBtn.onclick = restore; overlay.addEventListener('click',(e)=>{ if(e.target===overlay) restore(); });
+    const restore = () => {
+      if (placeholder && placeholder.parentNode) {
+        commentRoot.style.display = 'none';
+        placeholder.parentNode.insertBefore(commentRoot, placeholder);
+      }
+      overlay.remove();
+      document.body.style.overflow='';
+    };
+    closeBtn.onclick = restore;
+    overlay.addEventListener('click',(e)=>{ if(e.target===overlay) restore(); });
     const escHandler=(e)=>{ if(e.key==='Escape'){ restore(); document.removeEventListener('keydown',escHandler);} }; document.addEventListener('keydown',escHandler);
     document.body.style.overflow='hidden';
   }
