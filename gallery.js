@@ -387,10 +387,15 @@
     // 单独的“查看评论”栏目
     const commentContainer = document.createElement('p');
     commentContainer.className = 'g2 gsp';
+    // 与其它项保持一致：添加同样的图标与空格，保证对齐与箭头样式
+    const commentIcon = document.createElement('img');
+    commentIcon.src = 'https://ehgt.org/g/mr.gif';
     const commentLink = document.createElement('a');
     commentLink.href = '#view-comments';
     commentLink.textContent = '查看评论';
     commentLink.onclick = (e) => { e.preventDefault(); openCommentsOverlay(); };
+    commentContainer.appendChild(commentIcon);
+    commentContainer.appendChild(document.createTextNode(' '));
     commentContainer.appendChild(commentLink);
 
     // 插入到 MPV 按钮下方（如果存在）或顶部
@@ -506,13 +511,22 @@
             .then((doc) => {
               const links = doc.querySelectorAll('#gdt a[href*="/s/"]');
               const frag = document.createDocumentFragment();
+              // 克隆包含缩略图的容器（.gdtm 或 .gdtl），保持原布局结构
               links.forEach(a => {
-                const wrapper = document.createElement('a');
-                wrapper.href = a.getAttribute('href');
-                // 子 div 作为缩略图容器
-                const div = a.querySelector('div');
-                wrapper.appendChild(div ? div.cloneNode(true) : document.createTextNode(''));
-                frag.appendChild(wrapper);
+                const container = a.closest('.gdtm, .gdtl') || a;
+                const cloned = container.cloneNode(true);
+                if (cloned.nodeType === 1) cloned.setAttribute('data-eh-expanded', '1');
+                // 处理懒加载属性，确保图片可见
+                cloned.querySelectorAll('img').forEach(img => {
+                  const ds = img.getAttribute('data-src') || img.getAttribute('data-lazy') || img.getAttribute('data-original');
+                  if (ds && (!img.getAttribute('src') || img.getAttribute('src') === '')) {
+                    img.setAttribute('src', ds);
+                  }
+                  img.loading = 'eager';
+                  img.decoding = 'sync';
+                  img.style.opacity = '1';
+                });
+                frag.appendChild(cloned);
               });
               results[idx] = frag;
             })
@@ -530,6 +544,8 @@
     }
     // 展开后补充缩略图占位样式
     applyThumbnailPlaceholders();
+    // 启动持久化观察，防止站点脚本后续删除已展开的缩略图
+    startThumbnailPersistenceObserver();
 
     // 移除分页条
     document.querySelectorAll('.ptt, .ptb').forEach(el => el.remove());
@@ -644,18 +660,46 @@
   function applyThumbnailPlaceholders() {
     const grid = document.getElementById('gdt');
     if (!grid) return;
-    const theme = getThemeColors();
-    grid.querySelectorAll('a[href*="/s/"] div').forEach(div => {
-      if (!div.dataset.ehSkeletonApplied) {
-        div.dataset.ehSkeletonApplied = '1';
-        // 若图片尚未加载给一个淡背景，已加载则保持原样
-        if (!div.querySelector('img')) {
-          div.style.background = theme.dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
-          div.style.border = `1px solid ${theme.border}`;
-          div.style.borderRadius = '4px';
+    const candidates = grid.querySelectorAll('#gdt a[href*="/s/"] div, #gdt .glthumb, #gdt .glthumb div');
+    candidates.forEach(div => {
+      const cs = getComputedStyle(div);
+      const hasBg = cs.backgroundImage && cs.backgroundImage !== 'none';
+      const hasImg = !!div.querySelector('img[src]');
+      if (hasBg || hasImg) {
+        // 已有真实缩略图，移除占位样式
+        if (div.dataset.ehSkeletonApplied) {
+          div.style.background = '';
+          div.style.border = '';
+          div.style.borderRadius = '';
+          div.style.minHeight = '';
+          delete div.dataset.ehSkeletonApplied;
+        }
+      } else {
+        // 仅在确实没有图像时，给一个最小高度维持布局；不要覆盖背景以免挡图
+        if (!div.dataset.ehSkeletonApplied) {
+          div.dataset.ehSkeletonApplied = '1';
           div.style.minHeight = '140px';
         }
       }
     });
+  }
+
+  // 监控克隆缩略图被站点脚本意外移除时自动恢复
+  function startThumbnailPersistenceObserver() {
+    const grid = document.getElementById('gdt');
+    if (!grid) return;
+    if (window.__ehThumbObserver) return; // 已启动
+    const expanded = () => Array.from(grid.querySelectorAll('[data-eh-expanded="1"]'));
+    const baseline = new Set(expanded());
+    const observer = new MutationObserver((mutations) => {
+      // 若发现我们标记的节点消失则重新追加
+      baseline.forEach(node => {
+        if (!node.isConnected) {
+          grid.appendChild(node);
+        }
+      });
+    });
+    observer.observe(grid, { childList: true });
+    window.__ehThumbObserver = observer;
   }
 })();

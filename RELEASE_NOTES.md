@@ -1,5 +1,53 @@
 # Release Notes
 
+## v2.2.1 (2025-11-13)
+### Fixes
+- 画廊滚动后缩略图消失：正确克隆 `.gdtm/.gdtl` 容器并强制加载图片，加入持久化观察避免被站点脚本移除。
+- 占位灰块遮挡缩略图：移除灰色背景覆盖，只在无图片时设置 `min-height`，检测到图片后自动清理占位样式。
+- “查看评论”菜单与其他项对齐：补充同款小图标与空格，维持原站箭头样式。
+
+### Cleanups
+- `style/gallery.css` 移除旧的 `#eh-comments-wrapper` 预览样式，仅保留分页隐藏规则（消闪）。
+
+---
+
+## v2.2.0 (2025-11-13)
+### Features
+- 全屏评论页（方案A，参考JHenTai）
+  - 顶部AppBar + 滚动内容区 + 悬浮“发评论”按钮
+  - 桌面端优先体验；移动端自适应
+  - 返回键/ESC 关闭，仅关闭评论页
+  - 发评论在新窗口进行（避免影响阅读页）
+
+### Notes
+- 文件保存为UTF-8编码
+- 旧的模态弹窗已停用，后续将考虑删除遗留代码
+
+## v2.1.16 (2025-11-13)
+### Bug Fixes
+- 修复桌面端和移动端评论模态框滚动问题
+- 移除panel的`display: flex; flex-direction: column;`布局,防止子元素撑开容器高度
+- 为评论内容区域`#cdiv`添加CSS规则:`max-height: none; overflow: visible; height: auto`
+- JS中为originalRoot设置样式确保其不会限制panel的滚动行为
+- 强制`overflow-y: auto !important`和`overflow-x: hidden`
+- 桌面端和移动端现在都正确显示为固定高度的可滚动卡片窗口
+
+## v2.1.15 (2025-11-13)
+### Bug Fixes
+- **移动端评论模态框卡片边界修复**
+  - 为panel添加明确的`padding: 16px 20px`和`border-radius: 10px`
+  - 增强边框粗细至2px,提升可辨识度
+  - 设置`overflow-y: auto !important`确保评论内容在panel容器内部滚动
+  - 所有关键样式添加`!important`防止被覆盖
+  - 现在移动端显示为清晰的卡片窗口,四周有留白,内容可滚动
+
+## v2.1.14 (2025-11-13)
+### Bug Fixes
+- **移动端评论模态框居中显示修复**
+  - 在overlay的inline style中直接添加`display:flex; align-items:center; justify-content:center`
+  - 增强CSS的`!important`优先级以确保flexbox居中布局生效
+  - 修复之前版本中模态框未正确垂直居中的问题
+
 ## v2.1.13 (2025-11-13)
 
 移动端评论弹窗体验优化

@@ -5,6 +5,47 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-11-13
+## [2.2.1] - 2025-11-13
+### Fixed
+- 画廊页追加缩略图在滚动后“闪没”：改为克隆 `.gdtm/.gdtl` 容器保持原有网格结构，并强制把 `data-src` 写回 `src`；新增持久化观察避免站点脚本移除。
+- 灰色占位覆盖真实缩略图：移除占位背景，仅在确无图片时设置最小高度，并在图片出现后清理占位样式。
+- “查看评论”菜单：与其它项统一结构（带图标与空格），对齐站点箭头样式。
+
+### Cleanups
+- 删除不再使用的 `#eh-comments-wrapper` 相关样式，保留仅用于消除分页闪现的早期样式注入。
+
+### Added
+- 全屏评论页（方案A，参考JHenTai）
+  - 新增 `#eh-comment-page`：独立页面壳 + 顶部AppBar + 滚动内容区 + 悬浮“发评论”按钮
+  - 桌面端优先：最大宽度980px，内容区域独立滚动
+  - 系统返回键 / ESC 关闭评论页，不影响页面导航
+  - “发评论”按钮在新窗口打开站点原生评论位置
+
+### Changed
+- 旧的模态弹窗路径不再触发，改为进入全屏评论页
+
+## [2.1.16] - 2025-11-13
+### Fixed
+- 修复桌面端和移动端评论模态框滚动问题
+- 移除panel的flex-direction布局,防止内容撑开容器
+- 为#cdiv添加样式覆盖,确保评论内容不限制panel高度
+- 强制overflow-y:auto生效,确保panel内部可滚动
+- 桌面端和移动端现在都正确显示为可滚动的卡片窗口
+
+## [2.1.15] - 2025-11-13
+### Fixed
+- 修复移动端评论模态框边界显示问题
+- 为panel添加明确的内边距、圆角、边框和滚动容器
+- 增强border粗细(2px)和!important优先级确保卡片样式生效
+- 设置overflow-y:auto确保评论内容在panel内部滚动
+
+## [2.1.14] - 2025-11-13
+### Fixed
+- 修复移动端评论模态框居中显示问题
+- 在overlay的inline style中添加flex布局,确保垂直居中生效
+- 增强CSS !important优先级,覆盖可能的样式冲突
+
 ## [2.1.0] - 2025-11-12
 
 ### ✨ 新增

@@ -264,29 +264,32 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
 #eh-comment-modal { 
   padding: 40px; 
   box-sizing: border-box; 
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 #eh-comment-modal .eh-comment-panel {
   max-width: 900px;
   width: 100%;
   max-height: 85vh;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto !important;
+  overflow-x: hidden;
   box-sizing: border-box;
   position: relative;
+  border-radius: 8px;
 }
 #eh-comment-modal .eh-comment-header { 
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding-bottom: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+/* 评论内容区域不阻止滚动 */
+#eh-comment-modal #cdiv {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
 }
 #eh-comment-modal .eh-drag-handle { 
   width: 44px; 
@@ -302,21 +305,24 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
 @media (max-width: 860px) {
   #eh-comment-modal {
     padding: 16px !important;
-    align-items: center;
-    justify-content: center;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
   #eh-comment-modal .eh-comment-panel {
     position: relative;
     width: calc(100vw - 32px);
     max-width: calc(100vw - 32px);
-    height: auto;
-    max-height: calc(100vh - 80px);
-    border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    max-height: calc(100vh - 80px) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
     font-size: 15px;
     line-height: 1.6;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 16px 20px !important;
   }
   #eh-comment-modal .eh-drag-handle {
     display: none; /* 居中模式不需要拖拽把手 */
@@ -333,6 +339,7 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
     max-height: calc(100vh - 60px);
     font-size: 16px;
     line-height: 1.65;
+    padding: 14px 18px !important;
   }
 }
 
@@ -368,6 +375,91 @@ body.eh-dark-mode #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(
 }
 
 /* ==================== 图片查看区 ==================== */
+
+/* ========== 全屏评论页（方案A） ========== */
+#eh-comment-page {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.55);
+}
+
+#eh-comment-page .eh-page-shell {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 980px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#eh-comment-page .eh-appbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#eh-comment-page .eh-appbar .eh-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+#eh-comment-page .eh-appbar .eh-close-btn {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+#eh-comment-page .eh-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 12px 16px 88px 16px; /* 底部为悬浮按钮留白 */
+  border-radius: 10px;
+  margin: 12px;
+  backdrop-filter: blur(2px);
+}
+
+#eh-comment-page .eh-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 10001;
+}
+
+/* 颜色随主题变换 */
+body:not(.eh-dark-mode) #eh-comment-page .eh-appbar { background: #ffffff; color: #111; border-bottom: 1px solid rgba(0,0,0,0.08); }
+body:not(.eh-dark-mode) #eh-comment-page .eh-content { background: #ffffff; color: #111; outline: 1px solid rgba(0,0,0,0.08); }
+body:not(.eh-dark-mode) #eh-comment-page .eh-fab { background: #1976d2; color: #fff; border: 1px solid rgba(0,0,0,0.12); }
+
+body.eh-dark-mode #eh-comment-page .eh-appbar { background: #1e1e1e; color: #ddd; border-bottom: 1px solid rgba(255,255,255,0.12); }
+body.eh-dark-mode #eh-comment-page .eh-content { background: #1e1e1e; color: #ddd; outline: 1px solid rgba(255,255,255,0.14); }
+body.eh-dark-mode #eh-comment-page .eh-fab { background: #2962ff; color: #fff; border: 1px solid rgba(255,255,255,0.16); }
+
+/* 移动端：全宽显示，外边距减小 */
+@media (max-width: 860px) {
+  #eh-comment-page .eh-page-shell { max-width: none; }
+  #eh-comment-page .eh-content { margin: 8px; padding: 10px 12px 80px 12px; }
+  #eh-comment-page .eh-fab { right: 16px; bottom: 16px; }
+}
+
 
 #eh-viewer {
   flex: 1;
