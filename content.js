@@ -680,15 +680,25 @@
 
 
     // 获取图片 URL - E-Hentai MPV 使用 API 动态加载
+    function getSiteOrigin() {
+      try {
+        if (pageData && pageData.gallery_url) {
+          return new URL(pageData.gallery_url).origin;
+        }
+      } catch {}
+      try { return location.origin; } catch {}
+      return 'https://e-hentai.org';
+    }
     function getImageUrl(pageIndex) {
       const imageData = state.imagelist[pageIndex];
       if (!imageData) return null;
+      const base = getSiteOrigin();
       
       // E-Hentai MPV 格式: {n: 'filename', k: 'key', t: 'thumbnail'}
       // 我们需要使用 E-Hentai API 来获取完整图片
       if (typeof imageData === 'object' && imageData.k) {
         // 返回图片页面 URL，让浏览器处理加载
-        return `https://e-hentai.org/s/${imageData.k}/${pageData.gid}-${pageIndex + 1}`;
+        return `${base}/s/${imageData.k}/${pageData.gid}-${pageIndex + 1}`;
       }
       
       // 兼容其他格式
@@ -697,7 +707,7 @@
           return imageData[0];
         }
         const key = imageData[0];
-        return `https://e-hentai.org/s/${key}/${pageData.gid}-${pageIndex + 1}`;
+        return `${base}/s/${key}/${pageData.gid}-${pageIndex + 1}`;
       }
       
       if (typeof imageData === 'object') {
@@ -887,7 +897,13 @@
       try {
         console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
-        const response = await fetch(pageUrl, { signal });
+        const response = await fetch(pageUrl, {
+          signal,
+          credentials: 'include',
+          mode: 'cors',
+          referrer: location.href,
+          referrerPolicy: 'strict-origin-when-cross-origin'
+        });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
