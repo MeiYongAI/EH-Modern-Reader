@@ -656,7 +656,10 @@
     const panel = document.createElement('div');
     panel.className = 'eh-comment-panel';
     const theme = getThemeColors();
-    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;`;
+  panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;-webkit-overflow-scrolling:touch;`;
+  // 顶部拖拽指示条（仅移动端视觉辅助，不承载实际拖拽逻辑）
+  const dragHandle = document.createElement('div');
+  dragHandle.style.cssText = 'width:42px;height:5px;border-radius:3px;background:rgba(128,128,128,0.35);margin:4px auto 12px;';
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
     const hTitle = document.createElement('div');
@@ -684,9 +687,10 @@
     };
     closeBtn.onclick = () => { restoreRoot(); overlay.remove(); };
 
-    header.appendChild(hTitle);
+  header.appendChild(hTitle);
     header.appendChild(closeBtn);
-    panel.appendChild(header);
+  panel.appendChild(dragHandle);
+  panel.appendChild(header);
 
     // 将原始评论树移动进弹窗，避免背景响应
     originalRoot.style.display = 'block';

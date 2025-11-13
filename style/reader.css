@@ -275,11 +275,11 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
   #eh-comment-modal .eh-comment-panel { max-width: 100%; border-radius: 4px; padding: 12px 14px !important; max-height: calc(100vh - 28px); }
 }
 @media (max-width: 600px) {
-  #eh-comment-modal { padding: 8px !important; }
-  #eh-comment-modal .eh-comment-panel { border-radius: 0; max-height: 100vh; height: 100%; padding: 10px 12px !important; }
+  #eh-comment-modal { padding: 12px 10px 12px 10px !important; }
+  #eh-comment-modal .eh-comment-panel { border-radius: 6px; max-height: calc(100vh - 24px); padding: 12px 14px !important; }
 }
 @supports(padding: max(0px)) { /* 刘海/安全区适配 */
-  #eh-comment-modal { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important; }
+  #eh-comment-modal { padding: max(12px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)) !important; }
 }
 
 .eh-ch-skeleton::before {
