@@ -383,6 +383,14 @@
     buttonContainer.appendChild(icon);
     buttonContainer.appendChild(document.createTextNode(' '));
     buttonContainer.appendChild(button);
+    // 评论查看按钮（替代顶部预览区）
+    const commentBtn = document.createElement('a');
+    commentBtn.href = '#view-comments';
+    commentBtn.textContent = '查看评论';
+    commentBtn.style.cssText = 'margin-left:12px;';
+    commentBtn.onclick = (e) => { e.preventDefault(); openCommentsOverlay(); };
+    buttonContainer.appendChild(document.createTextNode(' '));
+    buttonContainer.appendChild(commentBtn);
 
     // 插入到 MPV 按钮下方（如果存在）或顶部
     if (mpvLink) {
@@ -392,7 +400,7 @@
       actionPanel.insertBefore(buttonContainer, actionPanel.firstChild);
     }
 
-    console.log('[EH Reader] Launch button added to Gallery page');
+    console.log('[EH Reader] Launch & comments buttons added to Gallery page');
   }
 
   // 页面加载完成后添加按钮
@@ -549,12 +557,9 @@
     setTimeout(autoExpandIfNeeded, 50);
   }
 
-  // 构建评论预览（放在缩略图上方）
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(buildCommentsPreview, 120));
-  } else {
-    setTimeout(buildCommentsPreview, 80);
-  }
+  // 隐藏原站评论区，改用“查看评论”按钮打开 Overlay
+  const hideCommentsEarly = () => { const root = document.getElementById('cdiv'); if (root) root.style.display = 'none'; };
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', hideCommentsEarly); } else { hideCommentsEarly(); }
 
   // ================= 评论预览与弹窗 =================
   function isDarkTheme() {
@@ -581,85 +586,33 @@
     return { dark, border, bodyBg, text };
   }
 
-  function buildCommentsPreview() {
+  function openCommentsOverlay() {
+    if (document.getElementById('eh-comment-overlay')) return;
     const commentRoot = document.getElementById('cdiv');
     if (!commentRoot) return;
-    if (document.getElementById('eh-comments-wrapper')) return; // 已构建新的居中容器
-    const grid = document.getElementById('gdt');
-    if (!grid) return;
-
-    // 提取评论块
-    const comments = Array.from(commentRoot.querySelectorAll('.c1'));
-    if (!comments.length) return;
-    const PREVIEW_COUNT = 4;
-
-    // 创建外层居中包裹容器
-    const wrapper = document.createElement('div');
-    wrapper.id = 'eh-comments-wrapper';
-
-    // 创建预览容器（使用新类方便 CSS 管理）
-    const preview = document.createElement('div');
-    preview.id = 'eh-comment-preview';
-    preview.className = 'eh-comment-preview-box';
-    const title = document.createElement('div');
-    title.textContent = '最新评论预览';
-    title.className = 'eh-comment-preview-title';
-    preview.appendChild(title);
-    // 主题色采样（用于克隆评论项配色）
     const theme = getThemeColors();
-
-    const list = document.createElement('div');
-    list.style.maxHeight = 'none';
-    comments.slice(0, PREVIEW_COUNT).forEach(c => {
-      const item = c.cloneNode(true);
-      // 精简：移除投票按钮、隐藏冗余
-      item.querySelectorAll('.c4, .c5').forEach(el => el.remove());
-      // 预览克隆移除所有 id，避免与弹窗内真实评论产生冲突（站点脚本可能按 id 定位）
-      item.removeAttribute('id');
-      item.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'));
-      item.style.background = 'transparent';
-      item.style.borderColor = theme.border;
-      item.style.color = theme.text;
-      item.style.margin = '4px 0';
-      // 预览区禁用交互，防止事件穿透或站点脚本联动
-      item.style.pointerEvents = 'none';
-      preview.appendChild(item);
-    });
-
-    // 内联展开按钮（替代旧全屏弹窗默认行为）
-    const expandBtn = document.createElement('a');
-    expandBtn.textContent = '展开全部评论';
-    expandBtn.href = '#expand-comments';
-    expandBtn.className = 'eh-comment-expand-btn';
-    preview.appendChild(expandBtn);
-    if (comments.length > PREVIEW_COUNT) {
-      const moreSpan = document.createElement('span');
-      moreSpan.textContent = `其余 ${comments.length - PREVIEW_COUNT} 条…`;
-      moreSpan.style.cssText = 'margin-left:8px;font-size:12px;color:#777;';
-      preview.appendChild(moreSpan);
-    }
-
-    // 初始折叠原始评论树
-    commentRoot.classList.add('eh-collapsed');
-
-    expandBtn.onclick = (e) => {
-      e.preventDefault();
-      const collapsed = commentRoot.classList.contains('eh-collapsed');
-      if (collapsed) {
-        commentRoot.classList.remove('eh-collapsed');
-        expandBtn.textContent = '收起评论';
-      } else {
-        commentRoot.classList.add('eh-collapsed');
-        expandBtn.textContent = '展开全部评论';
-        // 滚动回预览顶部，防止长列表末尾收起后用户位置迷失
-        try { preview.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch(_) {}
-      }
-    };
-
-    // 插入位置：缩略图上方（包裹容器包住预览 + 原始评论树）
-    wrapper.appendChild(preview);
-    wrapper.appendChild(commentRoot);
-    grid.parentNode.insertBefore(wrapper, grid);
+    const overlay = document.createElement('div');
+    overlay.id = 'eh-comment-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:40px;box-sizing:border-box;';
+    const panel = document.createElement('div');
+    panel.style.cssText = `max-width:900px;width:100%;max-height:100%;overflow:auto;background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,0.4);padding:16px 20px;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;`;
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+    const title = document.createElement('div');
+    title.textContent = '全部评论';
+    title.style.cssText = 'font-weight:600;font-size:15px;';
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '关闭';
+    closeBtn.style.cssText = 'cursor:pointer;font-size:12px;padding:4px 10px;border:1px solid '+theme.border+';background:transparent;border-radius:4px;';
+    header.appendChild(title); header.appendChild(closeBtn); panel.appendChild(header);
+    commentRoot.style.display = 'block';
+    panel.appendChild(commentRoot);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+    const restore = () => { commentRoot.style.display = 'none'; overlay.remove(); document.body.style.overflow=''; };
+    closeBtn.onclick = restore; overlay.addEventListener('click',(e)=>{ if(e.target===overlay) restore(); });
+    const escHandler=(e)=>{ if(e.key==='Escape'){ restore(); document.removeEventListener('keydown',escHandler);} }; document.addEventListener('keydown',escHandler);
+    document.body.style.overflow='hidden';
   }
 
   // 移除旧全屏评论页方案（已用居中容器替代）
