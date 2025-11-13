@@ -546,6 +546,8 @@
     applyThumbnailPlaceholders();
     // 启动持久化观察，防止站点脚本后续删除已展开的缩略图
     startThumbnailPersistenceObserver();
+    // 缓存展开结果，返回画廊时可直接恢复
+    saveExpandedToCache(totalImages);
 
     // 移除分页条
     document.querySelectorAll('.ptt, .ptb').forEach(el => el.remove());
@@ -562,6 +564,11 @@
       if (window.__ehAutoExpanded) return;
       const grid = document.getElementById('gdt');
       if (!grid) return;
+      // 先尝试从缓存恢复，避免返回画廊后重新加载
+      if (restoreExpandedFromCache()) {
+        window.__ehAutoExpanded = true;
+        return;
+      }
       // 判断是否存在分页元素（.ptt 或 .ptb 中是否有 >1 页）
       const pageTable = document.querySelector('.ptt, .ptb');
       if (!pageTable) return; // 无分页无需展开
@@ -701,5 +708,47 @@
     });
     observer.observe(grid, { childList: true });
     window.__ehThumbObserver = observer;
+  }
+
+  // ============== 展开结果缓存（sessionStorage） ==============
+  const CACHE_VERSION = 'v1';
+  function cacheKey() { return `eh:galleryExpanded:${pageData.gid}:${pageData.token}`; }
+  function saveExpandedToCache(totalImages) {
+    try {
+      const grid = document.getElementById('gdt'); if (!grid) return;
+      const payload = {
+        v: CACHE_VERSION,
+        ts: Date.now(),
+        total: totalImages || null,
+        html: grid.innerHTML
+      };
+      sessionStorage.setItem(cacheKey(), JSON.stringify(payload));
+      console.log('[EH Reader] Expanded thumbnails cached');
+    } catch (e) {
+      console.warn('[EH Reader] Failed to cache expanded thumbnails', e);
+    }
+  }
+  function restoreExpandedFromCache() {
+    try {
+      const raw = sessionStorage.getItem(cacheKey());
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data || data.v !== CACHE_VERSION || !data.html) return false;
+      // 可选：过期策略（3小时）
+      if (Date.now() - (data.ts||0) > 3*60*60*1000) return false;
+      const grid = document.getElementById('gdt'); if (!grid) return false;
+      grid.innerHTML = data.html;
+      // 移除分页条，更新统计文本
+      document.querySelectorAll('.ptt, .ptb').forEach(el => el.remove());
+      const gpcTop = document.querySelector('.gpc');
+      if (gpcTop && data.total) gpcTop.textContent = `Showing 1 - ${data.total} of ${data.total} images`;
+      applyThumbnailPlaceholders();
+      startThumbnailPersistenceObserver();
+      console.log('[EH Reader] Restored expanded thumbnails from cache');
+      return true;
+    } catch (e) {
+      console.warn('[EH Reader] Failed to restore expanded thumbnails', e);
+      return false;
+    }
   }
 })();
