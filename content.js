@@ -725,6 +725,7 @@
     // 真实图片 URL 缓存与请求复用（增加会话级持久化，提升二次进入速度）
     const realUrlCache = new Map(); // pageIndex -> url
     const realUrlRequests = new Map(); // pageIndex -> {promise, controller}
+    const realUrlFallbackToken = new Map(); // pageIndex -> nl token (用于失败时切换镜像)
     const persistentCacheKey = () => {
       // 使用 gid + mpvkey 组合减少误命中；缺失则仅用路径
       const gid = pageData.gid || 'nogid';
@@ -781,18 +782,19 @@
       }, 400); // 400ms 聚合
     }
 
-    function ensureRealImageUrl(pageIndex) {
+    async function ensureRealImageUrl(pageIndex) {
       if (realUrlCache.has(pageIndex)) {
-        return Promise.resolve({ url: realUrlCache.get(pageIndex), controller: null });
+        return { url: realUrlCache.get(pageIndex), controller: null };
       }
       const pageUrl = getImageUrl(pageIndex);
-      if (!pageUrl) return Promise.reject(new Error('图片页面 URL 不存在'));
+      if (!pageUrl) throw new Error('图片页面 URL 不存在');
       const inflight = realUrlRequests.get(pageIndex);
       if (inflight) return inflight.promise;
       const controller = new AbortController();
-      const promise = fetchRealImageUrl(pageUrl, controller.signal)
-        .then(url => {
+      const promise = fetchRealImageUrlAndToken(pageUrl, controller.signal)
+        .then(({ url, nlToken }) => {
           realUrlCache.set(pageIndex, url);
+          if (nlToken) realUrlFallbackToken.set(pageIndex, nlToken);
           persistRealUrlCacheLater();
           preconnectToOrigin(url);
           // 解析 URL 中可能的宽高信息, 形如 ...-1280-1523-xxx 或 -3000-3000-png
@@ -892,8 +894,8 @@
       startNextPrefetch();
     }
     
-    // 从 E-Hentai 图片页面提取真实图片 URL
-    async function fetchRealImageUrl(pageUrl, signal) {
+    // 从 E-Hentai 图片页面提取真实图片 URL + 备用 nl token
+    async function fetchRealImageUrlAndToken(pageUrl, signal) {
       try {
         console.log('[EH Modern Reader] 开始获取图片页面:', pageUrl);
         
@@ -913,24 +915,38 @@
         
         // 从页面中提取图片 URL (主要方法)
         const match = html.match(/<img[^>]+id="img"[^>]+src="([^"]+)"/);
+        let foundUrl = null;
         if (match && match[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法1):', match[1]);
-          return match[1];
+          foundUrl = match[1];
+          console.log('[EH Modern Reader] 找到图片 URL (方法1):', foundUrl);
         }
         
         // 尝试备用匹配模式
-        const match2 = html.match(/src="(https?:\/\/[^"]+\.(?:jpg|jpeg|png|gif|webp)[^"]*)"/i);
-        if (match2 && match2[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法2):', match2[1]);
-          return match2[1];
+        if (!foundUrl) {
+          const match2 = html.match(/src="(https?:\/\/[^\"]+\.(?:jpg|jpeg|png|gif|webp)[^\"]*)"/i);
+          if (match2 && match2[1]) {
+            foundUrl = match2[1];
+            console.log('[EH Modern Reader] 找到图片 URL (方法2):', foundUrl);
+          }
         }
         
         // 尝试直接匹配 URL
-        const match3 = html.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp))/i);
-        if (match3 && match3[1]) {
-          console.log('[EH Modern Reader] 找到图片 URL (方法3):', match3[1]);
-          return match3[1];
+        if (!foundUrl) {
+          const match3 = html.match(/(https?:\/\/[^\s"'<>]+\.(?:jpg|jpeg|png|gif|webp))/i);
+          if (match3 && match3[1]) {
+            foundUrl = match3[1];
+            console.log('[EH Modern Reader] 找到图片 URL (方法3):', foundUrl);
+          }
         }
+
+        // 提取 nl 备用令牌
+        let nlToken = null;
+        try {
+          const nlMatch = html.match(/nl\(['"]([^'\"]+)['"]\)/i) || html.match(/id=['"]loadfail['"][^>]*onclick=['"][^'"]*nl\(['"]([^'\"]+)['"]\)/i);
+          if (nlMatch && nlMatch[1]) nlToken = nlMatch[1];
+        } catch {}
+        
+        if (foundUrl) return { url: foundUrl, nlToken };
         
         console.error('[EH Modern Reader] 无法从页面提取图片 URL');
         console.log('[EH Modern Reader] HTML 片段:', html.substring(0, 1000));
@@ -939,6 +955,11 @@
         console.error('[EH Modern Reader] 获取图片 URL 失败:', pageUrl, error);
         throw error;
       }
+    }
+
+    async function fetchRealImageUrlWithToken(pageUrl, nlToken, signal) {
+      const url = pageUrl + (pageUrl.includes('?') ? '&' : '?') + 'nl=' + encodeURIComponent(nlToken);
+      return fetchRealImageUrlAndToken(url, signal);
     }
 
     // 🎯 使用 Image 对象加载图片（模拟进度动画）
@@ -1060,7 +1081,8 @@
           const abortController = new AbortController();
           state.imageRequests.set(pageIndex, abortController);
 
-          const imageUrl = await fetchRealImageUrl(pageUrl, abortController.signal);
+          const { url: imageUrl, nlToken } = await fetchRealImageUrlAndToken(pageUrl, abortController.signal);
+          if (nlToken) realUrlFallbackToken.set(pageIndex, nlToken);
           
           // 🎯 使用 XMLHttpRequest 加载图片并追踪进度
           const pending = loadImageWithProgress(imageUrl, (progress) => {
@@ -1070,9 +1092,23 @@
             state.imageCache.set(pageIndex, { status: 'loaded', img });
             state.imageRequests.delete(pageIndex);
             return img;
-          }).catch((error) => {
+          }).catch(async (error) => {
             console.error('[EH Modern Reader] Gallery 图片加载失败:', imageUrl, error);
             state.imageCache.delete(pageIndex);
+            // 试图使用 nl 令牌切换镜像
+            try {
+              const token = realUrlFallbackToken.get(pageIndex);
+              if (token) {
+                const ac2 = new AbortController();
+                const { url: altUrl } = await fetchRealImageUrlWithToken(pageUrl, token, ac2.signal);
+                const img2 = await loadImageWithProgress(altUrl, (p)=>updateImageLoadingProgress(p));
+                state.imageCache.set(pageIndex, { status: 'loaded', img: img2 });
+                state.imageRequests.delete(pageIndex);
+                return img2;
+              }
+            } catch (e2) {
+              console.warn('[EH Modern Reader] Gallery 使用 nl 回退失败:', e2);
+            }
             state.imageRequests.delete(pageIndex);
             throw new Error(`图片加载失败: ${imageUrl}`);
           });
@@ -1112,9 +1148,25 @@
             console.log('[EH Modern Reader] 图片加载成功:', realImageUrl);
             state.imageCache.set(pageIndex, { status: 'loaded', img });
             return img;
-          }).catch((error) => {
+          }).catch(async (error) => {
             console.error('[EH Modern Reader] 图片加载失败:', realImageUrl, error);
             state.imageCache.delete(pageIndex); // 清除缓存以便重试
+            // 尝试使用 nl 令牌切换镜像一次
+            try {
+              const token = realUrlFallbackToken.get(pageIndex);
+              if (token) {
+                const controller2 = new AbortController();
+                const { url: altUrl } = await fetchRealImageUrlWithToken(pageUrl, token, controller2.signal);
+                realUrlCache.set(pageIndex, altUrl);
+                persistRealUrlCacheLater();
+                preconnectToOrigin(altUrl);
+                const img2 = await loadImageWithProgress(altUrl, (p)=>updateImageLoadingProgress(p));
+                state.imageCache.set(pageIndex, { status: 'loaded', img: img2 });
+                return img2;
+              }
+            } catch (e2) {
+              console.warn('[EH Modern Reader] 使用 nl 令牌回退失败:', e2);
+            }
             throw new Error(`图片加载失败: ${realImageUrl}`);
           });
 
@@ -1967,8 +2019,36 @@
         }
       }
       
-      // 回退到真实图片加载（原有逻辑）
-      loadFullThumbnail(thumb, imageData, pageNum, idx, title, containerW, containerH);
+      // 回退：为避免大量连接直连 hath 域，缩略图不再主动抓取“真实大图”。
+      // 若当前页主图已在缓存中，则用缓存生成缩略图；否则保留数字占位。
+      const cached = state.imageCache.get(idx);
+      if (cached && cached.status === 'loaded' && cached.img) {
+        try {
+          const img = cached.img;
+          const iw = img.naturalWidth || img.width;
+          const ih = img.naturalHeight || img.height;
+          const scale = Math.min(containerW / iw, containerH / ih);
+          const dw = Math.max(1, Math.floor(iw * scale));
+          const dh = Math.max(1, Math.floor(ih * scale));
+          const dx = Math.floor((containerW - dw) / 2);
+          const dy = Math.floor((containerH - dh) / 2);
+          const canvas = document.createElement('canvas');
+          canvas.width = containerW; canvas.height = containerH;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+          ctx.clearRect(0,0,containerW,containerH); ctx.drawImage(img, dx, dy, dw, dh);
+          thumb.style.background = 'none'; thumb.replaceChildren(); thumb.appendChild(canvas);
+          const badge = document.createElement('div'); badge.className='eh-thumbnail-number'; badge.textContent=String(pageNum); thumb.appendChild(badge);
+          return;
+        } catch {}
+      }
+      // 默认占位：仅显示页码
+      thumb.style.background = 'none';
+      thumb.replaceChildren();
+      const badge = document.createElement('div');
+      badge.className = 'eh-thumbnail-number';
+      badge.textContent = String(pageNum);
+      thumb.appendChild(badge);
     }
     
     // 提取原有的完整图片加载逻辑为独立函数
