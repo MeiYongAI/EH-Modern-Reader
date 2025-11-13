@@ -121,6 +121,7 @@ body.eh-dark-mode #eh-image-container {
   color: #666;
   min-width: 80px;
   text-align: center;
+  display: none !important; /* 隐藏顶部当前页/总页数，保留节点供脚本引用避免空指针 */
 }
 
 body.eh-dark-mode #eh-page-info {
@@ -247,6 +248,38 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   user-select: none;
   -webkit-user-drag: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ========== 全局移动端点击/选择优化 ========== */
+body.eh-modern-reader, body.eh-dark-mode, #eh-reader-container, #eh-reader-container * {
+  -webkit-tap-highlight-color: rgba(0,0,0,0); /* 移除手机点击蓝色闪烁 */
+}
+body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-container * {
+  user-select: none; /* 防止出现系统选择高亮 */
+}
+.eh-icon-btn:focus, .eh-icon-btn-small:focus, button:focus { outline: none; }
+
+/* ========== 评论弹窗响应式 ========== */
+#eh-comment-modal { padding: 40px; box-sizing: border-box; }
+#eh-comment-modal .eh-comment-panel {
+  max-width: 900px;
+  width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+@media (max-width: 860px) {
+  #eh-comment-modal { padding: 14px !important; }
+  #eh-comment-modal .eh-comment-panel { max-width: 100%; border-radius: 4px; padding: 12px 14px !important; max-height: calc(100vh - 28px); }
+}
+@media (max-width: 600px) {
+  #eh-comment-modal { padding: 8px !important; }
+  #eh-comment-modal .eh-comment-panel { border-radius: 0; max-height: 100vh; height: 100%; padding: 10px 12px !important; }
+}
+@supports(padding: max(0px)) { /* 刘海/安全区适配 */
+  #eh-comment-modal { padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important; }
 }
 
 .eh-ch-skeleton::before {

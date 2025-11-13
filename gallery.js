@@ -652,10 +652,11 @@
     if (document.getElementById('eh-comment-modal')) return;
     const overlay = document.createElement('div');
     overlay.id = 'eh-comment-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:40px;';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
     const panel = document.createElement('div');
+    panel.className = 'eh-comment-panel';
     const theme = getThemeColors();
-    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};max-width:900px;width:100%;max-height:100%;overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;`;
+    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;`;
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
     const hTitle = document.createElement('div');
