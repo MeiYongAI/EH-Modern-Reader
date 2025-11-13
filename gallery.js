@@ -660,65 +660,22 @@
     
     const isMobile = window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
     
-    // 顶部拖拽指示条
+    // 顶部拖拽指示条（移动端居中模式不显示，桌面仅作装饰）
     const dragHandle = document.createElement('div');
     dragHandle.className = 'eh-drag-handle';
     
-    if (isMobile) {
-      // 移动端底部抽屉式：动态高度拖拽
-      const setPanelHeightVH = (vh) => {
-        vh = Math.max(50, Math.min(95, vh));
-        panel.style.height = (CSS && 'supports' in CSS && CSS.supports('height', '1dvh')) ? `${vh}dvh` : `${vh}vh`;
-      };
-      let startY = 0, startH = 0, dragging = false;
-      const getViewportH = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
-      const pxToVh = (px) => 100 * px / getViewportH();
-      
-      const onPointerDown = (ev) => {
-        const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
-        startY = y;
-        const rect = panel.getBoundingClientRect();
-        startH = pxToVh(rect.height);
-        dragging = true;
-        ev.preventDefault();
-      };
-      const onPointerMove = (ev) => {
-        if (!dragging) return;
-        const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
-        const delta = y - startY;
-        const next = startH - pxToVh(delta);
-        setPanelHeightVH(next);
-        ev.preventDefault();
-      };
-      const onPointerUp = () => {
-        if (!dragging) return;
-        dragging = false;
-        const rect = panel.getBoundingClientRect();
-        const current = pxToVh(rect.height);
-        const snaps = [55, 80, 95];
-        let best = snaps[0], mind = 999;
-        for (const s of snaps) { const d = Math.abs(s - current); if (d < mind) { mind = d; best = s; } }
-        setPanelHeightVH(best);
-      };
-      
-      dragHandle.addEventListener('touchstart', onPointerDown, { passive: false });
-      dragHandle.addEventListener('touchmove', onPointerMove, { passive: false });
-      dragHandle.addEventListener('touchend', onPointerUp, { passive: false });
-      dragHandle.addEventListener('mousedown', onPointerDown);
-      window.addEventListener('mousemove', onPointerMove);
-      window.addEventListener('mouseup', onPointerUp);
-      
+    // 移动端不再需要拖拽逻辑（改为居中卡片，靠 CSS overflow 滚动）
+    // 仅保留视口高度自适应（软键盘弹出时收缩）
+    if (isMobile && window.visualViewport) {
       const updateMaxH = () => {
-        const vh = getViewportH();
-        panel.style.maxHeight = (vh - 12) + 'px';
+        const vh = window.visualViewport.height;
+        panel.style.maxHeight = (vh - 80) + 'px';
       };
       updateMaxH();
-      if (window.visualViewport) window.visualViewport.addEventListener('resize', updateMaxH);
+      window.visualViewport.addEventListener('resize', updateMaxH);
       
       const cleanup = () => {
-        window.removeEventListener('mousemove', onPointerMove);
-        window.removeEventListener('mouseup', onPointerUp);
-        if (window.visualViewport) window.visualViewport.removeEventListener('resize', updateMaxH);
+        window.visualViewport.removeEventListener('resize', updateMaxH);
       };
       panel._mobileCleanup = cleanup;
     }
