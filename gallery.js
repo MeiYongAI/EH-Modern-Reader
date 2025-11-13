@@ -652,31 +652,28 @@
     if (document.getElementById('eh-comment-modal')) return;
     const overlay = document.createElement('div');
     overlay.id = 'eh-comment-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;';
     const panel = document.createElement('div');
     panel.className = 'eh-comment-panel';
     const theme = getThemeColors();
-    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};overflow:auto;padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);border-radius:6px;overscroll-behavior: contain;-webkit-overflow-scrolling:touch;`;
-    const isMobileSheet = window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
-    // 顶部拖拽指示条（移动端：可拖动改变高度；桌面仅作装饰）
+    panel.style.cssText = `background:${theme.bodyBg};color:${theme.text};border:1px solid ${theme.border};padding:16px 20px;box-shadow:0 4px 18px rgba(0,0,0,0.4);`;
+    
+    const isMobile = window.matchMedia && window.matchMedia('(max-width: 860px)').matches;
+    
+    // 顶部拖拽指示条
     const dragHandle = document.createElement('div');
     dragHandle.className = 'eh-drag-handle';
-    if (isMobileSheet) {
-      panel.classList.add('eh-comment-sheet');
-      // 覆盖圆角为顶部圆角，宽度占满
-      panel.style.borderRadius = '12px 12px 0 0';
-      panel.style.maxWidth = '100vw';
-      panel.style.width = '100vw';
-      // 初始高度 82dvh（由 CSS 提供）；确保最大高度贴合可视窗口
+    
+    if (isMobile) {
+      // 移动端底部抽屉式：动态高度拖拽
       const setPanelHeightVH = (vh) => {
         vh = Math.max(50, Math.min(95, vh));
-        // 优先使用 dvh，降级到 vh
         panel.style.height = (CSS && 'supports' in CSS && CSS.supports('height', '1dvh')) ? `${vh}dvh` : `${vh}vh`;
       };
-      // 拖拽逻辑（仅 handle 区域生效）
       let startY = 0, startH = 0, dragging = false;
       const getViewportH = () => (window.visualViewport ? window.visualViewport.height : window.innerHeight);
       const pxToVh = (px) => 100 * px / getViewportH();
+      
       const onPointerDown = (ev) => {
         const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
         startY = y;
@@ -688,40 +685,42 @@
       const onPointerMove = (ev) => {
         if (!dragging) return;
         const y = ev.touches ? ev.touches[0].clientY : ev.clientY;
-        const delta = y - startY; // 向下为正，降低高度
+        const delta = y - startY;
         const next = startH - pxToVh(delta);
         setPanelHeightVH(next);
         ev.preventDefault();
       };
-      const onPointerUp = (ev) => {
+      const onPointerUp = () => {
         if (!dragging) return;
         dragging = false;
         const rect = panel.getBoundingClientRect();
         const current = pxToVh(rect.height);
-        // 吸附到 55 / 80 / 95 三档
         const snaps = [55, 80, 95];
         let best = snaps[0], mind = 999;
         for (const s of snaps) { const d = Math.abs(s - current); if (d < mind) { mind = d; best = s; } }
         setPanelHeightVH(best);
       };
+      
       dragHandle.addEventListener('touchstart', onPointerDown, { passive: false });
       dragHandle.addEventListener('touchmove', onPointerMove, { passive: false });
       dragHandle.addEventListener('touchend', onPointerUp, { passive: false });
       dragHandle.addEventListener('mousedown', onPointerDown);
       window.addEventListener('mousemove', onPointerMove);
       window.addEventListener('mouseup', onPointerUp);
-      // 视口变化（地址栏显隐/软键盘）时更新最大高度
+      
       const updateMaxH = () => {
         const vh = getViewportH();
         panel.style.maxHeight = (vh - 12) + 'px';
       };
       updateMaxH();
       if (window.visualViewport) window.visualViewport.addEventListener('resize', updateMaxH);
-      overlay.addEventListener('remove', () => {
+      
+      const cleanup = () => {
         window.removeEventListener('mousemove', onPointerMove);
         window.removeEventListener('mouseup', onPointerUp);
         if (window.visualViewport) window.visualViewport.removeEventListener('resize', updateMaxH);
-      });
+      };
+      panel._mobileCleanup = cleanup;
     }
     // ============ History Back 支持：按系统/浏览器返回仅关闭弹窗 ============
     let historyInjected = false;
@@ -735,6 +734,7 @@
     const popHandler = (ev) => {
       if (document.getElementById('eh-comment-modal')) {
         closingByPopstate = true;
+        if (panel._mobileCleanup) panel._mobileCleanup();
         restoreRoot();
         overlay.remove();
         window.removeEventListener('popstate', popHandler);
@@ -768,11 +768,11 @@
       }
     };
     closeBtn.onclick = () => {
+      if (panel._mobileCleanup) panel._mobileCleanup();
       restoreRoot();
       overlay.remove();
-      // 若我们曾 pushState，主动回退一次消费该历史；避免堆积虚假历史项
       if (historyInjected && !closingByPopstate) {
-        window.removeEventListener('popstate', popHandler); // 先移除监听，避免重复关闭
+        window.removeEventListener('popstate', popHandler);
         try { history.back(); } catch (_) {}
       }
     };
@@ -799,6 +799,7 @@
     const restore = () => { document.body.style.overflow = prevOverflow || ''; };
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
+        if (panel._mobileCleanup) panel._mobileCleanup();
         restoreRoot();
         overlay.remove();
         if (historyInjected && !closingByPopstate) {
@@ -810,6 +811,7 @@
     });
     const escHandler = (e) => {
       if (e.key === 'Escape') {
+        if (panel._mobileCleanup) panel._mobileCleanup();
         restoreRoot();
         overlay.remove();
         if (historyInjected && !closingByPopstate) {
