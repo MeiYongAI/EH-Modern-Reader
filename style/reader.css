@@ -1175,6 +1175,11 @@ body.eh-dark-mode #eh-page-input {
   opacity: 0;
 }
 
+/* 侧边缩略图容器隐藏 */
+#eh-thumbnails-container.eh-hidden {
+  display: none;
+}
+
 .eh-panel-content {
   background: #fff;
   border-radius: 12px;

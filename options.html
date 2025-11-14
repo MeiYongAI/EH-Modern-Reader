@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EH Modern Reader - 设置</title>
+  <style>
+    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif; margin: 0; padding: 24px; background: #0b1020; color: #fff; }
+    .card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin: 0 auto; max-width: 720px; }
+    h1 { margin: 0 0 8px; font-size: 20px; }
+    p.tip { margin: 0 0 16px; opacity: .8; }
+    .row { display: flex; gap: 12px; align-items: center; margin: 12px 0; }
+    .row label { min-width: 200px; opacity: .9; }
+    .muted { opacity: .7; font-size: 12px; }
+    a { color: #7aa2ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer { margin-top: 16px; opacity: .7; font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>EH Modern Reader 设置</h1>
+    <p class="tip">当前版本：<span id="ver">-</span></p>
+
+    <div class="row">
+      <label>缩略图：使用画廊小图回退</label>
+      <input id="opt-thumb-fallback" type="checkbox" checked disabled />
+    </div>
+
+    <div class="row">
+      <label>图片失败：nl-token 镜像回退</label>
+      <input id="opt-nl-fallback" type="checkbox" checked disabled />
+    </div>
+
+    <div class="row">
+      <label>键盘：F 键切换缩略图栏</label>
+      <input id="opt-key-f" type="checkbox" checked disabled />
+    </div>
+
+    <p class="muted">以上为内置策略，暂不提供开关。后续将开放更多自定义项。</p>
+
+    <p class="muted">使用说明见 <a href="welcome.html" target="_blank" rel="noopener">Welcome</a> · <a href="README.md" target="_blank" rel="noopener">README</a></p>
+  </div>
+
+  <footer>
+    Made with ❤️ · 问题反馈请附带控制台日志
+  </footer>
+
+  <script>
+    try {
+      const m = chrome.runtime.getManifest?.();
+      if (m?.version) document.getElementById('ver').textContent = `v${m.version}`;
+    } catch {}
+  </script>
+</body>
+</html>

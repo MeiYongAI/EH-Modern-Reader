@@ -1,5 +1,17 @@
 # Release Notes
 
+## v2.3.2 (2025-11-14)
+### Fixes
+- 抑制 MPV 原站脚本 (`ehg_mpv.c.js`) 在接管后访问已移除节点抛出的 `offsetTop` 异常：加入多层拦截 (`error` / `unhandledrejection` / `window.onerror` + `console.error` 过滤 + MutationObserver 动态删除脚本)。
+- 修复顶层脚本结构被破坏造成的初始化风险：重写 `extractPageData()`，确保核心字段解析与 `gallery_url` DOM/referrer 回退。
+- 缩略图显示重复/定位失效：移除实验性“Gallery 小缩略图 CSS 背景定位”路径，恢复 v2.1.8 的雪碧图 Canvas 裁剪与真实图片回退策略，避免偏移解析不稳定与重复首帧。
+### Changes
+- 加强原站脚本阻断：注入阶段移除匹配 mpv 的脚本与样式链接，后续动态插入立即截获删除。
+### Internal
+- 统一错误关键字过滤（含 `offsetTop`）降低控制台噪声，聚焦扩展自身日志。
+### Notes
+- 若需再次启用“基于 Gallery 小图快速占位”模式，可在后续版本以设置开关形式恢复，当前版本优先保证稳定与一致视觉。
+
 ## v2.3.1 (2025-11-13)
 ### Fixes
 - MPV 图片页链接域名修正：/s/ 链接改为基于当前站点 origin 构造，自动兼容 e-hentai.org 与 exhentai.org，解决抓取失败与异常重定向。

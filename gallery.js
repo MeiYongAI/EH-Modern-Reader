@@ -489,10 +489,22 @@
       }
     }
     if (!totalImages) return;
-    const totalPages = Math.ceil(totalImages / firstPageThumbs);
+      const totalPages = Math.ceil(totalImages / firstPageThumbs);
     if (totalPages <= 1) return;
 
     // 静默展开：不显示任何进度或提示，避免视觉干扰
+      // 先修复当前第一页：将懒加载属性写回 src，避免站点懒加载脚本失效导致首屏不显示
+      try {
+        grid.querySelectorAll('img').forEach(img => {
+          const ds = img.getAttribute('data-src') || img.getAttribute('data-lazy') || img.getAttribute('data-original');
+          if (ds && (!img.getAttribute('src') || img.getAttribute('src') === '')) {
+            img.setAttribute('src', ds);
+          }
+          img.loading = 'eager';
+          img.decoding = 'sync';
+          img.style.opacity = '1';
+        });
+      } catch {}
 
     // 并发抓取 pageIndex: 1..totalPages-1（第0页当前已在）
     const indexes = [];

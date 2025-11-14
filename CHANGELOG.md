@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MPV 图片页链接改为使用当前站点的 origin 构造 `/s/` URL，自动兼容 e-hentai 与 exhentai。
 - 为 `fetchRealImageUrl` 补充 `credentials: include` 与 `referrer`，修复 Chromium 116 环境下偶发获取失败。
 
+## [2.3.2] - 2025-11-14
+### Fixed
+- 屏蔽原站 MPV 脚本残留异常 (`ehg_mpv.c.js` 访问已移除节点导致 `offsetTop` 报错)：新增 `error`/`unhandledrejection`/`window.onerror` 拦截、`console.error` 过滤与 `MutationObserver` 动态脚本移除。
+- 修复顶层代码意外破坏导致的初始化不可用：重建 `extractPageData()`，健壮解析 `gid/mpvkey/pagecount/imagelist/title` 并用 DOM/referrer 兜底 `gallery_url`。
+- 缩略图重复首帧问题：回退到 v2.1.8 样式逻辑（雪碧图 Canvas 裁剪 + 真实图片回退），移除后续“Gallery 小缩略图 CSS 背景定位”路径导致的偏移解析不稳定。
+### Changed
+- 更彻底阻断原站脚本：在注入阶段移除匹配 `ehg_mpv` 的外链与内联脚本，并在后续动态插入时拦截删除，减少控制台噪音。
+### Technical
+- 增强错误过滤匹配范围（含 `offsetTop` 关键字）避免误报影响调试聚焦。
+
+
 ## [2.3.0] - 2025-11-13
 ### Added
 - 持久图片缓存：

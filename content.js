@@ -12,191 +12,101 @@
   }
   window.ehModernReaderInjected = true;
 
-  // 早期脚本拦截：阻止原站 MPV 脚本注入与执行
+  // 屏蔽原站 MPV 脚本的异常（例如 ehg_mpv.c.js 在我们接管后仍访问已被移除的节点）
   try {
-    // 提前捕获页面变量（imagelist / pagecount / gid / mpvkey / gallery_url）
-    const captured = (window.__ehCaptured = window.__ehCaptured || {
-      imagelist: null,
-      pagecount: null,
-      gid: null,
-      mpvkey: null,
-      gallery_url: null,
-      title: null
-    });
-
-    function captureFromScriptText(text) {
-      if (!text || typeof text !== 'string') return;
+    const swallowErr = (ev) => {
       try {
-        const listMatch = text.match(/var\s+imagelist\s*=\s*(\[.*?\]);/s);
-        if (listMatch && !captured.imagelist) {
-          try { captured.imagelist = JSON.parse(listMatch[1]); } catch {}
-        }
-        const gidMatch = text.match(/var\s+gid\s*=\s*(\d+);/);
-        if (gidMatch && !captured.gid) captured.gid = gidMatch[1];
-        const keyMatch = text.match(/var\s+mpvkey\s*=\s*"([^"]+)";/);
-        if (keyMatch && !captured.mpvkey) captured.mpvkey = keyMatch[1];
-        const countMatch = text.match(/var\s+pagecount\s*=\s*(\d+);/);
-        if (countMatch && !captured.pagecount) captured.pagecount = parseInt(countMatch[1]);
-        const gurlMatch = text.match(/var\s+gallery_url\s*=\s*"([^"]+)";/);
-        if (gurlMatch && !captured.gallery_url) captured.gallery_url = gurlMatch[1];
-        if (!captured.title) {
-          const tMatch = document.title && document.title.match(/^(.+?) - E-Hentai/);
-          if (tMatch) captured.title = tMatch[1];
-        }
-      } catch {}
-    }
-
-    // 扫描已存在的内联脚本（有些页面在我们注入前已经插入了脚本节点）
-    try {
-      document.querySelectorAll('script:not([src])').forEach(s => captureFromScriptText(s.textContent || ''));
-    } catch {}
-
-    const shouldBlockScript = (node) => {
-      try {
-        if (!node) return false;
-        const src = node.src || '';
-        const text = node.textContent || '';
-        // 阻止 ehg_mpv 相关脚本
-        if (/ehg_mpv\.|mpv\.|mpv\.js/i.test(src) || /var\s+imagelist\s*=|load_image\(|preload_scroll_images\(/i.test(text)) {
-          // 拦截前先尝试捕获变量
-          captureFromScriptText(text);
+        const src = ev && (ev.filename || (ev.error && ev.error.fileName) || '');
+        const msg = (ev && (ev.message || (ev.reason && ev.reason.message))) || '';
+        if ((src && /ehg_mpv/i.test(src)) || /ehg_mpv/i.test(String(msg)) || /offsetTop/.test(msg)) {
+          // 阻止控制台报错进一步传播
+          if (ev.preventDefault) ev.preventDefault();
+          if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
           return true;
         }
       } catch {}
       return false;
     };
-
-    const originalAppendChild = Element.prototype.appendChild;
-    const originalInsertBefore = Element.prototype.insertBefore;
-
-    Element.prototype.appendChild = function(child) {
-      if (child && child.tagName === 'SCRIPT' && shouldBlockScript(child)) {
-        // 可能是内联脚本，尽量从其文本提取
-        try { captureFromScriptText(child.textContent || ''); } catch {}
-        return child; // 丢弃
+    window.addEventListener('error', swallowErr, true);
+    window.addEventListener('unhandledrejection', swallowErr, true);
+    // 附加：覆盖 window.onerror 以最大化拦截
+    const oldOnError = window.onerror;
+    window.onerror = function(message, source, lineno, colno, error) {
+      if (/ehg_mpv|offsetTop/.test(String(message)) || /ehg_mpv/.test(String(source))) {
+        return true; // 吞掉
       }
-      return originalAppendChild.call(this, child);
+      if (typeof oldOnError === 'function') {
+        return oldOnError.apply(this, arguments);
+      }
     };
-
-    Element.prototype.insertBefore = function(newNode, referenceNode) {
-      if (newNode && newNode.tagName === 'SCRIPT' && shouldBlockScript(newNode)) {
-        try { captureFromScriptText(newNode.textContent || ''); } catch {}
-        return newNode; // 丢弃
-      }
-      return originalInsertBefore.call(this, newNode, referenceNode);
+    // 包装 console.error 过滤特定报错输出
+    const origConsoleError = console.error;
+    console.error = function(...args) {
+      try {
+        const joined = args.map(a => typeof a === 'string' ? a : (a && a.message) || '').join(' ');
+        if (/ehg_mpv|offsetTop/.test(joined)) {
+          return; // 静默
+        }
+      } catch {}
+      return origConsoleError.apply(console, args);
     };
-
-    // 观察动态添加的脚本并移除
-    const mo = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        m.addedNodes && m.addedNodes.forEach((n) => {
-          if (n.tagName === 'SCRIPT' && shouldBlockScript(n)) {
-            // 先尝试捕获再移除
-            try { captureFromScriptText(n.textContent || ''); } catch {}
-            n.remove();
-          }
-        });
-      }
-    });
-    mo.observe(document.documentElement, { childList: true, subtree: true });
-
-    // 兜底：屏蔽相关全局函数，避免已注入脚本继续运行
-    window.preload_generic = function() {};
-    window.preload_scroll_images = function() {};
-    window.load_image = function() {};
-  } catch (e) {
-    console.warn('[EH Modern Reader] 早期脚本拦截失败:', e);
-  }
-
-  console.log('[EH Modern Reader] 正在初始化...');
-
-  /**
-   * 从原页面提取必要数据
-   */
-  function extractPageData() {
-    // 检查是否从 Gallery 页面启动
-    if (window.__ehGalleryBootstrap && window.__ehGalleryBootstrap.enabled) {
-      console.log('[EH Modern Reader] 从 Gallery 页面启动');
-      const galleryData = window.__ehReaderData;
-      if (galleryData) {
-        return galleryData;
-      }
-    }
-
-    const scriptTags = document.querySelectorAll('script');
-    const captured = window.__ehCaptured || {};
-    let pageData = {
-      // 优先使用早期捕获的数据
-      imagelist: Array.isArray(captured.imagelist) ? captured.imagelist : undefined,
-      gid: captured.gid,
-      mpvkey: captured.mpvkey,
-      pagecount: captured.pagecount,
-      gallery_url: captured.gallery_url,
-      title: captured.title
-    };
-
-    try {
-      for (let script of scriptTags) {
-        const content = script.textContent;
-        
-        // 提取图片列表
-        // 仅当早期捕获没有拿到时，才从脚本中解析
-        const imagelistMatch = !pageData.imagelist && content.match(/var imagelist = (\[.*?\]);/s);
-        if (imagelistMatch) {
-          try {
-            const parsedList = JSON.parse(imagelistMatch[1]);
-            // 数据校验：确保是数组且不为空
-            if (Array.isArray(parsedList) && parsedList.length > 0) {
-              pageData.imagelist = parsedList;
-            } else {
-              console.warn('[EH Modern Reader] imagelist 为空或格式错误');
+    // 使用 MutationObserver 主动移除后续动态插入的 ehg_mpv 脚本
+    const scriptBlockObserver = new MutationObserver(mutations => {
+      try {
+        for (const m of mutations) {
+          for (const node of m.addedNodes) {
+            if (node.tagName === 'SCRIPT') {
+              const src = node.getAttribute('src') || '';
+              if (/ehg_mpv|mpv/.test(src)) {
+                node.type = 'javascript/blocked';
+                node.remove();
+              } else if (!src && /mpvkey|preload_scroll_images|load_image/.test(node.textContent || '')) {
+                node.remove();
+              }
             }
-          } catch (e) {
-            console.error('[EH Modern Reader] 解析 imagelist 失败:', e);
           }
         }
+      } catch {}
+    });
+    try { scriptBlockObserver.observe(document.documentElement || document.body, { childList: true, subtree: true }); } catch {}
+  } catch {}
 
-        // 提取其他配置变量
-        if (!pageData.gid) {
-          const gidMatch = content.match(/var gid=(\d+);/);
-          if (gidMatch) pageData.gid = gidMatch[1];
-        }
-
-        if (!pageData.mpvkey) {
-          const mpvkeyMatch = content.match(/var mpvkey = "([^"]+)";/);
-          if (mpvkeyMatch) pageData.mpvkey = mpvkeyMatch[1];
-        }
-
-        if (!pageData.pagecount) {
-          const pagecountMatch = content.match(/var pagecount = (\d+);/);
-          if (pagecountMatch) pageData.pagecount = parseInt(pagecountMatch[1]);
-        }
-
-        if (!pageData.gallery_url) {
-          const galleryUrlMatch = content.match(/var gallery_url = "([^"]+)";/);
-          if (galleryUrlMatch) pageData.gallery_url = galleryUrlMatch[1];
-        }
-
-        if (!pageData.title) {
-          const titleMatch = document.title.match(/^(.+?) - E-Hentai/);
-          if (titleMatch) pageData.title = titleMatch[1];
-        }
+  // 提取页面数据（MPV 页面脚本变量 + DOM 兜底）
+  function extractPageData() {
+    const pageData = {
+      title: document.title || '未知画廊',
+      pagecount: 0,
+      imagelist: [],
+      gid: '',
+      mpvkey: '',
+      gallery_url: ''
+    };
+    try {
+      const scripts = Array.from(document.scripts).map(s => s.textContent || '');
+      const all = scripts.join('\n');
+      const mgid = all.match(/var\s+gid\s*=\s*(\d+)/);
+      if (mgid) pageData.gid = mgid[1];
+      const mkey = all.match(/var\s+mpvkey\s*=\s*['"]([^'"\n]+)['"]/);
+      if (mkey) pageData.mpvkey = mkey[1];
+      const mcount = all.match(/var\s+pagecount\s*=\s*(\d+)/);
+      if (mcount) pageData.pagecount = parseInt(mcount[1], 10);
+      const mtitle = all.match(/var\s+mpvtitle\s*=\s*['"]([^'"\n]+)['"]/);
+      if (mtitle) pageData.title = mtitle[1];
+      const mlist = all.match(/var\s+imagelist\s*=\s*(\[[\s\S]*?\]);/);
+      if (mlist) {
+        try { pageData.imagelist = JSON.parse(mlist[1]); } catch {}
       }
-    } catch (e) {
-      console.error('[EH Modern Reader] 提取页面数据失败:', e);
+    } catch {}
+    // gallery_url 兜底：DOM 链接或 referrer
+    try {
+      const a = document.querySelector('a[href^="/g/"], a[href*="/g/"]');
+      if (a) pageData.gallery_url = new URL(a.getAttribute('href'), location.origin).href;
+    } catch {}
+    if (!pageData.gallery_url && document.referrer && /\/g\/\d+\//.test(document.referrer)) {
+      try { pageData.gallery_url = new URL(document.referrer).href; } catch {}
     }
-
-    // 兜底处理：确保必要字段存在
-    if (!pageData.imagelist || !Array.isArray(pageData.imagelist)) {
-      pageData.imagelist = [];
-    }
-    if (!pageData.pagecount) {
-      pageData.pagecount = pageData.imagelist.length || 0;
-    }
-    if (!pageData.title) {
-      pageData.title = '未知画廊';
-    }
-
+    if (!pageData.pagecount) pageData.pagecount = pageData.imagelist.length || 0;
+    if (!pageData.title) pageData.title = '未知画廊';
     return pageData;
   }
 
@@ -207,7 +117,14 @@
     // 阻止原始脚本继续运行 - 更彻底的方式
     try {
       // 移除所有原始脚本
-      document.querySelectorAll('script[src*="ehg_mpv"]').forEach(s => s.remove());
+      document.querySelectorAll('script[src*="ehg_mpv"], link[href*="ehg_mpv"]').forEach(s => s.remove());
+      // 进一步移除内联脚本中含有 mpv 关键字的节点（尽力而为）
+      document.querySelectorAll('script:not([src])').forEach(s => {
+        try {
+          const t = s.textContent || '';
+          if (/mpvkey|preload_scroll_images|load_image/.test(t)) s.remove();
+        } catch {}
+      });
       
       // 停止页面加载
       window.stop();
@@ -2018,9 +1935,12 @@
           console.warn('[EH Sprite] 雪碧图解析失败:', e);
         }
       }
+
+      // 回退：使用真实图片生成缩略图（与 v2.1.8 一致）
+      loadFullThumbnail(thumb, imageData, pageNum, idx, title, containerW, containerH);
+      return;
       
-      // 回退：为避免大量连接直连 hath 域，缩略图不再主动抓取“真实大图”。
-      // 若当前页主图已在缓存中，则用缓存生成缩略图；否则保留数字占位。
+      // 回退（缓存）：若当前页主图已在缓存中，则用缓存生成缩略图；否则保留数字占位。
       const cached = state.imageCache.get(idx);
       if (cached && cached.status === 'loaded' && cached.img) {
         try {
@@ -2064,7 +1984,10 @@
         }
         
         imageUrlPromise = fetchFn(idx)
-          .then(pageData => fetchRealImageUrl(pageData.pageUrl, new AbortController().signal));
+          .then(pageData =>
+            fetchRealImageUrlAndToken(pageData.pageUrl, new AbortController().signal)
+              .then(res => res && res.url)
+          );
       } else {
         // MPV 模式：使用 ensureRealImageUrl
         imageUrlPromise = ensureRealImageUrl(idx).then(({ url }) => url);
@@ -3015,6 +2938,18 @@
       scheduleShowPage(state.currentPage, { instant: true });
     }
 
+    // 兜底：在捕获阶段优先处理 ESC 退出元素全屏，避免被页面监听拦截
+    document.addEventListener('keydown', (e) => {
+      try {
+        if (e.key === 'Escape' && document.fullscreenElement) {
+          e.stopPropagation();
+          e.preventDefault();
+          document.exitFullscreen();
+          return;
+        }
+      } catch {}
+    }, true);
+
     // 键盘导航和缩放
     document.addEventListener('keydown', (e) => {
       // 忽略长按重复与输入控件聚焦状态
@@ -3049,6 +2984,15 @@
 
       // 页面导航
       switch(e.key) {
+        case 'f':
+        case 'F': {
+          // 切换缩略图栏显示/隐藏
+          const container = document.getElementById('eh-thumbnails-container');
+          if (container) {
+            container.classList.toggle('eh-hidden');
+          }
+          e.preventDefault();
+          break; }
         case 'h':
         case 'H':
           // 切到横向连续
