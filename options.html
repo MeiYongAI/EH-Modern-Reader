@@ -46,11 +46,6 @@
     Made with ❤️ · 问题反馈请附带控制台日志
   </footer>
 
-  <script>
-    try {
-      const m = chrome.runtime.getManifest?.();
-      if (m?.version) document.getElementById('ver').textContent = `v${m.version}`;
-    } catch {}
-  </script>
+  <script src="options.js" defer></script>
 </body>
 </html>

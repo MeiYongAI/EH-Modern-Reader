@@ -37,6 +37,7 @@ $includeItems = @(
     "popup.html",
     "popup.js",
     "options.html",
+    "options.js",
     "welcome.html",
     "README.md",
     "LICENSE",
