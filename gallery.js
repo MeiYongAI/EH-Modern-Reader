@@ -672,6 +672,90 @@
     overlay.addEventListener('click',(e)=>{ if(e.target===overlay) restore(); });
     const escHandler=(e)=>{ if(e.key==='Escape'){ restore(); document.removeEventListener('keydown',escHandler);} }; document.addEventListener('keydown',escHandler);
     document.body.style.overflow='hidden';
+
+    // —— 评论展开逻辑（默认自动展开全部） ——
+    async function expandAllCommentsAuto() {
+      if (!commentRoot) return;
+      try {
+        const galleryUrl = `${pageData.baseUrl}g/${pageData.gid}/${pageData.token}/`;
+        const url = galleryUrl + '?hc=1';
+        const resp = await fetch(url, { credentials: 'same-origin' });
+        if (!resp.ok) throw new Error('HTTP '+resp.status);
+        const html = await resp.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newRoot = doc.getElementById('cdiv');
+        if (newRoot) {
+          commentRoot.innerHTML = newRoot.innerHTML;
+        }
+      } catch (err) {
+        console.warn('[EH Reader] 自动展开评论失败:', err);
+      }
+    }
+    // 打开弹窗后立即自动展开
+    expandAllCommentsAuto();
+
+    // 捕获 overlay 内所有可能导致跳转导致窗口关闭的链接（?hc=1 / #cdiv 等）
+    function genericCommentLinkInterceptor(e) {
+      const a = e.target && (e.target.closest ? e.target.closest('a') : null);
+      if (!a) return;
+      const href = (a.getAttribute('href') || '').trim();
+      // 站点“展开全部评论”常见跳转参数 ?hc=1 或锚点回到 #cdiv
+      if (/hc=1/.test(href) || /#cdiv/.test(href) || /expand_comment/i.test(href)) {
+        e.preventDefault(); e.stopPropagation();
+        // 已默认自动展开，这里阻断站点导航即可
+      }
+    }
+    panel.addEventListener('click', genericCommentLinkInterceptor, true);
+    panel.addEventListener('mousedown', genericCommentLinkInterceptor, true);
+    panel.addEventListener('auxclick', genericCommentLinkInterceptor, true);
+    // 关闭时移除拦截
+    const originalRestore = closeBtn.onclick;
+    closeBtn.onclick = function() { panel.removeEventListener('click', genericCommentLinkInterceptor, true); panel.removeEventListener('mousedown', genericCommentLinkInterceptor, true); panel.removeEventListener('auxclick', genericCommentLinkInterceptor, true); if (originalRestore) originalRestore(); };
+    overlay.addEventListener('remove', () => { panel.removeEventListener('click', genericCommentLinkInterceptor, true); panel.removeEventListener('mousedown', genericCommentLinkInterceptor, true); panel.removeEventListener('auxclick', genericCommentLinkInterceptor, true); });
+
+    // ===== 浮动“发评论”按钮：无需滚动到底部 =====
+    const fab = document.createElement('button');
+    fab.textContent = '发评论';
+    fab.title = '跳转到评论输入区域';
+    // 仿原版样式的悬浮按钮（尽量简洁）
+    fab.style.cssText = 'position:fixed;right:28px;bottom:32px;z-index:10000;padding:12px 18px;background:#6a7ee1;color:#fff;border:none;border-radius:22px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,0.35);transition:transform .18s,box-shadow .18s;';
+    fab.onmouseenter = () => { fab.style.transform='translateY(-2px)'; fab.style.boxShadow='0 8px 26px rgba(0,0,0,0.45)'; };
+    fab.onmouseleave = () => { fab.style.transform=''; fab.style.boxShadow='0 6px 20px rgba(0,0,0,0.35)'; };
+    overlay.appendChild(fab);
+
+    function ensureCommentFormVisible() {
+      try {
+        // 优先查找常见表单/文本域
+        let form = commentRoot.querySelector('#newcomment, #commentform, form[action*="comment"], form');
+        let textarea = commentRoot.querySelector('textarea, [name="commenttext"]');
+        // 若被隐藏，尝试解除隐藏
+        if (form && (form.style && form.style.display === 'none')) form.style.display = '';
+        if (textarea) {
+          const p = textarea.closest('[style*="display:none"], .hidden');
+          if (p && p.style) p.style.display = '';
+        }
+        // 部分站点使用锚点链接触发展开
+        if (!textarea) {
+          const anchor = commentRoot.querySelector('a[href*="#newcomment"], a[href*="comment"]');
+          if (anchor) { try { anchor.click(); } catch {} }
+          // 再次尝试获取
+          textarea = commentRoot.querySelector('textarea, [name="commenttext"]');
+          form = commentRoot.querySelector('#newcomment, #commentform, form[action*="comment"], form');
+        }
+        // 滚动并聚焦
+        if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (textarea) setTimeout(()=> { try { textarea.focus(); } catch {} }, 260);
+      } catch {}
+    }
+    fab.addEventListener('click', (e)=> { e.preventDefault(); e.stopPropagation(); ensureCommentFormVisible(); });
+
+    // 关闭时移除 FAB
+    const removeFab = () => { try { fab.remove(); } catch {} };
+    const oldClose = closeBtn.onclick;
+    closeBtn.onclick = function() { removeFab(); if (oldClose) oldClose(); };
+    overlay.addEventListener('click', (e)=> { if (e.target===overlay) removeFab(); });
+    escHandler.fabCleanup = removeFab;
   }
 
   // 移除旧全屏评论页方案（已用居中容器替代）

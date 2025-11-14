@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EH Modern Reader",
-  "version": "2.3.2",
+  "version": "2.3.4",
   "description": "Modern E-Hentai Reader with MPV/Gallery modes, smart throttling, progress indicator",
   "permissions": [
     "storage",

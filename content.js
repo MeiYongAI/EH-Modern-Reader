@@ -1868,21 +1868,33 @@
       const title = (imageData && imageData.n) ? imageData.n : `Page ${pageNum}`;
       const containerW = 100, containerH = 142;
       
-      // 🎯 雪碧图优化：优先使用E-Hentai自带的雪碧图预览（参考JHenTai）
-      if (imageData && typeof imageData.t === 'string' && imageData.t.includes('url(')) {
+      // 🎯 雪碧图优化：兼容两种格式
+      // 1) "url(https://.../sprite.webp) -200px -0px"
+      // 2) "(https://.../3630904-0.webp) -0px 0" （MPV 原站格式，第二个偏移可能无 px）
+      if (imageData && typeof imageData.t === 'string' && (imageData.t.includes('url(') || imageData.t.trim().startsWith('('))) {
         try {
-          // 解析 style 属性: "url(https://.../sprite.webp) -200px -0px"
-          const styleMatch = imageData.t.match(/url\(['"]?([^'"()]+)['"]?\)\s*(-?\d+)px\s+(-?\d+)px/);
-          if (styleMatch) {
-            const spriteUrl = styleMatch[1];
-            const offsetX = Math.abs(parseInt(styleMatch[2]) || 0);
-            const offsetY = Math.abs(parseInt(styleMatch[3]) || 0);
-            
+          const raw = imageData.t.trim();
+          let spriteUrl = null, offsetX = 0, offsetY = 0;
+          // 格式1: url(...)
+          const m1 = raw.match(/url\(['"]?([^'"()]+)['"]?\)\s*(-?\d+)px\s+(-?\d+)px/);
+          if (m1) {
+            spriteUrl = m1[1];
+            offsetX = Math.abs(parseInt(m1[2]) || 0);
+            offsetY = Math.abs(parseInt(m1[3]) || 0);
+          } else {
+            // 格式2: (https://... ) -0px 0   第二个偏移可能没有 px
+            const m2 = raw.match(/^\(\s*([^()]+?)\s*\)\s*(-?\d+)px\s+(-?\d+)(?:px)?/);
+            if (m2) {
+              spriteUrl = m2[1];
+              offsetX = Math.abs(parseInt(m2[2]) || 0);
+              offsetY = Math.abs(parseInt(m2[3]) || 0);
+            }
+          }
+          if (spriteUrl) {
             // 假设每个缩略图宽度200px，高度通过比例计算（E-Hentai通常是267px）
             const spriteThumbW = 200;
             const spriteThumbH = 267;
-            
-            console.log(`[EH Sprite] 页${pageNum} 使用雪碧图: ${spriteUrl}, 偏移: (${offsetX}, ${offsetY})`);
+            console.log(`[EH Sprite] 页${pageNum} 使用雪碧图: ${spriteUrl}, 偏移: (${offsetX}, ${offsetY}) 原始: ${raw}`);
             
             // 加载雪碧图并裁剪
             getSpriteMeta(spriteUrl).then(({ img, tileW, tileH }) => {
@@ -1931,6 +1943,7 @@
             
             return; // 雪碧图路径，直接返回
           }
+          console.warn(`[EH Sprite] 页${pageNum} 未匹配雪碧图格式 raw="${raw}"`);
         } catch (e) {
           console.warn('[EH Sprite] 雪碧图解析失败:', e);
         }
