@@ -37,16 +37,6 @@ Chrome/Edge（开发者模式）
 
 详细见 `docs/INSTALL.md`。
 
-### 油猴脚本版
-
-如果你更喜欢使用 Tampermonkey/Violentmonkey：
-
-1. 安装 [Tampermonkey](https://www.tampermonkey.net/) 或 [Violentmonkey](https://violentmonkey.github.io/)
-2. 下载 [`dist/eh-modern-reader.user.js`](dist/eh-modern-reader.user.js)
-3. 直接拖拽到浏览器窗口安装
-
-**功能完全一致**，选择你喜欢的安装方式即可。详细说明见 [`dist/INSTALL.md`](dist/INSTALL.md)。
-
 ## 使用
 
 - MPV 模式：进入 `/mpv/` 页面自动启用
