@@ -1,0 +1,2005 @@
+/**
+ * EH Modern Reader - 样式表
+ * 现代化的阅读器界面设计
+ */
+
+/* ==================== 全局样式 ==================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.eh-modern-reader {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow: hidden;
+  background: #f5f5f5;
+  color: #333;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ==================== 暗色模式 ==================== */
+
+body.eh-dark-mode {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode #eh-header {
+  background: #2d2d2d;
+  border-bottom-color: #404040;
+}
+
+body.eh-dark-mode .eh-panel-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+body.eh-dark-mode #eh-image-container {
+  background: #1a1a1a;
+}
+
+/* 旧 .eh-loading 已移除 */
+
+/* ==================== 容器布局 ==================== */
+
+#eh-reader-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative; /* 为绝对定位的header提供定位上下文 */
+}
+
+/* ==================== 顶部工具栏 ==================== */
+
+#eh-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 100;
+  pointer-events: none; /* 允许点击穿透 */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* 隐藏header时向上滑出 */
+#eh-header.eh-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 恢复header内部按钮和元素的点击能力 */
+#eh-header * {
+  pointer-events: auto;
+}
+
+.eh-header-left,
+.eh-header-center,
+.eh-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eh-header-left {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 防止返回按钮因标题过长被挤压变形 */
+#eh-close-btn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.eh-header-center {
+  flex: 0 0 auto;
+}
+
+.eh-header-right {
+  flex: 0 0 auto;
+}
+
+#eh-title {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+#eh-page-info {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  min-width: 80px;
+  text-align: center;
+  display: none !important; /* 隐藏顶部当前页/总页数，保留节点供脚本引用避免空指针 */
+}
+
+body.eh-dark-mode #eh-page-info {
+  color: #aaa;
+}
+
+/* ==================== 按钮样式 ==================== */
+
+.eh-icon-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  color: #222;
+}
+
+body.eh-dark-mode .eh-icon-btn {
+  color: #e0e0e0;
+}
+
+.eh-icon-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+body.eh-dark-mode .eh-icon-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* 缩略图悬停开关激活样式 */
+.eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.4);
+}
+body.eh-dark-mode .eh-icon-btn.eh-active {
+  background: rgba(255, 107, 157, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.5);
+}
+
+.eh-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.eh-icon-btn-small {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  color: #222;
+}
+
+body.eh-dark-mode .eh-icon-btn-small {
+  color: #e0e0e0;
+}
+
+.eh-icon-btn-small:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+body.eh-dark-mode .eh-icon-btn-small:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* ==================== 主内容区 ==================== */
+
+#eh-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  /* 移除 padding-top，因为 header 是 absolute 定位，不占据空间 */
+  /* padding-top: 56px; */
+  /* 不需要过渡效果，避免切换时图片位移 */
+  /* transition: padding-top 0.3s ease; */
+}
+
+/* 删除这个规则，不再需要 */
+/* #eh-main.eh-fullheight {
+  padding-top: 0;
+} */
+
+/* 隐藏横向连续模式容器的原生滚动条（使用自定义进度条） */
+#eh-continuous-horizontal {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+#eh-continuous-horizontal::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;            /* Chrome/Safari/Edge (Blink/WebKit) */
+}
+/* 避免在横向连续模式中误选图片导致蓝色高亮 */
+#eh-continuous-horizontal {
+  user-select: none;
+}
+
+/* 横向模式的占位包装与骨架 */
+.eh-ch-wrapper {
+  height: 100%;
+  aspect-ratio: var(--eh-aspect, 0.7); /* 默认2:3纵向图 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* 连续横向模式图片：填满包装容器，保持比例，消除内侧大留白 */
+.eh-ch-wrapper > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 隐藏纵向连续模式容器的原生滚动条 */
+#eh-continuous-vertical {
+  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;    /* Firefox */
+}
+#eh-continuous-vertical::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;            /* Chrome/Safari/Edge (Blink/WebKit) */
+}
+/* 避免在纵向连续模式中误选图片 */
+#eh-continuous-vertical {
+  user-select: none;
+}
+
+/* 纵向模式的占位包装与骨架 */
+.eh-cv-wrapper {
+  width: 100%;
+  aspect-ratio: var(--eh-aspect, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  max-width: 100%;
+}
+
+/* 连续纵向模式图片 */
+.eh-cv-wrapper > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 骨架屏动画（横向和纵向共用） */
+.eh-ch-skeleton, .eh-cv-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========== 全局移动端点击/选择优化 ========== */
+body.eh-modern-reader, body.eh-dark-mode, #eh-reader-container, #eh-reader-container * {
+  -webkit-tap-highlight-color: rgba(0,0,0,0); /* 移除手机点击蓝色闪烁 */
+}
+body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-container * {
+  user-select: none; /* 防止出现系统选择高亮 */
+}
+.eh-icon-btn:focus, .eh-icon-btn-small:focus, button:focus { outline: none; }
+
+/* ========== 评论弹窗多端自适应 ========== */
+/* 桌面端：居中弹窗 */
+#eh-comment-modal { 
+  padding: 40px; 
+  box-sizing: border-box; 
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#eh-comment-modal .eh-comment-panel {
+  max-width: 900px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  position: relative;
+  border-radius: 8px;
+}
+#eh-comment-modal .eh-comment-header { 
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+/* 评论内容区域不阻止滚动 */
+#eh-comment-modal #cdiv {
+  max-height: none !important;
+  overflow: visible !important;
+  height: auto !important;
+}
+#eh-comment-modal .eh-drag-handle { 
+  width: 44px; 
+  height: 5px; 
+  border-radius: 3px; 
+  background: rgba(128,128,128,0.35); 
+  margin: 8px auto 10px; 
+  cursor: grab;
+  touch-action: none;
+}
+
+/* 移动端（≤860px）：垂直居中卡片式弹窗 */
+@media (max-width: 860px) {
+  #eh-comment-modal {
+    padding: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  #eh-comment-modal .eh-comment-panel {
+    position: relative;
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 80px) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 16px 20px !important;
+  }
+  #eh-comment-modal .eh-drag-handle {
+    display: none; /* 居中模式不需要拖拽把手 */
+  }
+}
+/* 超小屏（≤600px）：字体更大，更舒适 */
+@media (max-width: 600px) {
+  #eh-comment-modal {
+    padding: 12px !important;
+  }
+  #eh-comment-modal .eh-comment-panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100vh - 60px);
+    font-size: 16px;
+    line-height: 1.65;
+    padding: 14px 18px !important;
+  }
+}
+
+/* 安全区适配（刘海屏/底部手势条） */
+@supports(padding: max(0px)) {
+  @media (max-width: 860px) {
+    #eh-comment-modal {
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)) !important;
+    }
+    #eh-comment-modal .eh-comment-panel {
+      max-height: calc(100vh - max(80px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 32px));
+    }
+  }
+  @media (max-width: 600px) {
+    #eh-comment-modal {
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important;
+    }
+    #eh-comment-modal .eh-comment-panel {
+      max-height: calc(100vh - max(60px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 24px));
+    }
+  }
+}
+/* 提升边框可辨识度：浅色/深色模式给一个细 outline */
+body:not(.eh-dark-mode) #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(0,0,0,0.08); }
+body.eh-dark-mode #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(255,255,255,0.14); }
+
+.eh-ch-skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(60, 60, 60, 0.08);
+  border-radius: 4px;
+}
+
+/* ==================== 图片查看区 ==================== */
+
+/* ========== 全屏评论页（方案A） ========== */
+#eh-comment-page {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,0.55);
+}
+
+#eh-comment-page .eh-page-shell {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 980px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+#eh-comment-page .eh-appbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+#eh-comment-page .eh-appbar .eh-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+#eh-comment-page .eh-appbar .eh-close-btn {
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+#eh-comment-page .eh-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  padding: 12px 16px 88px 16px; /* 底部为悬浮按钮留白 */
+  border-radius: 10px;
+  margin: 12px;
+  backdrop-filter: blur(2px);
+}
+
+#eh-comment-page .eh-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 10001;
+}
+
+/* 颜色随主题变换 */
+body:not(.eh-dark-mode) #eh-comment-page .eh-appbar { background: #ffffff; color: #111; border-bottom: 1px solid rgba(0,0,0,0.08); }
+body:not(.eh-dark-mode) #eh-comment-page .eh-content { background: #ffffff; color: #111; outline: 1px solid rgba(0,0,0,0.08); }
+body:not(.eh-dark-mode) #eh-comment-page .eh-fab { background: #1976d2; color: #fff; border: 1px solid rgba(0,0,0,0.12); }
+
+body.eh-dark-mode #eh-comment-page .eh-appbar { background: #1e1e1e; color: #ddd; border-bottom: 1px solid rgba(255,255,255,0.12); }
+body.eh-dark-mode #eh-comment-page .eh-content { background: #1e1e1e; color: #ddd; outline: 1px solid rgba(255,255,255,0.14); }
+body.eh-dark-mode #eh-comment-page .eh-fab { background: #2962ff; color: #fff; border: 1px solid rgba(255,255,255,0.16); }
+
+/* 移动端：全宽显示，外边距减小 */
+@media (max-width: 860px) {
+  #eh-comment-page .eh-page-shell { max-width: none; }
+  #eh-comment-page .eh-content { margin: 8px; padding: 10px 12px 80px 12px; }
+  #eh-comment-page .eh-fab { right: 16px; bottom: 16px; }
+}
+
+
+#eh-viewer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  background: #f5f5f5;
+  cursor: pointer; /* 提示可点击切换菜单 */
+  user-select: none;
+}
+
+body.eh-dark-mode #eh-viewer {
+  background: #1a1a1a;
+}
+
+/* ==================== 底部菜单(缩略图+进度条+按钮) ==================== */
+
+#eh-bottom-menu {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.9) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+body.eh-dark-mode #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(20, 20, 20, 0.98) 0%, rgba(30, 30, 30, 0.95) 100%);
+}
+
+/* 浅色模式下的底部栏样式覆盖 */
+body:not(.eh-dark-mode) #eh-bottom-menu {
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+}
+
+#eh-bottom-menu.eh-menu-hidden {
+  bottom: calc(-100% - 20px); /* 完全隐藏到屏幕外 */
+}
+
+/* 缩略图容器 */
+
+.eh-thumbnails-container {
+  height: 160px;  /* 增高以完整显示缩略图 */
+  padding: 6px 0 6px 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+body:not(.eh-dark-mode) .eh-thumbnails-container { border-bottom-color: rgba(0,0,0,0.06); }
+
+.eh-thumbnails-horizontal {
+  display: flex;
+  flex-direction: row;
+  align-items: center; /* 垂直居中缩略图 */
+  gap: 8px;
+  padding: 6px 12px; /* 微调内边距 */
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar {
+  display: none; /* 隐藏滚动条 */
+}
+
+/* 保留滚动功能，但隐藏滚动条轨道和滑块 */
+.eh-thumbnails-horizontal {
+  -ms-overflow-style: none;  /* IE和Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+/* 浅色模式滚动条颜色 */
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.eh-thumbnails-horizontal::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== 缩略图 ==================== */
+
+.eh-thumbnail {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 142px; /* 与 JS 中计算的 thumbHeight 保持一致 */
+  flex-shrink: 0;
+  display: flex;
+  align-items: center; /* 内部img/canvas垂直居中 */
+  justify-content: center; /* 内部img/canvas水平居中 */
+  position: relative;
+  cursor: pointer;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  background: rgba(255,255,255,0.04); /* 默认轻微底色，真正缩略图加载后会移除 */
+}
+
+/* 缩略图占位内部容器：保持尺寸稳定，快速背景预览挂载在父 .eh-thumbnail 上 */
+.eh-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  background: transparent;
+  user-select: none;
+}
+body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
+
+/* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
+.eh-thumbnail > img {
+  width: 100px;
+  height: 142px;
+  object-fit: contain;
+  display: block;
+}
+/* Canvas 缩略图等同于 img 尺寸与居中展示 */
+.eh-thumbnail > canvas {
+  width: 100px !important;
+  height: 142px !important;
+  display: block;
+  /* 🎯 淡入效果（参考JHenTai的fadeIn） */
+  animation: ehThumbnailFadeIn 0.3s ease-out;
+}
+
+/* 🎯 缩略图淡入动画 */
+@keyframes ehThumbnailFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.eh-thumbnail:hover { transform: scale(1.04); }
+
+.eh-thumbnail.active { border: 2px solid #FF6B9D; box-shadow: 0 0 0 3px rgba(255,107,157,0.25); }
+
+.eh-thumbnail-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.eh-thumbnail.active .eh-thumbnail-number {
+  color: #FF6B9D;
+  font-weight: 600;
+}
+
+/* ==================== 进度条区域 ==================== */
+
+.eh-slider-container {
+  padding: 16px 20px 12px 20px;  /* 增加上下空间 */
+  display: flex;
+  flex-direction: row;  /* 改为横向布局 */
+  align-items: center;
+  gap: 12px;
+}
+
+.eh-progress-number {
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  opacity: 0.8;
+  min-width: 40px;
+  text-align: center;
+  flex-shrink: 0;
+}
+body:not(.eh-dark-mode) .eh-progress-number { color: #333; opacity: 0.9; }
+
+.eh-slider-track {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  flex: 1;  /* 让进度条占据剩余空间 */
+}
+
+.eh-slider-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: linear-gradient(to right, #FF6B9D 0%, #FF8FAB 100%);
+  border-radius: 3px 0 0 3px;
+  pointer-events: none;
+  z-index: 1;
+  transition: width 0.2s ease;
+  box-shadow: 0 0 8px rgba(255, 107, 157, 0.5);
+}
+
+.eh-progress-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+}
+body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
+
+.eh-progress-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF8FAB 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(255, 107, 157, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.eh-progress-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 3px 10px rgba(255, 107, 157, 0.6);
+}
+
+.eh-progress-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+/* 隐藏进度条的粉色填充，仅保留拖动球 */
+#eh-slider-fill, .eh-slider-fill {
+  display: none !important;
+}
+
+/* 移除进度条冗余页码（顶部已显示） */
+
+.eh-thumb-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* 缩略图容器（每个容器只放一张缩略图） */
+.eh-thumbnail {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
+  margin-bottom: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.eh-thumbnail:hover {
+  border-color: #FF6B9D;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.eh-thumbnail.active {
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
+}
+
+.eh-thumbnail-placeholder {
+  width: 100%;
+  height: 281px;
+  background-color: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+body.eh-dark-mode .eh-thumbnail-placeholder {
+  background-color: #3a3a3a;
+}
+
+.eh-thumbnail-placeholder span {
+  font-size: 24px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.2);
+  position: absolute;
+  z-index: 1;
+}
+
+body.eh-dark-mode .eh-thumbnail-placeholder span {
+  color: rgba(255,255,255,0.2);
+}
+
+.eh-thumbnail-number {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  z-index: 2;
+}
+
+/* ==================== 图片查看区 ==================== */
+
+#eh-viewer {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#eh-image-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  position: relative;
+}
+
+body.eh-dark-mode #eh-image-container {
+  background: #1a1a1a;
+}
+
+#eh-current-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%; /* 填充容器宽度，避免小图片留空白 */
+  height: 100%; /* 填充容器高度，避免小图片留空白 */
+  object-fit: contain; /* 保持比例，不裁剪 */
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+}
+
+#eh-current-image[src] {
+  opacity: 1;
+}
+
+/* 缩放时的过渡效果 */
+#eh-current-image.zooming {
+  transition: transform 0.1s ease;
+}
+
+#eh-current-image[src] {
+  opacity: 1;
+}
+
+/* 旧加载动画已移除，统一使用环形进度覆盖层 */
+
+/* ==================== 翻页按钮 ==================== */
+
+.eh-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 56px;
+  height: 56px;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 20;
+}
+
+body.eh-dark-mode .eh-nav-btn {
+  background: rgba(45, 45, 45, 0.9);
+}
+
+#eh-viewer:hover .eh-nav-btn {
+  opacity: 1;
+}
+
+.eh-nav-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+}
+
+body.eh-dark-mode .eh-nav-btn:hover {
+  background: rgba(45, 45, 45, 1);
+}
+
+.eh-nav-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.eh-nav-btn:disabled {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+.eh-nav-prev {
+  left: 24px;
+}
+
+.eh-nav-next {
+  right: 24px;
+}
+
+/* ==================== 浮动侧边栏切换按钮 ==================== */
+
+.eh-sidebar-toggle-float {
+  position: fixed;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float {
+  background: rgba(45, 45, 45, 0.95);
+  color: #e0e0e0;
+}
+
+/* 当侧边栏隐藏时显示浮动按钮 */
+#eh-sidebar.eh-sidebar-hidden ~ #eh-viewer .eh-sidebar-toggle-float,
+.eh-sidebar-hidden ~ * .eh-sidebar-toggle-float {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.eh-sidebar-toggle-float:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+body.eh-dark-mode .eh-sidebar-toggle-float:hover {
+  background: rgba(60, 60, 60, 1);
+}
+
+.eh-sidebar-toggle-float:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.eh-sidebar-toggle-float svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* ==================== 底部控制栏 ==================== */
+
+#eh-footer {
+  height: 72px;
+  background: #fff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 20px;
+  gap: 10px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+body.eh-dark-mode #eh-footer {
+  background: #2a2a2a;
+  border-top-color: #404040;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+}
+
+.eh-progress-container {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.eh-progress-bar {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  border-radius: 4px;
+}
+
+.eh-progress-bar::-webkit-slider-track {
+  height: 8px;
+  background: linear-gradient(to right, #FFE5EE 0%, #e0e0e0 0%);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+body.eh-dark-mode .eh-progress-bar::-webkit-slider-track {
+  background: linear-gradient(to right, #4a2a3a 0%, #404040 0%);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.eh-progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #FF6B9D 0%, #FF8FAB 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.4);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 3px solid #fff;
+}
+
+body.eh-dark-mode .eh-progress-bar::-webkit-slider-thumb {
+  border-color: #2a2a2a;
+  box-shadow: 0 3px 8px rgba(255, 107, 157, 0.6);
+}
+
+.eh-progress-bar::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(255, 107, 157, 0.5);
+}
+
+.eh-progress-bar::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+}
+
+.eh-progress-bar::-moz-range-track {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+}
+
+body.eh-dark-mode .eh-progress-bar::-moz-range-track {
+  background: #404040;
+}
+
+.eh-progress-bar::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #FF6B9D;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+
+.eh-progress-bar::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+.eh-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 6px;
+  background: linear-gradient(90deg, #FF6B9D 0%, #FFB6C1 100%);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+  transition: width 0.3s ease;
+}
+
+.eh-footer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.eh-btn-small {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+body.eh-dark-mode .eh-btn-small {
+  background: #3a3a3a;
+  border-color: #505050;
+}
+
+.eh-btn-small:hover {
+  background: #f5f5f5;
+  border-color: #FF6B9D;
+}
+
+body.eh-dark-mode .eh-btn-small:hover {
+  background: #454545;
+  border-color: #FF6B9D;
+}
+
+.eh-btn-small:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+#eh-page-input {
+  width: 60px;
+  height: 32px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #fff;
+  color: #333;
+}
+
+body.eh-dark-mode #eh-page-input {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+
+#eh-page-input:focus {
+  outline: none;
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.1);
+}
+
+/* ==================== 设置面板 ==================== */
+
+.eh-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+  transition: opacity 0.25s, visibility 0.25s;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.eh-panel.eh-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 侧边缩略图容器隐藏 */
+#eh-thumbnails-container.eh-hidden {
+  display: none;
+}
+
+.eh-panel-content {
+  background: #fff;
+  width: 380px;
+  height: 100%;
+  padding: 28px 24px;
+  overflow-y: auto;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transform: translateX(0);
+  color: #333;
+  display: flex;
+  flex-direction: column;
+}
+
+.eh-panel.eh-hidden .eh-panel-content {
+  transform: translateX(100%);
+}
+
+body.eh-dark-mode .eh-panel-content {
+  background: #2a2a2a;
+  color: #e0e0e0;
+  box-shadow: -4px 0 32px rgba(0,0,0,0.6);
+}
+
+/* 面板头部：标题 + 关闭按钮 */
+.eh-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.eh-panel-close {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eh-panel-close:hover {
+  background: rgba(0,0,0,0.08);
+  color: #333;
+}
+
+body.eh-dark-mode .eh-panel-close {
+  color: #999;
+}
+
+body.eh-dark-mode .eh-panel-close:hover {
+  background: rgba(255,255,255,0.1);
+  color: #e0e0e0;
+}
+
+.eh-panel-content h3 {
+  font-size: 19px;
+  margin: 0;
+  font-weight: 700;
+  color: #222;
+  letter-spacing: 0.3px;
+}
+
+body.eh-dark-mode .eh-panel-content h3 {
+  color: #f0f0f0;
+}
+
+.eh-setting-item {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.eh-setting-item label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #666;
+  text-align: left;
+}
+
+body.eh-dark-mode .eh-setting-item label {
+  color: #bbb;
+}
+
+/* 设置分组 */
+.eh-setting-group {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.eh-setting-group:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+body.eh-dark-mode .eh-setting-group {
+  border-bottom-color: #3a3a3a;
+}
+
+/* 分组标签 */
+.eh-setting-label-group {
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF6B9D;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+body.eh-dark-mode .eh-setting-label-group {
+  color: #ffb3d1;
+}
+
+/* 滑块容器 */
+.eh-slider-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eh-slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(to right, #FF6B9D 0%, #FF6B9D var(--value-percent, 0%), #e0e0e0 var(--value-percent, 0%), #e0e0e0 100%);
+  border-radius: 3px;
+  outline: none;
+  transition: opacity 0.2s;
+}
+
+.eh-slider:hover {
+  opacity: 0.9;
+}
+
+/* Slider thumb - WebKit */
+.eh-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #FF6B9D;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.eh-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(255,107,157,0.4);
+}
+
+/* Slider thumb - Firefox */
+.eh-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #FF6B9D;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.eh-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(255,107,157,0.4);
+}
+
+body.eh-dark-mode .eh-slider {
+  background: linear-gradient(to right, #FF6B9D 0%, #FF6B9D var(--value-percent, 0%), #505050 var(--value-percent, 0%), #505050 100%);
+}
+
+/* 滑块数值显示 */
+.eh-slider-value {
+  min-width: 60px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+body.eh-dark-mode .eh-slider-value {
+  color: #e0e0e0;
+}
+
+.eh-speed-label {
+  min-width: 48px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #FF6B9D;
+  background: rgba(255,107,157,0.1);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+body.eh-dark-mode .eh-speed-label {
+  background: rgba(255,107,157,0.15);
+  color: #ffb3d1;
+}
+
+/* 自定义滚动条（视觉降噪） */
+.eh-panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.eh-panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.eh-panel-content::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.eh-panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.25);
+}
+
+body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+}
+
+body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* 恢复默认设置按钮 */
+.eh-reset-btn {
+  width: 100%;
+  padding: 11px 16px;
+  background: linear-gradient(135deg, #f5f5f5, #e8e8e8);
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.eh-reset-btn:hover {
+  background: linear-gradient(135deg, #fff, #f0f0f0);
+  border-color: #FF6B9D;
+  color: #FF6B9D;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(255,107,157,0.2);
+}
+
+.eh-reset-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(255,107,157,0.15);
+}
+
+body.eh-dark-mode .eh-reset-btn {
+  background: linear-gradient(135deg, #333, #2a2a2a);
+  border-color: #404040;
+  color: #bbb;
+}
+
+body.eh-dark-mode .eh-reset-btn:hover {
+  background: linear-gradient(135deg, #3a3a3a, #333);
+  border-color: #FF6B9D;
+  color: #ffb3d1;
+  box-shadow: 0 2px 6px rgba(255,107,157,0.3);
+}
+
+/* 内联设置项（label 和 input 同行） */
+.eh-setting-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  min-height: 34px;
+}
+
+.eh-setting-inline label {
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+body.eh-dark-mode .eh-setting-inline label {
+  color: #e0e0e0;
+  flex: 1;
+}
+
+/* 数字输入：居中文本，移除浏览器默认spin按钮 */
+.eh-setting-inline input[type="number"] {
+  width: 110px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: border-color 0.2s;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  background: #fff;
+  color: #222;
+  appearance: textfield; /* 标准属性 */
+  -moz-appearance: textfield; /* Firefox */
+}
+/* Chrome/Edge 隐藏上下箭头 */
+.eh-setting-inline input[type="number"]::-webkit-inner-spin-button,
+.eh-setting-inline input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.eh-setting-inline input[type="number"]:focus {
+  outline: none;
+  border-color: #FF6B9D;
+  font-size: 13px;
+  text-align: center;
+  background: #fff;
+}
+
+body.eh-dark-mode .eh-setting-inline input[type="number"] {
+  background: #333;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+body.eh-dark-mode .eh-setting-inline input[type="number"]:focus {
+  border-color: #FF6B9D;
+  background: #2a2a2a;
+}
+
+/* 禁用态可读性提升 */
+.eh-setting-inline input[type="number"]:disabled {
+  background: #f8f8f8;
+  color: #777;
+  border-color: #e5e5e5;
+}
+body.eh-dark-mode .eh-setting-inline input[type="number"]:disabled {
+  background: #2f2f2f;
+  color: #9a9a9a;
+  border-color: #3f3f3f;
+}
+
+.eh-setting-item select {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #fff;
+  cursor: pointer;
+}
+
+body.eh-dark-mode .eh-setting-item select {
+  background: #3a3a3a;
+  border-color: #505050;
+  color: #e0e0e0;
+}
+
+.eh-setting-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #FF6B9D;
+}
+
+/* 单选按钮组样式（修复双圈与对比度） */
+.eh-radio-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.eh-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 600;
+  background: linear-gradient(180deg, #fafafa, #f5f5f5);
+  color: #444;
+  user-select: none;
+}
+
+.eh-radio-label:hover {
+  border-color: #ffb3d1;
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* 自定义单选圆点，避免原生与自定义叠加导致“两个圈” */
+.eh-radio-label input[type="radio"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 2px solid #FF6B9D;
+  border-radius: 50%;
+  background: #fff;
+  position: relative;
+  cursor: pointer;
+}
+body.eh-dark-mode .eh-radio-label input[type="radio"] {
+  background: #2a2a2a;
+  border-color: #FF6B9D;
+}
+.eh-radio-label input[type="radio"]::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #FF6B9D;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.12s ease;
+}
+.eh-radio-label input[type="radio"]:checked::after {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.eh-radio-label span {
+  color: #555;
+}
+body.eh-dark-mode .eh-radio-label span {
+  color: #e0e0e0;
+}
+
+.eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.25);
+}
+body.eh-dark-mode .eh-radio-label {
+  border-color: #484848;
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+body.eh-dark-mode .eh-radio-label:hover {
+  border-color: #ffb3d1;
+  background: #333;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+body.eh-dark-mode .eh-radio-label:has(input[type="radio"]:checked) {
+  border-color: #FF6B9D;
+  background: #333;
+  box-shadow: 0 2px 8px rgba(255,107,157,0.3);
+}
+
+/* Toggle Switch Styles */
+.eh-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  vertical-align: middle;
+}
+
+.eh-toggle-switch input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.eh-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 26px;
+  transition: background-color 0.3s ease;
+}
+
+.eh-toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider {
+  background-color: #FF6B9D;
+}
+
+.eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider::before {
+  transform: translateX(24px);
+}
+
+.eh-toggle-switch input[type="checkbox"]:focus + .eh-toggle-slider {
+  box-shadow: 0 0 0 2px rgba(255, 107, 157, 0.2);
+}
+
+.eh-toggle-switch input[type="checkbox"]:disabled + .eh-toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+body.eh-dark-mode .eh-toggle-slider {
+  background-color: #505050;
+}
+
+body.eh-dark-mode .eh-toggle-slider::before {
+  background-color: #ddd;
+}
+
+body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-slider {
+  background-color: #FF6B9D;
+}
+
+.eh-btn {
+  width: 100%;
+  height: 40px;
+  border: none;
+  background: #FF6B9D;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 16px;
+  transition: background-color 0.2s;
+}
+
+.eh-btn:hover {
+  background: #FF5A8C;
+}
+
+.eh-btn:active {
+  transform: scale(0.98);
+}
+
+/* ==================== 响应式设计 ==================== */
+
+@media (max-width: 768px) {
+  #eh-sidebar.eh-sidebar-visible {
+    width: 180px;
+  }
+
+  #eh-title {
+    font-size: 14px;
+  }
+
+  .eh-nav-btn {
+    width: 48px;
+    height: 48px;
+    opacity: 0.6;
+  }
+
+  .eh-nav-prev {
+    left: 16px;
+  }
+
+  .eh-nav-next {
+    right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  #eh-header {
+    height: 48px;
+    padding: 0 8px;
+  }
+
+  #eh-sidebar.eh-sidebar-visible {
+    position: absolute;
+    left: 0;
+    top: 48px;
+    height: calc(100% - 48px - 64px);
+    z-index: 50;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  }
+
+  .eh-header-left {
+    gap: 8px;
+  }
+
+  #eh-title {
+    display: none;
+  }
+
+  .eh-nav-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .eh-nav-prev {
+    left: 8px;
+  }
+
+  .eh-nav-next {
+    right: 8px;
+  }
+}
+
+/* ==================== 打印样式 ==================== */
+
+@media print {
+  #eh-header,
+  #eh-footer,
+  #eh-sidebar,
+  .eh-nav-btn {
+    display: none !important;
+  }
+
+  #eh-viewer {
+    width: 100%;
+    height: auto;
+  }
+
+  #eh-current-image {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* ==================== 无障碍 ==================== */
+
+.eh-icon-btn:focus,
+.eh-btn-small:focus,
+.eh-btn:focus {
+  outline: 2px solid #FF6B9D;
+  outline-offset: 2px;
+}
+
+/* ==================== 图片加载进度指示器 ==================== */
+
+/* 进度覆盖层容器 */
+.eh-image-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.eh-image-loading-overlay.eh-fade-out {
+  opacity: 0;
+}
+
+/* 环形进度条容器 */
+.eh-circular-progress {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 16px;
+}
+
+/* SVG 空心环样式 */
+.eh-circular-progress svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* 进度百分比文字 */
+.eh-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* Loading 提示文字 */
+.eh-loading-hint {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 页码提示 */
+.eh-loading-page-number {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  margin-top: 4px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* 暗色模式适配 */
+body.eh-dark-mode .eh-image-loading-overlay {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+/* SVG 空心环在暗色模式下保持相同样式 */
+body.eh-dark-mode #eh-progress-ring {
+  stroke: #FF6B9D;
+}
+
+/* ==================== 性能优化 ==================== */
+
+#eh-current-image {
+  will-change: opacity;
+}
+
+.eh-thumb {
+  will-change: transform;
+  contain: layout style paint;
+}
+
+.eh-nav-btn {
+  will-change: opacity, transform;
+}
+
+/* SVG 进度环性能优化 */
+#eh-progress-ring {
+  will-change: stroke-dashoffset;
+}

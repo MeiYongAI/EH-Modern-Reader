@@ -1,0 +1,68 @@
+# 编辑器和 IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 日志文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 依赖目录（如果未来添加）
+node_modules/
+bower_components/
+
+# 构建输出
+dist/test-extract/
+dist/*.tmp
+build/
+temp_build/
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试覆盖率
+coverage/
+.nyc_output/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 包管理器锁文件（可选保留）
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# 密钥文件
+*.pem
+*.key
+key.properties
+
+# 开发时的测试文件
+test-*.html
+debug-*.js
+
+# 编译后的图标（如果使用脚本生成）
+# icons/*.png
+
+# 用户数据
+user-data/
+storage/
+
+# 备份文件
+*.bak
+*.backup
