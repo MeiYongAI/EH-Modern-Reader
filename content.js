@@ -739,12 +739,22 @@
 
     // ==================== 图片加载进度指示器 ====================
     
+    // 进度指示器隐藏动画的定时器ID
+    let hideProgressTimer = null;
+    
     // 显示图片加载进度覆盖层
     function showImageLoadingProgress(pageNum) {
       if (!elements.imageLoadingOverlay) return;
       
-      elements.imageLoadingOverlay.style.display = 'flex';
+      // 取消之前的隐藏定时器（如果存在）
+      if (hideProgressTimer) {
+        clearTimeout(hideProgressTimer);
+        hideProgressTimer = null;
+      }
+      
+      // 立即移除淡出动画并显示
       elements.imageLoadingOverlay.classList.remove('eh-fade-out');
+      elements.imageLoadingOverlay.style.display = 'flex';
       
       // 重置进度为 0
       updateImageLoadingProgress(0);
@@ -782,14 +792,21 @@
     function hideImageLoadingProgress() {
       if (!elements.imageLoadingOverlay) return;
       
+      // 取消之前的隐藏定时器（如果存在）
+      if (hideProgressTimer) {
+        clearTimeout(hideProgressTimer);
+        hideProgressTimer = null;
+      }
+      
       // 添加淡出动画
       elements.imageLoadingOverlay.classList.add('eh-fade-out');
       
       // 动画结束后隐藏
-      setTimeout(() => {
+      hideProgressTimer = setTimeout(() => {
         if (elements.imageLoadingOverlay) {
           elements.imageLoadingOverlay.style.display = 'none';
         }
+        hideProgressTimer = null;
       }, 300);
       
       console.log('[EH Loading Progress] 隐藏进度指示器');
