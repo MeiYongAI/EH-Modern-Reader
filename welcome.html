@@ -22,12 +22,16 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 1200px;
       background: white;
       border-radius: 20px;
-      padding: 48px;
+      padding: 24px 32px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
       animation: slideIn 0.4s ease-out;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     @keyframes slideIn {
@@ -42,111 +46,167 @@
     }
 
     .header {
-      text-align: center;
-      margin-bottom: 40px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f0f0f0;
     }
 
     .logo {
-      font-size: 64px;
-      margin-bottom: 16px;
+      font-size: 48px;
       animation: float 3s ease-in-out infinite;
+      flex-shrink: 0;
     }
 
     @keyframes float {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
+      50% { transform: translateY(-6px); }
+    }
+
+    .header-text {
+      flex: 1;
     }
 
     h1 {
-      font-size: 32px;
+      font-size: 28px;
       color: #333;
-      margin-bottom: 12px;
+      margin: 0 0 6px 0;
       font-weight: 700;
     }
 
     .subtitle {
-      font-size: 16px;
+      font-size: 14px;
       color: #999;
       font-weight: 500;
+      margin: 0;
     }
 
     .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 24px;
-      margin: 40px 0;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 0 0 20px 0;
     }
 
     .feature {
-      padding: 24px;
+      padding: 14px;
       background: #f8f9fa;
-      border-radius: 12px;
-      border-left: 4px solid #667eea;
+      border-radius: 10px;
+      border-left: 3px solid #667eea;
       transition: all 0.3s ease;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
     }
 
     .feature:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 8px 16px rgba(102, 126, 234, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(102, 126, 234, 0.1);
       background: #f0f3ff;
     }
 
     .feature-icon {
-      font-size: 32px;
-      margin-bottom: 12px;
-      display: inline-block;
+      font-size: 28px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .feature-content {
+      flex: 1;
+      min-width: 0;
     }
 
     .feature h3 {
-      font-size: 18px;
+      font-size: 16px;
       color: #333;
-      margin-bottom: 8px;
+      margin: 0 0 4px 0;
       font-weight: 600;
     }
 
     .feature p {
-      font-size: 14px;
+      font-size: 13px;
       color: #666;
-      line-height: 1.6;
+      line-height: 1.4;
+      margin: 0;
     }
 
     .shortcuts {
-      background: #f8f9fa;
-      border-radius: 12px;
-      padding: 24px;
-      margin: 32px 0;
-      border-left: 4px solid #764ba2;
+      background: transparent;
+      border-radius: 0;
+      padding: 12px 0;
+      margin: 0;
+      border: none;
+      border-top: 2px solid #f0f0f0;
     }
 
     .shortcuts h2 {
-      font-size: 20px;
+      font-size: 14px;
       color: #333;
-      margin-bottom: 16px;
+      margin: 0;
       font-weight: 600;
+      display: none;
+    }
+
+    .shortcuts-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: #667eea;
+      padding: 8px 0;
+      user-select: none;
+    }
+
+    .shortcuts-toggle:hover {
+      color: #764ba2;
+    }
+
+    .toggle-icon {
+      display: inline-block;
+      transition: transform 0.3s ease;
+      font-size: 16px;
+    }
+
+    .toggle-icon.collapsed {
+      transform: rotate(-90deg);
     }
 
     .shortcut-list {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      max-height: 1000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .shortcut-list.collapsed {
+      max-height: 0;
+      margin-top: 0;
+      gap: 0;
     }
 
     .shortcut-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      font-size: 14px;
+      gap: 8px;
+      font-size: 13px;
       color: #555;
     }
 
     .key {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 6px 12px;
-      border-radius: 6px;
+      padding: 5px 10px;
+      border-radius: 5px;
       font-weight: 600;
-      font-size: 12px;
-      min-width: 50px;
+      font-size: 11px;
+      min-width: 40px;
       text-align: center;
       flex-shrink: 0;
       box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
@@ -154,17 +214,18 @@
 
     .cta {
       text-align: center;
-      margin-top: 40px;
+      margin-top: 20px;
+      margin-bottom: 0;
     }
 
     .btn {
       display: inline-block;
-      padding: 16px 32px;
+      padding: 14px 28px;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       text-decoration: none;
-      border-radius: 12px;
-      font-size: 16px;
+      border-radius: 10px;
+      font-size: 15px;
       font-weight: 600;
       transition: all 0.3s ease;
       box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
@@ -183,16 +244,16 @@
 
     .footer {
       text-align: center;
-      margin-top: 32px;
-      padding-top: 24px;
-      border-top: 1px solid #e0e0e0;
-      font-size: 13px;
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 2px solid #f0f0f0;
+      font-size: 12px;
       color: #999;
-      line-height: 1.8;
+      line-height: 1.6;
     }
 
     .footer p {
-      margin: 4px 0;
+      margin: 2px 0;
     }
 
     .footer a {
@@ -209,25 +270,74 @@
       display: inline-block;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 10px;
+      font-size: 11px;
       font-weight: 600;
-      margin-top: 8px;
+      margin-left: 6px;
     }
 
     /* 响应式优化 */
-    @media (max-width: 600px) {
+    @media (max-width: 1024px) {
+      .features {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .shortcut-list {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
       .container {
-        padding: 24px;
+        padding: 16px 20px;
+      }
+
+      .header {
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .logo {
+        font-size: 40px;
       }
 
       h1 {
         font-size: 24px;
       }
 
+      .features {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .feature {
+        padding: 12px;
+      }
+
+      .shortcut-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
       .logo {
-        font-size: 48px;
+        font-size: 36px;
       }
 
       .features {
@@ -237,10 +347,6 @@
       .shortcut-list {
         grid-template-columns: 1fr;
       }
-
-      .btn {
-        width: 100%;
-      }
     }
   </style>
 </head>
@@ -248,51 +354,67 @@
   <div class="container">
     <div class="header">
       <div class="logo">📚</div>
-      <h1>EH Modern Reader</h1>
-      <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器</p>
-      <div class="version-badge">v2.3.6</div>
+      <div class="header-text">
+        <h1>EH Modern Reader</h1>
+        <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器 <span class="version-badge">v2.3.6</span></p>
+      </div>
     </div>
 
     <div class="features">
       <div class="feature">
         <div class="feature-icon">🚀</div>
-        <h3>双模式支持</h3>
-        <p>MPV 自动启动 + Gallery 手动启动，无需 300 Hath 也能使用</p>
+        <div class="feature-content">
+          <h3>双模式支持</h3>
+          <p>MPV 自动 + Gallery 手动启动</p>
+        </div>
       </div>
 
       <div class="feature">
         <div class="feature-icon">🎨</div>
-        <h3>流畅阅读</h3>
-        <p>单页翻页 / 横向滚动，三区点击，智能预加载</p>
+        <div class="feature-content">
+          <h3>流畅阅读</h3>
+          <p>多种模式、三区点击、预加载</p>
+        </div>
       </div>
 
       <div class="feature">
         <div class="feature-icon">🛡️</div>
-        <h3>安全限速</h3>
-        <p>智能请求节流（3并发+250ms），避免 IP 封禁</p>
+        <div class="feature-content">
+          <h3>安全限速</h3>
+          <p>智能节流、避免 IP 封禁</p>
+        </div>
       </div>
 
       <div class="feature">
         <div class="feature-icon">💾</div>
-        <h3>永久进度</h3>
-        <p>自动保存阅读进度，跨标签/重启浏览器仍可续读</p>
+        <div class="feature-content">
+          <h3>永久进度</h3>
+          <p>跨标签、跨会话保存阅读进度</p>
+        </div>
       </div>
 
       <div class="feature">
         <div class="feature-icon">🖼️</div>
-        <h3>完美缩略图</h3>
-        <p>居中对齐 + 批量懒加载，快速跳页无延迟</p>
+        <div class="feature-content">
+          <h3>完美缩略图</h3>
+          <p>居中对齐、批量懒加载</p>
+        </div>
       </div>
 
       <div class="feature">
         <div class="feature-icon">⚡</div>
-        <h3>缓存与性能</h3>
-        <p>URL 持久化 24h + 会话缓存 + 智能预加载</p>
+        <div class="feature-content">
+          <h3>缓存与性能</h3>
+          <p>URL 持久化 24h + 会话缓存</p>
+        </div>
       </div>
     </div>
 
     <div class="shortcuts">
-      <h2>⌨️ 快捷键</h2>
+      <div class="shortcuts-toggle" onclick="this.nextElementSibling.classList.toggle('collapsed'); this.querySelector('.toggle-icon').classList.toggle('collapsed');">
+        <span class="toggle-icon">▼</span>
+        <span>⌨️ 快捷键</span>
+      </div>
       <div class="shortcut-list">
         <div class="shortcut-item">
           <span class="key">← / →</span>
@@ -336,9 +458,8 @@
     </div>
 
     <div class="footer">
-      <p><strong>MPV 模式</strong>：访问 /mpv/ 页面自动启用</p>
-      <p><strong>Gallery 模式</strong>：在 /g/ 页面点击右侧按钮启动</p>
-      <p style="margin-top: 12px; font-size: 12px;">Made with ❤️ by MeiYongAI · <a href="https://github.com/jiangtian616/JHenTai" target="_blank" rel="noreferrer">致谢 JHenTai</a></p>
+      <p><strong>MPV 模式</strong>：访问 /mpv/ 页面自动启用 | <strong>Gallery 模式</strong>：在 /g/ 页面点击按钮启动</p>
+      <p>Made with ❤️ by MeiYongAI · <a href="https://github.com/jiangtian616/JHenTai" target="_blank" rel="noreferrer">致谢 JHenTai</a></p>
     </div>
   </div>
 </body>
