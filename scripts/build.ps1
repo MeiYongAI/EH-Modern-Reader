@@ -48,21 +48,36 @@ Write-Host "`nCreate release zip..." -ForegroundColor Yellow
 $releaseZip = Join-Path $distDir "eh-modern-reader-$version.zip"
 Write-Host "  Zipping $version ..." -ForegroundColor Cyan
 
+# 先使用标准方法创建 ZIP
+Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseZip -Force
+
+# 修复 ZIP 内部路径：将反斜杠替换为正斜杠（Chrome 要求）
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-if (Test-Path $releaseZip) { Remove-Item $releaseZip -Force }
+$tempZip = Join-Path $distDir "temp.zip"
+$sourceZip = [System.IO.Compression.ZipFile]::Open($releaseZip, [System.IO.Compression.ZipArchiveMode]::Read)
+$targetZip = [System.IO.Compression.ZipFile]::Open($tempZip, [System.IO.Compression.ZipArchiveMode]::Create)
 
-$zip = [System.IO.Compression.ZipFile]::Open($releaseZip, [System.IO.Compression.ZipArchiveMode]::Create)
 try {
-    Get-ChildItem -Path $tempDir -Recurse -File | ForEach-Object {
-        $relativePath = $_.FullName.Substring($tempDir.Length + 1)
-        $entryName = $relativePath -replace '\\', '/'
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName) | Out-Null
+    foreach ($entry in $sourceZip.Entries) {
+        $newName = $entry.FullName -replace '\\', '/'
+        $newEntry = $targetZip.CreateEntry($newName)
+        $newEntry.LastWriteTime = $entry.LastWriteTime
+        
+        $sourceStream = $entry.Open()
+        $targetStream = $newEntry.Open()
+        $sourceStream.CopyTo($targetStream)
+        $sourceStream.Close()
+        $targetStream.Close()
     }
 } finally {
-    $zip.Dispose()
+    $sourceZip.Dispose()
+    $targetZip.Dispose()
 }
+
+Remove-Item $releaseZip -Force
+Move-Item $tempZip $releaseZip
 
 Write-Host "  Created: eh-modern-reader-$version.zip (with forward slashes)" -ForegroundColor Green
 
