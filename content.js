@@ -254,7 +254,7 @@
                 <div class="eh-loading-hint">Loading</div>
                 <div id="eh-loading-page-number" class="eh-loading-page-number">Page 1</div>
               </div>
-              <img id="eh-current-image" alt="当前页" />
+              <img id="eh-current-image" alt="当前页" style="opacity: 1; transition: opacity 0.25s ease-in;" />
             </div>
 
             <!-- 翻页按钮 -->
@@ -1542,11 +1542,24 @@
         // 隐藏错误提示（如果有）
         hideErrorMessage();
         
-        // 更新图片
+        // 更新图片 - 添加淡入淡出动画
         if (elements.currentImage) {
-          elements.currentImage.src = img.src;
-          elements.currentImage.style.display = 'block';
-          elements.currentImage.alt = `第 ${pageNum} 页`;
+          // 先淡出当前图片
+          elements.currentImage.style.opacity = '0';
+          elements.currentImage.style.transition = 'opacity 0.2s ease-out';
+          
+          // 延迟切换图片并淡入
+          setTimeout(() => {
+            elements.currentImage.src = img.src;
+            elements.currentImage.style.display = 'block';
+            elements.currentImage.alt = `第 ${pageNum} 页`;
+            
+            // 淡入新图片
+            requestAnimationFrame(() => {
+              elements.currentImage.style.opacity = '1';
+              elements.currentImage.style.transition = 'opacity 0.25s ease-in';
+            });
+          }, 200); // 淡出动画时长
         }
 
         // 更新页码显示
