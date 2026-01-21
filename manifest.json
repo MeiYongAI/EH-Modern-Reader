@@ -39,7 +39,7 @@
       ],
       "css": ["style/gallery.css"],
       "js": ["gallery.js"],
-      "run_at": "document_end"
+      "run_at": "document_start"
     },
     {
       "matches": [

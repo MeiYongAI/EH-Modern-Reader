@@ -446,11 +446,21 @@
     }, true); // 捕获阶段优先，减少站内脚本干预
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', interceptThumbnailClicks);
-  } else {
-    interceptThumbnailClicks();
+  // 在 DOM 准备好后立即绑定点击事件
+  function ensureInterception() {
+    if (document.getElementById('gdt')) {
+      // DOM 已准备好，直接执行
+      interceptThumbnailClicks();
+    } else if (document.readyState === 'loading') {
+      // 等待 DOMContentLoaded
+      document.addEventListener('DOMContentLoaded', interceptThumbnailClicks);
+    } else {
+      // DOM 已完全加载但 gdt 还没出现，延迟重试
+      setTimeout(ensureInterception, 100);
+    }
   }
+  
+  ensureInterception();
 
   console.log('[EH Reader] Gallery page script initialized');
 })();
