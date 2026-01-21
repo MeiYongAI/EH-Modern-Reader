@@ -137,6 +137,15 @@
         try { pageData.imagelist = JSON.parse(mlist[1]); } catch {}
       }
     } catch {}
+    // 标题清理：去掉站点后缀，避免出现 "- E-Hentai Galleries" 等空标题
+    const cleanedTitle = (pageData.title || '').replace(/\s*-\s*(?:Ex)?Hentai Galleries$/i, '').trim();
+    if (cleanedTitle) {
+      pageData.title = cleanedTitle;
+    } else if (pageData.gid) {
+      pageData.title = `GID ${pageData.gid}`;
+    } else {
+      pageData.title = '未知画廊';
+    }
     // gallery_url 兜底：DOM 链接或 referrer
     try {
       const a = document.querySelector('a[href^="/g/"], a[href*="/g/"]');
@@ -254,10 +263,7 @@
                 <div class="eh-loading-hint">Loading</div>
                 <div id="eh-loading-page-number" class="eh-loading-page-number">Page 1</div>
               </div>
-              <!-- 图片容器使用相对定位，允许图片叠加实现交叉渐变 -->
-              <div id="eh-images-stack" style="position: relative; width: 100%; height: 100%;">
-                <img id="eh-current-image" alt="当前页" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 1;" />
-              </div>
+              <img id="eh-current-image" alt="当前页" />
             </div>
 
             <!-- 翻页按钮 -->
@@ -1482,8 +1488,7 @@
       // 普通（单页）模式：延时合并为一次实际加载
       lastRequestedPage = pageNum;
       if (navTimer) clearTimeout(navTimer);
-
-      const runShow = () => {
+      navTimer = setTimeout(() => {
         navTimer = null;
         // 取消除目标页以外的正在加载请求，避免占用带宽
         state.imageRequests.forEach((entry, idx) => {
@@ -1493,13 +1498,7 @@
         });
         cancelPrefetchExcept(lastRequestedPage - 1);
         internalShowPage(lastRequestedPage);
-      };
-
-      if (immediate) {
-        runShow();
-      } else {
-        navTimer = setTimeout(runShow, navDelay);
-      }
+      }, navDelay);
     }
 
     async function internalShowPage(pageNum) {
@@ -1508,8 +1507,6 @@
     }
 
     // 显示指定页面（带竞态令牌）
-    let skipNextCrossfade = false; // 手势驱动的实时切换时跳过二次淡入淡出
-
     async function showPage(pageNum, tokenCheck) {
       if (pageNum < 1 || pageNum > state.pageCount) return;
       // 重复点击相同页：若已经是当前页且图片已显示，则短路
@@ -1554,38 +1551,11 @@
         // 隐藏错误提示（如果有）
         hideErrorMessage();
         
-        // 更新图片：手势实时切换时跳过淡入淡出，普通切换使用交叉渐变
+        // 更新图片
         if (elements.currentImage) {
-          const container = document.getElementById('eh-images-stack');
-          if (skipNextCrossfade || !container) {
-            elements.currentImage.src = img.src;
-            elements.currentImage.style.display = 'block';
-            elements.currentImage.alt = `第 ${pageNum} 页`;
-            elements.currentImage.style.opacity = '1';
-            elements.currentImage.style.transform = '';
-            skipNextCrossfade = false;
-          } else {
-            // 创建新图片元素用于交叉渐变
-            const newImage = document.createElement('img');
-            newImage.src = img.src;
-            newImage.alt = `第 ${pageNum} 页`;
-            newImage.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.3s ease;';
-            
-            container.appendChild(newImage);
-            
-            requestAnimationFrame(() => {
-              newImage.style.opacity = '1';
-              elements.currentImage.style.transition = 'opacity 0.3s ease';
-              elements.currentImage.style.opacity = '0';
-            });
-            
-            setTimeout(() => {
-              const oldImages = container.querySelectorAll('img:not(:last-child)');
-              oldImages.forEach(img => img.remove());
-              elements.currentImage = newImage;
-              newImage.id = 'eh-current-image';
-            }, 300);
-          }
+          elements.currentImage.src = img.src;
+          elements.currentImage.style.display = 'block';
+          elements.currentImage.alt = `第 ${pageNum} 页`;
         }
 
         // 更新页码显示
@@ -2456,231 +2426,92 @@
       };
     }
 
-    // 触摸手势支持（单页模式）：实时拖动、同步滑动动画
+    // 触摸手势支持（单页模式）
     if (elements.viewer) {
       let touchStartX = 0;
       let touchStartY = 0;
       let touchStartTime = 0;
-      let dragging = false;
-      let dragAxis = null; // 'x' | 'y'
-      let previewImage = null;
-      let dragTargetPage = null;
-      let viewerRect = null;
-      let dragLastDelta = 0;
-      const MIN_SWIPE_DISTANCE = 50; // 判定翻页阈值
-      const MIN_ACTIVATE_DISTANCE = 10; // 轴锁定阈值
-      const containerId = 'eh-images-stack';
-
-      function cleanupPreview(removeOnly = false) {
-        if (previewImage && previewImage.parentNode) {
-          previewImage.remove();
-        }
-        if (!removeOnly) {
-          previewImage = null;
-          dragTargetPage = null;
-        }
-      }
-
-      function ensurePreviewImage(targetPage, directionSign, isHorizontal) {
-        const container = document.getElementById(containerId);
-        if (!container) return null;
-
-        // 重用或创建预览图片
-        if (!previewImage || previewImage.dataset.page !== String(targetPage)) {
-          cleanupPreview(true);
-          previewImage = document.createElement('img');
-          previewImage.dataset.page = String(targetPage);
-          previewImage.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 1;';
-          container.appendChild(previewImage);
-
-          // 先放到屏幕外，后续根据位移更新
-          const offset = isHorizontal ? viewerRect.width : viewerRect.height;
-          const base = directionSign > 0 ? -offset : offset;
-          previewImage.style.transform = isHorizontal ? `translateX(${base}px)` : `translateY(${base}px)`;
-
-          // 尝试使用缓存，若无则异步加载
-          const targetIndex = targetPage - 1;
-          const cached = state.imageCache.get(targetIndex);
-          if (cached && cached.status === 'loaded' && cached.img) {
-            previewImage.src = cached.img.src;
-          } else {
-            loadImage(targetIndex).then(loaded => {
-              if (previewImage && previewImage.parentNode && previewImage.dataset.page === String(targetPage)) {
-                previewImage.src = loaded.src;
-              }
-            }).catch(() => {});
-          }
-        }
-        return previewImage;
-      }
-
-      function resetTransforms() {
-        if (elements.currentImage) {
-          elements.currentImage.style.transition = '';
-          elements.currentImage.style.transform = '';
-        }
-        if (previewImage) {
-          previewImage.style.transition = '';
-          previewImage.style.transform = '';
-        }
-      }
+      const MIN_SWIPE_DISTANCE = 50; // 最小滑动距离
+      const MAX_SWIPE_TIME = 300; // 最大滑动时间（ms）
 
       elements.viewer.addEventListener('touchstart', (e) => {
+        // 排除按钮、菜单等元素
         if (e.target.tagName === 'BUTTON' || 
             e.target.closest('button') || 
             e.target.closest('#eh-bottom-menu')) {
           return;
         }
-        if (state.settings.readMode !== 'single' && state.settings.readMode !== 'single-vertical') return;
-
+        
         const touch = e.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
         touchStartTime = Date.now();
-        dragging = true;
-        dragAxis = null;
-        dragTargetPage = null;
-        cleanupPreview();
-        viewerRect = elements.viewer.getBoundingClientRect();
       }, { passive: true });
 
-      elements.viewer.addEventListener('touchmove', (e) => {
-        if (!dragging) return;
-        if (state.settings.readMode !== 'single' && state.settings.readMode !== 'single-vertical') return;
-
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-
-        const absX = Math.abs(deltaX);
-        const absY = Math.abs(deltaY);
-
-        // 轴锁定：避免对角误触
-        if (!dragAxis) {
-          if (absX > absY * 1.2 && absX > MIN_ACTIVATE_DISTANCE) dragAxis = 'x';
-          else if (absY > absX * 1.2 && absY > MIN_ACTIVATE_DISTANCE) dragAxis = 'y';
-          else return;
-        }
-
-        const isHorizontal = state.settings.readMode === 'single';
-        if ((isHorizontal && dragAxis !== 'x') || (!isHorizontal && dragAxis !== 'y')) return;
-
-        e.preventDefault(); // 在单页模式阻止滚动，避免冲突
-
-        const primaryDelta = isHorizontal ? deltaX : deltaY;
-        const crossDelta = isHorizontal ? deltaY : deltaX;
-        if (Math.abs(crossDelta) > Math.abs(primaryDelta) * 1.2) return;
-
-        const directionSign = primaryDelta > 0 ? 1 : -1; // 手指滑动的物理方向
-        let logicalDirection = 0;
-        if (isHorizontal) {
-          logicalDirection = directionSign > 0 ? (state.settings.reverse ? 1 : -1) : (state.settings.reverse ? -1 : 1);
-        } else {
-          logicalDirection = directionSign > 0 ? -1 : 1;
-        }
-
-        const targetPage = state.currentPage + logicalDirection;
-        if (targetPage < 1 || targetPage > state.pageCount) {
-          // 边界：允许轻微拉动但不创建预览
-          if (elements.currentImage) {
-            const damped = primaryDelta * 0.2;
-            elements.currentImage.style.transition = 'none';
-            elements.currentImage.style.transform = isHorizontal ? `translateX(${damped}px)` : `translateY(${damped}px)`;
-          }
+      elements.viewer.addEventListener('touchend', (e) => {
+        // 排除按钮、菜单等元素
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.closest('button') || 
+            e.target.closest('#eh-bottom-menu')) {
           return;
         }
 
-        dragTargetPage = targetPage;
-        dragLastDelta = primaryDelta;
-        const preview = ensurePreviewImage(targetPage, directionSign, isHorizontal);
-        const offset = isHorizontal ? viewerRect.width : viewerRect.height;
-        const base = directionSign > 0 ? -offset : offset;
-
-        // 实时跟随手指
-        if (elements.currentImage) {
-          elements.currentImage.style.transition = 'none';
-          elements.currentImage.style.transform = isHorizontal ? `translateX(${primaryDelta}px)` : `translateY(${primaryDelta}px)`;
-        }
-        if (preview) {
-          preview.style.transition = 'none';
-          preview.style.transform = isHorizontal ? `translateX(${primaryDelta + base}px)` : `translateY(${primaryDelta + base}px)`;
-          preview.style.opacity = '1';
-        }
-      }, { passive: false });
-
-      function finalizeDrag(commit) {
-        const isHorizontal = state.settings.readMode === 'single';
-        const offset = isHorizontal ? viewerRect.width : viewerRect.height;
-        const directionSign = dragLastDelta > 0 ? 1 : -1; // 物理滑动方向决定动画方向
-        const currentExit = directionSign > 0 ? offset : -offset; // 当前图随手指滑动的方向离场
-        const duration = 180;
-
-        if (!elements.currentImage) return resetDrag();
-
-        if (commit && dragTargetPage) {
-          if (previewImage) {
-            previewImage.style.transition = isHorizontal ? `transform ${duration}ms ease-out` : `transform ${duration}ms ease-out`;
-            previewImage.style.transform = isHorizontal ? 'translateX(0px)' : 'translateY(0px)';
-          }
-          elements.currentImage.style.transition = isHorizontal ? `transform ${duration}ms ease-out` : `transform ${duration}ms ease-out`;
-          elements.currentImage.style.transform = isHorizontal ? `translateX(${currentExit}px)` : `translateY(${currentExit}px)`;
-
-          setTimeout(() => {
-            // 将预览图的内容替换到当前图，避免闪烁
-            if (previewImage && previewImage.src) {
-              elements.currentImage.src = previewImage.src;
-              elements.currentImage.alt = `第 ${dragTargetPage} 页`;
-            }
-            resetTransforms();
-            cleanupPreview();
-            skipNextCrossfade = true; // 跳过 showPage 的二次淡入淡出
-            const target = dragTargetPage;
-            resetDrag();
-            scheduleShowPage(target, { immediate: true });
-          }, duration);
-        } else {
-          // 回弹
-          if (previewImage) {
-            const base = directionSign > 0 ? -offset : offset;
-            previewImage.style.transition = `transform ${duration}ms ease-out`;
-            previewImage.style.transform = isHorizontal ? `translateX(${base}px)` : `translateY(${base}px)`;
-          }
-          elements.currentImage.style.transition = `transform ${duration}ms ease-out`;
-          elements.currentImage.style.transform = isHorizontal ? 'translateX(0px)' : 'translateY(0px)';
-          setTimeout(() => {
-            resetTransforms();
-            cleanupPreview();
-            resetDrag();
-          }, duration);
-        }
-      }
-
-      function resetDrag() {
-        dragging = false;
-        dragAxis = null;
-        dragTargetPage = null;
-        viewerRect = null;
-        dragLastDelta = 0;
-      }
-
-      elements.viewer.addEventListener('touchend', (e) => {
-        if (!dragging) return;
         const touch = e.changedTouches[0];
-        const deltaX = touch.clientX - touchStartX;
-        const deltaY = touch.clientY - touchStartY;
-        const deltaTime = Date.now() - touchStartTime;
-
-        const isHorizontal = state.settings.readMode === 'single';
-        const primaryDelta = isHorizontal ? deltaX : deltaY;
-        const shouldCommit = Math.abs(primaryDelta) > MIN_SWIPE_DISTANCE || (Math.abs(primaryDelta) > 30 && deltaTime < 180);
-
-        finalizeDrag(shouldCommit);
+        const touchEndX = touch.clientX;
+        const touchEndY = touch.clientY;
+        const touchEndTime = Date.now();
+        
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const deltaTime = touchEndTime - touchStartTime;
+        
+        // 检查是否为有效滑动
+        if (deltaTime > MAX_SWIPE_TIME) return;
+        
+        const absDeltaX = Math.abs(deltaX);
+        const absDeltaY = Math.abs(deltaY);
+        
+        // 横向单页模式 (single)：响应左右滑动
+        if (state.settings.readMode === 'single') {
+          if (absDeltaX > MIN_SWIPE_DISTANCE && absDeltaX > absDeltaY * 1.5) {
+            // 横向滑动
+            let direction = 0;
+            if (deltaX > 0) {
+              // 向右滑动：反向时向后翻（+1），正常时向前翻（-1）
+              direction = state.settings.reverse ? 1 : -1;
+            } else {
+              // 向左滑动：反向时向前翻（-1），正常时向后翻（+1）
+              direction = state.settings.reverse ? -1 : 1;
+            }
+            
+            const target = state.currentPage + direction;
+            if (target >= 1 && target <= state.pageCount) {
+              scheduleShowPage(target);
+              console.log('[EH Modern Reader] 触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
+            }
+          }
+        }
+        // 纵向单页模式 (single-vertical)：响应上下滑动
+        else if (state.settings.readMode === 'single-vertical') {
+          if (absDeltaY > MIN_SWIPE_DISTANCE && absDeltaY > absDeltaX * 1.5) {
+            // 纵向滑动
+            let direction = 0;
+            if (deltaY > 0) {
+              // 向下滑动：向前翻（-1）
+              direction = -1;
+            } else {
+              // 向上滑动：向后翻（+1）
+              direction = 1;
+            }
+            
+            const target = state.currentPage + direction;
+            if (target >= 1 && target <= state.pageCount) {
+              scheduleShowPage(target);
+              console.log('[EH Modern Reader] 纵向触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
+            }
+          }
+        }
       }, { passive: false });
-
-      elements.viewer.addEventListener('touchcancel', () => {
-        if (!dragging) return;
-        finalizeDrag(false);
-      });
     }
 
     // 主题图标切换（深色：月亮；浅色：太阳）
