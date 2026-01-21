@@ -2477,7 +2477,6 @@
             
             const target = state.currentPage + direction;
             if (target >= 1 && target <= state.pageCount) {
-              e.preventDefault();  // 只在确认翻页时才阻止默认行为
               scheduleShowPage(target);
               console.log('[EH Modern Reader] 触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
             }
@@ -2498,7 +2497,6 @@
             
             const target = state.currentPage + direction;
             if (target >= 1 && target <= state.pageCount) {
-              e.preventDefault();  // 只在确认翻页时才阻止默认行为
               scheduleShowPage(target);
               console.log('[EH Modern Reader] 纵向触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
             }
