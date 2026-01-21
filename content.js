@@ -1482,7 +1482,8 @@
       // 普通（单页）模式：延时合并为一次实际加载
       lastRequestedPage = pageNum;
       if (navTimer) clearTimeout(navTimer);
-      navTimer = setTimeout(() => {
+
+      const runShow = () => {
         navTimer = null;
         // 取消除目标页以外的正在加载请求，避免占用带宽
         state.imageRequests.forEach((entry, idx) => {
@@ -1492,7 +1493,13 @@
         });
         cancelPrefetchExcept(lastRequestedPage - 1);
         internalShowPage(lastRequestedPage);
-      }, navDelay);
+      };
+
+      if (immediate) {
+        runShow();
+      } else {
+        navTimer = setTimeout(runShow, navDelay);
+      }
     }
 
     async function internalShowPage(pageNum) {
@@ -2629,7 +2636,7 @@
             skipNextCrossfade = true; // 跳过 showPage 的二次淡入淡出
             const target = dragTargetPage;
             resetDrag();
-            scheduleShowPage(target);
+            scheduleShowPage(target, { immediate: true });
           }, duration);
         } else {
           // 回弹
