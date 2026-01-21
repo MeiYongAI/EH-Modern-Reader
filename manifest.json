@@ -38,7 +38,8 @@
         "https://exhentai.org/g/*/*"
       ],
       "css": ["style/gallery.css"],
-      "run_at": "document_start"
+      "js": ["gallery.js"],
+      "run_at": "document_end"
     },
     {
       "matches": [
@@ -47,14 +48,6 @@
       ],
       "js": ["content.js"],
       "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "https://e-hentai.org/g/*/*",
-        "https://exhentai.org/g/*/*"
-      ],
-      "js": ["gallery.js", "content.js"],
-      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
