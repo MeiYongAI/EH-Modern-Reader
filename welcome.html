@@ -216,6 +216,10 @@
       text-align: center;
       margin-top: 20px;
       margin-bottom: 0;
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
 
     .btn {
@@ -240,6 +244,15 @@
 
     .btn:active {
       transform: translateY(0);
+    }
+
+    .btn.secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+
+    .btn.secondary:hover {
+      box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
     }
 
     .footer {
@@ -322,6 +335,10 @@
 
       .btn {
         width: 100%;
+      }
+
+      .cta {
+        gap: 8px;
       }
     }
 
@@ -453,7 +470,13 @@
 
     <div class="cta">
       <a href="https://github.com/MeiYongAI/EH-Modern-Reader" class="btn" target="_blank">
-        查看 GitHub 项目 →
+        🔗 查看 GitHub 项目
+      </a>
+      <a href="https://e-hentai.org/" class="btn secondary" target="_blank">
+        📖 表站 (e-hentai.org)
+      </a>
+      <a href="https://exhentai.org/" class="btn secondary" target="_blank">
+        🔒 里站 (exhentai.org)
       </a>
     </div>
 
