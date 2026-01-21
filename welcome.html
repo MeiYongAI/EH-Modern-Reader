@@ -27,6 +27,18 @@
       border-radius: 20px;
       padding: 48px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideIn 0.4s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .header {
@@ -37,17 +49,25 @@
     .logo {
       font-size: 64px;
       margin-bottom: 16px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
     }
 
     h1 {
       font-size: 32px;
       color: #333;
       margin-bottom: 12px;
+      font-weight: 700;
     }
 
     .subtitle {
       font-size: 16px;
-      color: #666;
+      color: #999;
+      font-weight: 500;
     }
 
     .features {
@@ -61,22 +81,27 @@
       padding: 24px;
       background: #f8f9fa;
       border-radius: 12px;
-      transition: transform 0.2s;
+      border-left: 4px solid #667eea;
+      transition: all 0.3s ease;
     }
 
     .feature:hover {
       transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(102, 126, 234, 0.1);
+      background: #f0f3ff;
     }
 
     .feature-icon {
       font-size: 32px;
       margin-bottom: 12px;
+      display: inline-block;
     }
 
     .feature h3 {
       font-size: 18px;
       color: #333;
       margin-bottom: 8px;
+      font-weight: 600;
     }
 
     .feature p {
@@ -90,12 +115,14 @@
       border-radius: 12px;
       padding: 24px;
       margin: 32px 0;
+      border-left: 4px solid #764ba2;
     }
 
     .shortcuts h2 {
       font-size: 20px;
       color: #333;
       margin-bottom: 16px;
+      font-weight: 600;
     }
 
     .shortcut-list {
@@ -109,17 +136,20 @@
       align-items: center;
       gap: 12px;
       font-size: 14px;
+      color: #555;
     }
 
     .key {
-      background: white;
-      padding: 4px 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 6px 12px;
       border-radius: 6px;
       font-weight: 600;
-      color: #667eea;
-      border: 2px solid #667eea;
-      min-width: 60px;
+      font-size: 12px;
+      min-width: 50px;
       text-align: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
     }
 
     .cta {
@@ -136,8 +166,10 @@
       border-radius: 12px;
       font-size: 16px;
       font-weight: 600;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: all 0.3s ease;
       box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      border: none;
+      cursor: pointer;
     }
 
     .btn:hover {
@@ -145,13 +177,70 @@
       box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
     }
 
+    .btn:active {
+      transform: translateY(0);
+    }
+
     .footer {
       text-align: center;
       margin-top: 32px;
       padding-top: 24px;
       border-top: 1px solid #e0e0e0;
-      font-size: 14px;
-      color: #666;
+      font-size: 13px;
+      color: #999;
+      line-height: 1.8;
+    }
+
+    .footer p {
+      margin: 4px 0;
+    }
+
+    .footer a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .version-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    /* 响应式优化 */
+    @media (max-width: 600px) {
+      .container {
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      .logo {
+        font-size: 48px;
+      }
+
+      .features {
+        grid-template-columns: 1fr;
+      }
+
+      .shortcut-list {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -159,8 +248,9 @@
   <div class="container">
     <div class="header">
       <div class="logo">📚</div>
-        <h1>欢迎使用 EH Modern Reader</h1>
-      <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器 v2.3.6</p>
+      <h1>EH Modern Reader</h1>
+      <p class="subtitle">现代化的 E-Hentai / ExHentai 阅读器</p>
+      <div class="version-badge">v2.3.6</div>
     </div>
 
     <div class="features">
@@ -179,7 +269,7 @@
       <div class="feature">
         <div class="feature-icon">🛡️</div>
         <h3>安全限速</h3>
-        <p>智能请求节流（3并发+250ms），滚动锁保护，避免 IP 封禁</p>
+        <p>智能请求节流（3并发+250ms），避免 IP 封禁</p>
       </div>
 
       <div class="feature">
@@ -197,28 +287,28 @@
       <div class="feature">
         <div class="feature-icon">⚡</div>
         <h3>缓存与性能</h3>
-        <p>主图真实 URL 持久化（24h）+ 画廊展开会话缓存 + 预加载/取消滞后请求</p>
+        <p>URL 持久化 24h + 会话缓存 + 智能预加载</p>
       </div>
     </div>
 
     <div class="shortcuts">
-      <h2>⌨️ 快捷键说明</h2>
+      <h2>⌨️ 快捷键</h2>
       <div class="shortcut-list">
         <div class="shortcut-item">
           <span class="key">← / →</span>
-          <span>翻页/滚动</span>
+          <span>翻页</span>
         </div>
         <div class="shortcut-item">
           <span class="key">A / D</span>
-          <span>翻页/滚动</span>
+          <span>翻页</span>
         </div>
         <div class="shortcut-item">
           <span class="key">Home</span>
-          <span>跳到首页</span>
+          <span>首页</span>
         </div>
         <div class="shortcut-item">
           <span class="key">End</span>
-          <span>跳到末页</span>
+          <span>末页</span>
         </div>
         <div class="shortcut-item">
           <span class="key">H / S</span>
@@ -229,12 +319,12 @@
           <span>自动播放</span>
         </div>
         <div class="shortcut-item">
-          <span class="key">F11</span>
-          <span>全屏模式</span>
+          <span class="key">R</span>
+          <span>反向阅读</span>
         </div>
         <div class="shortcut-item">
-          <span class="key">Esc</span>
-          <span>退出/隐藏</span>
+          <span class="key">F11</span>
+          <span>全屏</span>
         </div>
       </div>
     </div>
@@ -246,8 +336,9 @@
     </div>
 
     <div class="footer">
-        <p><strong>MPV 模式</strong>：访问 /mpv/ 页面自动启用 | <strong>Gallery 模式</strong>：在 /g/ 页面点击右侧按钮启动 | 评论弹窗右下角可快速“发评论”</p>
-      <p style="margin-top: 8px; font-size: 12px;">v2.3.4 | Made with ❤️ by MeiYongAI · 致谢：<a href="https://github.com/jiangtian616/JHenTai" target="_blank" rel="noreferrer">JHenTai</a></p>
+      <p><strong>MPV 模式</strong>：访问 /mpv/ 页面自动启用</p>
+      <p><strong>Gallery 模式</strong>：在 /g/ 页面点击右侧按钮启动</p>
+      <p style="margin-top: 12px; font-size: 12px;">Made with ❤️ by MeiYongAI · <a href="https://github.com/jiangtian616/JHenTai" target="_blank" rel="noreferrer">致谢 JHenTai</a></p>
     </div>
   </div>
 </body>
