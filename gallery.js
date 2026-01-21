@@ -337,18 +337,13 @@
         fetchPageImageUrl: fetchPageImageUrl
       };
       
-      // 6. 动态注入 content.js（因为它只在 /mpv/ 页面自动加载）
-      const contentScript = document.createElement('script');
-      contentScript.src = chrome.runtime.getURL('content.js');
-      contentScript.onload = () => {
-        console.log('[EH Reader] content.js loaded and reader initialized');
-      };
-      contentScript.onerror = (err) => {
-        console.error('[EH Reader] Failed to load content.js:', err);
-        alert('加载阅读器失败，请刷新页面重试');
-      };
-      (document.head || document.documentElement).appendChild(contentScript);
-      console.log('[EH Reader] Injecting content.js into page...');
+      // 6. 通知 content.js 启动（content.js 已经通过 manifest 加载）
+      // 触发自定义事件
+      const event = new CustomEvent('ehGalleryReaderReady', { 
+        detail: readerPageData 
+      });
+      document.dispatchEvent(event);
+      console.log('[EH Reader] Gallery reader ready event dispatched');
       
     } catch (error) {
       console.error('[EH Reader] Failed to launch reader:', error);
