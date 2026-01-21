@@ -254,7 +254,10 @@
                 <div class="eh-loading-hint">Loading</div>
                 <div id="eh-loading-page-number" class="eh-loading-page-number">Page 1</div>
               </div>
-              <img id="eh-current-image" alt="当前页" style="opacity: 1; transition: opacity 0.25s ease-in;" />
+              <!-- 图片容器使用相对定位，允许图片叠加实现交叉渐变 -->
+              <div id="eh-images-stack" style="position: relative; width: 100%; height: 100%;">
+                <img id="eh-current-image" alt="当前页" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 1;" />
+              </div>
             </div>
 
             <!-- 翻页按钮 -->
@@ -1542,24 +1545,43 @@
         // 隐藏错误提示（如果有）
         hideErrorMessage();
         
-        // 更新图片 - 添加淡入淡出动画
+        // 更新图片 - 交叉渐变效果（新旧图片同时过渡）
         if (elements.currentImage) {
-          // 先淡出当前图片
-          elements.currentImage.style.opacity = '0';
-          elements.currentImage.style.transition = 'opacity 0.2s ease-out';
-          
-          // 延迟切换图片并淡入
-          setTimeout(() => {
+          const container = document.getElementById('eh-images-stack');
+          if (!container) {
+            // 降级方案：如果容器不存在，直接切换
             elements.currentImage.src = img.src;
             elements.currentImage.style.display = 'block';
             elements.currentImage.alt = `第 ${pageNum} 页`;
+          } else {
+            // 创建新图片元素
+            const newImage = document.createElement('img');
+            newImage.src = img.src;
+            newImage.alt = `第 ${pageNum} 页`;
+            newImage.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.3s ease;';
             
-            // 淡入新图片
+            // 将新图片添加到容器（叠加在旧图片上方）
+            container.appendChild(newImage);
+            
+            // 触发淡入动画
             requestAnimationFrame(() => {
-              elements.currentImage.style.opacity = '1';
-              elements.currentImage.style.transition = 'opacity 0.25s ease-in';
+              newImage.style.opacity = '1';
+              // 同时淡出旧图片
+              elements.currentImage.style.transition = 'opacity 0.3s ease';
+              elements.currentImage.style.opacity = '0';
             });
-          }, 200); // 淡出动画时长
+            
+            // 动画完成后清理：移除旧图片，新图片成为当前图片
+            setTimeout(() => {
+              // 移除所有旧图片元素
+              const oldImages = container.querySelectorAll('img:not(:last-child)');
+              oldImages.forEach(img => img.remove());
+              
+              // 更新 currentImage 引用
+              elements.currentImage = newImage;
+              newImage.id = 'eh-current-image';
+            }, 300); // 等待动画完成
+          }
         }
 
         // 更新页码显示
