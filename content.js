@@ -319,7 +319,7 @@
                   </label>
                   <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="single-vertical">
-                    <span>单页竖向</span>
+                    <span>单页纵向</span>
                   </label>
                   <label class="eh-radio-label">
                     <input type="radio" name="eh-read-mode-radio" value="continuous-horizontal">
@@ -2417,6 +2417,96 @@
       };
     }
 
+    // 触摸手势支持（单页模式）
+    if (elements.viewer) {
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let touchStartTime = 0;
+      const MIN_SWIPE_DISTANCE = 50; // 最小滑动距离
+      const MAX_SWIPE_TIME = 300; // 最大滑动时间（ms）
+
+      elements.viewer.addEventListener('touchstart', (e) => {
+        // 排除按钮、菜单等元素
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.closest('button') || 
+            e.target.closest('#eh-bottom-menu')) {
+          return;
+        }
+        
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartTime = Date.now();
+      }, { passive: true });
+
+      elements.viewer.addEventListener('touchend', (e) => {
+        // 排除按钮、菜单等元素
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.closest('button') || 
+            e.target.closest('#eh-bottom-menu')) {
+          return;
+        }
+
+        const touch = e.changedTouches[0];
+        const touchEndX = touch.clientX;
+        const touchEndY = touch.clientY;
+        const touchEndTime = Date.now();
+        
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const deltaTime = touchEndTime - touchStartTime;
+        
+        // 检查是否为有效滑动
+        if (deltaTime > MAX_SWIPE_TIME) return;
+        
+        const absDeltaX = Math.abs(deltaX);
+        const absDeltaY = Math.abs(deltaY);
+        
+        // 横向单页模式 (single)：响应左右滑动
+        if (state.settings.readMode === 'single') {
+          if (absDeltaX > MIN_SWIPE_DISTANCE && absDeltaX > absDeltaY * 1.5) {
+            // 横向滑动
+            let direction = 0;
+            if (deltaX > 0) {
+              // 向右滑动：反向时向后翻（+1），正常时向前翻（-1）
+              direction = state.settings.reverse ? 1 : -1;
+            } else {
+              // 向左滑动：反向时向前翻（-1），正常时向后翻（+1）
+              direction = state.settings.reverse ? -1 : 1;
+            }
+            
+            const target = state.currentPage + direction;
+            if (target >= 1 && target <= state.pageCount) {
+              scheduleShowPage(target);
+              console.log('[EH Modern Reader] 触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
+            }
+            e.preventDefault();
+          }
+        }
+        // 纵向单页模式 (single-vertical)：响应上下滑动
+        else if (state.settings.readMode === 'single-vertical') {
+          if (absDeltaY > MIN_SWIPE_DISTANCE && absDeltaY > absDeltaX * 1.5) {
+            // 纵向滑动
+            let direction = 0;
+            if (deltaY > 0) {
+              // 向下滑动：向前翻（-1）
+              direction = -1;
+            } else {
+              // 向上滑动：向后翻（+1）
+              direction = 1;
+            }
+            
+            const target = state.currentPage + direction;
+            if (target >= 1 && target <= state.pageCount) {
+              scheduleShowPage(target);
+              console.log('[EH Modern Reader] 纵向触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
+            }
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
+    }
+
     // 主题图标切换（深色：月亮；浅色：太阳）
   // Feather 风格的 Sun 图标（MIT），更简洁，与现有描边风格一致
   const SUN_ICON = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#000">\
@@ -3015,7 +3105,7 @@
           e.preventDefault();
         }
       });
-      // 鼠标滚轮翻页 (单页/单页竖向模式下) 上一页/下一页
+      // 鼠标滚轮翻页 (单页/单页纵向模式下) 上一页/下一页
       elements.viewer.addEventListener('wheel', (e) => {
         if (state.settings.readMode !== 'single' && state.settings.readMode !== 'single-vertical') return; // 仅单页类模式翻页
         const delta = e.deltaY;
