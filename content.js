@@ -137,8 +137,10 @@
         try { pageData.imagelist = JSON.parse(mlist[1]); } catch {}
       }
     } catch {}
-    // 标题清理：去掉站点后缀，避免出现 "- E-Hentai Galleries" 等空标题
-    const cleanedTitle = (pageData.title || '').replace(/\s*-\s*(?:Ex)?Hentai Galleries$/i, '').trim();
+    // 标题清理：去掉站点后缀，避免出现 "- E-Hentai Galleries"、"- E" 等残留
+    let cleanedTitle = (pageData.title || '').replace(/\s*-\s*(?:Ex)?Hentai(?: Galleries)?$/i, '').trim();
+    // 若仍以 "-" 开头（无有效文本），继续剔除前导破折号
+    cleanedTitle = cleanedTitle.replace(/^\s*-\s*/, '').trim();
     if (cleanedTitle) {
       pageData.title = cleanedTitle;
     } else if (pageData.gid) {
