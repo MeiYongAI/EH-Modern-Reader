@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [2.3.7] - 2026-01-23
+### Added
+- **缩略图拖动支持**：缩略图栏现在可以用鼠标拖动滚动，操作更便捷。
+
+### Improved
+- **纵向连续模式优化**：对纵向连续阅读模式进行了重大调整，对条漫阅读体验有很大提升。
+- **图片加载挤压修复**：解决了图片加载时布局挤压/抱动的问题，滚动更平稳。
+
 ### Performance
 - **自动滚动丝滑优化**：采用帧率无关的平滑滚动算法（deltaTime + 亚像素累加器），在 60Hz/144Hz/240Hz 显示器上速度一致、无抖动。
 - **onScroll 节流优化**：自动滚动期间将滚动事件处理从每帧降低到 300ms 一次，大幅减少 DOM 查询和 UI 更新带来的性能开销。
@@ -14,11 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **模式切换保持页面位置**：从连续模式切换到单页模式时，现在会保持当前正在查看的页面，而非跳回之前单页模式的位置。
 - **缓存图片即时显示**：模式切换时若图片已在缓存中，直接显示而不显示加载动画，提升切换流畅度。
-
-### Technical
-- 新增模块级 `autoScrollLockLayout` 标志位，协调自动滚动期间的 DOM 更新策略。
-- 修复 `showPage` 函数参数传递异常（通过模块级变量绕过）。
-- 自动滚动停止时自动触发一次 scroll 事件，确保页码和进度条同步更新。
 
 ## [Unreleased]
 ### Fixed
