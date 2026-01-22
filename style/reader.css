@@ -659,8 +659,8 @@ body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
 .eh-thumbnail > canvas {
   width: 100px !important;
   height: 142px !important;
-  display: inline-block;
-  vertical-align: middle;
+  flex: 0 0 auto;
+  align-self: center;
   /* 🎯 淡入效果（参考JHenTai的fadeIn） */
   animation: ehThumbnailFadeIn 0.3s ease-out;
 }
