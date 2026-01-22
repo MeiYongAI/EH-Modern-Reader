@@ -634,51 +634,16 @@ body:not(.eh-dark-mode) .eh-thumbnails-horizontal::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.04); /* 默认轻微底色，真正缩略图加载后会移除 */
 }
 
-/* 缩略图占位内部容器：保持尺寸稳定，快速背景预览挂载在父 .eh-thumbnail 上 */
-.eh-thumb-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: rgba(255,255,255,0.25);
-  background: transparent;
-  user-select: none;
-}
-body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
-
-/* 缩略图内部图片固定容器尺寸，使用等比缩放后的成品图（dataURL），不再使用背景图 */
-.eh-thumbnail > img {
-  width: 100px;
-  height: 142px;
-  object-fit: contain;
-  display: block;
-}
-/* Canvas 缩略图等同于 img 尺寸与居中展示 */
-.eh-thumbnail > canvas {
-  width: 100px !important;
-  height: 142px !important;
-  display: block;
-  /* 🎯 淡入效果（参考JHenTai的fadeIn） */
-  animation: ehThumbnailFadeIn 0.3s ease-out;
+.eh-thumbnail:hover { 
+  transform: scale(1.04); 
+  border-color: #FF6B9D;
+  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
 }
 
-/* 🎯 缩略图淡入动画 */
-@keyframes ehThumbnailFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.eh-thumbnail.active { 
+  border: 2px solid #FF6B9D; 
+  box-shadow: 0 0 0 3px rgba(255,107,157,0.25); 
 }
-
-.eh-thumbnail:hover { transform: scale(1.04); }
-
-.eh-thumbnail.active { border: 2px solid #FF6B9D; box-shadow: 0 0 0 3px rgba(255,107,157,0.25); }
 
 .eh-thumbnail-number {
   position: absolute;
@@ -796,71 +761,9 @@ body:not(.eh-dark-mode) .eh-progress-slider { background: rgba(0,0,0,0.15); }
   font-weight: 500;
 }
 
-/* 缩略图容器（每个容器只放一张缩略图） */
-.eh-thumbnail {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
-  height: 142px; /* 与前面定义保持一致，防止被后续样式覆盖 */
-  margin-bottom: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  position: relative;
-  flex: 0 0 auto;
-}
+/* 缩略图容器（每个容器只放一张缩略图） - 已与第 619 行定义合并 */
+/* 保留第 619 行的定义，删除此处重复 */
 
-.eh-thumbnail:hover {
-  border-color: #FF6B9D;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.eh-thumbnail.active {
-  border-color: #FF6B9D;
-  box-shadow: 0 0 0 3px rgba(255, 107, 157, 0.2);
-}
-
-.eh-thumbnail-placeholder {
-  width: 100%;
-  height: 281px;
-  background-color: #f0f0f0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
-}
-
-body.eh-dark-mode .eh-thumbnail-placeholder {
-  background-color: #3a3a3a;
-}
-
-.eh-thumbnail-placeholder span {
-  font-size: 24px;
-  font-weight: 600;
-  color: rgba(0,0,0,0.2);
-  position: absolute;
-  z-index: 1;
-}
-
-body.eh-dark-mode .eh-thumbnail-placeholder span {
-  color: rgba(255,255,255,0.2);
-}
-
-.eh-thumbnail-number {
-  position: absolute;
-  bottom: 4px;
-  right: 4px;
-  background: rgba(0,0,0,0.7);
-  color: white;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-  z-index: 2;
 }
 
 /* ==================== 图片查看区 ==================== */
