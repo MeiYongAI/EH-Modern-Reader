@@ -2299,7 +2299,7 @@
 
           canvas.setAttribute('role', 'img');
           canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
-          canvas.style.display = 'block';
+          canvas.style.display = 'inline-block';
 
           // 移除占位与背景，插入最终缩略图
           thumb.style.background = 'none';
