@@ -2,7 +2,7 @@
 
 现代化的 E-Hentai / ExHentai 阅读器扩展，支持 MPV 与 Gallery 双模式、智能节流、持久缓存与永久阅读进度。
 
-![Version](https://img.shields.io/badge/version-2.3.6-blue)
+![Version](https://img.shields.io/badge/version-2.3.7-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
@@ -54,11 +54,11 @@ Chrome/Edge（开发者模式）
 
 - 最新版本与变更说明见 GitHub Releases：`https://github.com/MeiYongAI/EH-Modern-Reader/releases`
 近期版本要点：
+ - v2.3.7：自动滚动优化（帧率无关平滑滚动、节流防抖、模式切换保持页面位置）
  - v2.3.6：新增纵向连续阅读模式（上下滚动浏览）
  - v2.3.5：MPV 初始化性能优化 4-6 倍，轮询机制改进，CPU 占用降低 80%
  - v2.3.4：评论弹窗浮动"发评论"按钮（快速跳转与聚焦输入）
  - v2.3.3：评论"展开全部"不再跳出弹窗，拦截 ?hc=1 链接防止导航
- - v2.3.2：屏蔽遗留 MPV 脚本异常、缩略图逻辑回退稳定版本
 
 ## 风控与提示
 

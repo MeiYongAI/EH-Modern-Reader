@@ -1490,7 +1490,7 @@ body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
 .eh-reset-btn {
   width: 100%;
   padding: 11px 16px;
-  background: linear-gradient(135deg, #f5f5f5, #e8e8e8);
+  background: #f5f5f5;
   border: 1px solid #d0d0d0;
   border-radius: 8px;
   cursor: pointer;
@@ -1506,7 +1506,7 @@ body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
 }
 
 .eh-reset-btn:hover {
-  background: linear-gradient(135deg, #fff, #f0f0f0);
+  background: #ffffff;
   border-color: #FF6B9D;
   color: #FF6B9D;
   transform: translateY(-1px);
@@ -1519,13 +1519,13 @@ body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
 }
 
 body.eh-dark-mode .eh-reset-btn {
-  background: linear-gradient(135deg, #333, #2a2a2a);
+  background: #2f2f2f;
   border-color: #404040;
   color: #bbb;
 }
 
 body.eh-dark-mode .eh-reset-btn:hover {
-  background: linear-gradient(135deg, #3a3a3a, #333);
+  background: #373737;
   border-color: #FF6B9D;
   color: #ffb3d1;
   box-shadow: 0 2px 6px rgba(255,107,157,0.3);

@@ -296,16 +296,11 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 骨架屏动画（横向和纵向共用） */
+/* 骨架屏样式（横向和纵向共用）- 透明背景+边框轮廓，不再用灰块 */
 .eh-ch-skeleton, .eh-cv-skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: skeleton-loading 1.5s ease-in-out infinite;
-}
-
-@keyframes skeleton-loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  background: transparent;
+  border: 1px dashed rgba(128, 128, 128, 0.3);
+  border-radius: 4px;
 }
 
 /* ========== 全局移动端点击/选择优化 ========== */
@@ -424,13 +419,7 @@ body.eh-modern-reader #eh-reader-container *, body.eh-dark-mode #eh-reader-conta
 body:not(.eh-dark-mode) #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(0,0,0,0.08); }
 body.eh-dark-mode #eh-comment-modal .eh-comment-panel { outline: 1px solid rgba(255,255,255,0.14); }
 
-.eh-ch-skeleton::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(60, 60, 60, 0.08);
-  border-radius: 4px;
-}
+/* 骨架屏不再需要伪元素遮罩 */
 
 /* ==================== 图片查看区 ==================== */
 
@@ -659,9 +648,9 @@ body:not(.eh-dark-mode) .eh-thumb-placeholder { color: rgba(0,0,0,0.25); }
 .eh-thumbnail > canvas {
   width: 100px !important;
   height: 142px !important;
+  display: block;
   flex: 0 0 auto;
   align-self: center;
-  display: block;
   /* 🎯 淡入效果（参考JHenTai的fadeIn） */
   animation: ehThumbnailFadeIn 0.3s ease-out;
 }

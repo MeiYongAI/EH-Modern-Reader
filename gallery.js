@@ -1,7 +1,29 @@
-/**
+﻿/**
  * Gallery Script - Gallery 页面入口脚本
  * 为没有 MPV 权限的用户提供阅读器入口
  */
+
+// 调试日志开关：从 chrome.storage.local 读取 eh_debug_mode
+let debugModeEnabled = false;
+try {
+  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+    chrome.storage.local.get(['eh_debug_mode'], (result) => {
+      debugModeEnabled = result.eh_debug_mode === true;
+    });
+  }
+} catch (e) {
+  // 忽略错误，保持 debugModeEnabled = false
+}
+
+/**
+ * 调试日志函数：仅在 options 页面开启调试模式时输出
+ * @param {...any} args - 传递给 console.log 的参数
+ */
+function debugLog(...args) {
+  if (debugModeEnabled) {
+    console.log(...args);
+  }
+}
 
 (function() {
   'use strict';
@@ -12,7 +34,7 @@
   }
   window.ehGalleryBootstrapInjected = true;
 
-  console.log('[EH Reader] Gallery bootstrap script loaded');
+  debugLog('[EH Reader] Gallery bootstrap script loaded');
 
   // 从页面脚本中捕获变量
   function extractPageVariables() {
@@ -32,7 +54,7 @@
     if (urlMatch) {
       data.gid = parseInt(urlMatch[1]);
       data.token = urlMatch[2];
-      console.log('[EH Reader] Extracted from URL: gid=' + data.gid + ', token=' + data.token);
+      debugLog('[EH Reader] Extracted from URL: gid=' + data.gid + ', token=' + data.token);
     }
 
     // 遍历所有 script 标签（作为备选或补充）
@@ -80,7 +102,7 @@
   }
 
   const pageData = extractPageVariables();
-  console.log('[EH Reader] Page data captured:', pageData);
+  debugLog('[EH Reader] Page data captured:', pageData);
 
   // 检查是否已经有 MPV 链接（有权限的用户）
   const mpvLink = document.querySelector('a[href*="/mpv/"]');
@@ -116,7 +138,7 @@
       
       if (data.gmetadata && data.gmetadata[0]) {
         const metadata = data.gmetadata[0];
-        console.log('[EH Reader] Gallery metadata:', metadata);
+        debugLog('[EH Reader] Gallery metadata:', metadata);
         
         // 如果返回了错误
         if (metadata.error) {
@@ -143,6 +165,9 @@
 
   // 缓存正在进行的 Gallery 分页抓取请求，避免重复抓取
   const galleryPageFetchCache = new Map(); // galleryPageIndex -> Promise
+  
+  // 保存每页缩略图数量（在 DOM 被替换前检测）
+  let detectedThumbsPerPage = 0;
 
   /**
    * 从 Gallery 分页抓取指定范围的 imgkey
@@ -150,22 +175,25 @@
    */
   async function fetchImgkeysFromGallery(startPage, endPage) {
     try {
-      // 检测当前页面每页显示多少张缩略图（从初始加载的缩略图数量推断）
-      const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
-      const thumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20; // 默认 20
+      // 使用已检测的值，或从 DOM 检测，或默认 20
+      let thumbsPerPage = detectedThumbsPerPage;
+      if (thumbsPerPage <= 0) {
+        const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
+        thumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20;
+      }
       
       // 计算需要抓取哪个 Gallery 分页
       const galleryPageIndex = Math.floor(startPage / thumbsPerPage);
       
       // 检查是否已有进行中的请求
       if (galleryPageFetchCache.has(galleryPageIndex)) {
-        console.log(`[EH Reader] Gallery page ${galleryPageIndex} fetch already in progress, reusing...`);
+        debugLog(`[EH Reader] Gallery page ${galleryPageIndex} fetch already in progress, reusing...`);
         return galleryPageFetchCache.get(galleryPageIndex);
       }
       
       const galleryUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${galleryPageIndex}`;
       
-      console.log(`[EH Reader] Fetching imgkeys from gallery page ${galleryPageIndex} (${thumbsPerPage} thumbs/page):`, galleryUrl);
+      debugLog(`[EH Reader] Fetching imgkeys from gallery page ${galleryPageIndex} (${thumbsPerPage} thumbs/page):`, galleryUrl);
       
       const fetchPromise = (async () => {
         const response = await fetch(galleryUrl);
@@ -179,7 +207,7 @@
         
         // 从缩略图链接提取 imgkey
         const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
-        console.log(`[EH Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${galleryPageIndex}`);
+        debugLog(`[EH Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${galleryPageIndex}`);
         
         let updatedCount = 0;
         thumbnailLinks.forEach((link, index) => {
@@ -196,7 +224,7 @@
           }
         });
         
-        console.log(`[EH Reader] Updated ${updatedCount} imgkeys for gallery page ${galleryPageIndex}`);
+        debugLog(`[EH Reader] Updated ${updatedCount} imgkeys for gallery page ${galleryPageIndex}`);
         
         // 完成后从缓存中移除
         galleryPageFetchCache.delete(galleryPageIndex);
@@ -223,11 +251,10 @@
       
       // 如果 imgkey 不存在，动态从 Gallery 页面抓取
       if (!imgkey) {
-        console.log(`[EH Reader] Page ${page} imgkey not cached, fetching from gallery...`);
+        debugLog(`[EH Reader] Page ${page} imgkey not cached, fetching from gallery...`);
         
-        // 检测每页缩略图数量
-        const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
-        const thumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20;
+        // 使用已保存的每页数量，或默认 20
+        const thumbsPerPage = detectedThumbsPerPage > 0 ? detectedThumbsPerPage : 20;
         
         // 只获取当前页所在的 Gallery 页面（不预加载，避免风控）
         const currentGalleryPage = Math.floor(page / thumbsPerPage);
@@ -244,7 +271,7 @@
       // 构造单页 URL: https://e-hentai.org/s/{imgkey}/{gid}-{page}
       const pageUrl = `${window.location.origin}/s/${imgkey}/${pageData.gid}-${page + 1}`;
       
-      console.log(`[EH Reader] Page ${page} URL:`, pageUrl);
+      debugLog(`[EH Reader] Page ${page} URL:`, pageUrl);
       
       // 返回单页 URL，content.js 会自动抓取 HTML 提取图片
       return {
@@ -262,14 +289,19 @@
    * 启动阅读器
    */
   async function launchReader(startPage /* 1-based, optional */) {
-    console.log('[EH Reader] Launching reader from Gallery page...');
+    debugLog('[EH Reader] Launching reader from Gallery page...');
     
     try {
+      // 0. 在 DOM 被替换前，检测并保存每页缩略图数量
+      const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
+      detectedThumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20;
+      debugLog(`[EH Reader] Detected ${detectedThumbsPerPage} thumbs per gallery page`);
+      
       // 1. 获取画廊元数据
       const metadata = await fetchGalleryMetadata();
       const pageCount = parseInt(metadata.filecount);
       
-      console.log(`[EH Reader] Gallery has ${pageCount} pages`);
+      debugLog(`[EH Reader] Gallery has ${pageCount} pages`);
       
       // 2. 构建图片列表（类似 MPV 的 imagelist 格式）
       const imagelist = [];
@@ -284,7 +316,7 @@
       }
       
       // 从 Gallery 第 0 页提取前几张图片的 imgkey（确保第一页能正常加载）
-      console.log('[EH Reader] Fetching initial imgkeys from Gallery page 0...');
+      debugLog('[EH Reader] Fetching initial imgkeys from Gallery page 0...');
       
       try {
         const firstPageUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=0`;
@@ -294,7 +326,7 @@
         const doc = parser.parseFromString(html, 'text/html');
         
         const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
-        console.log(`[EH Reader] Found ${thumbnailLinks.length} thumbnail links in first page`);
+        debugLog(`[EH Reader] Found ${thumbnailLinks.length} thumbnail links in first page`);
         
         thumbnailLinks.forEach((link) => {
           const href = link.getAttribute('href');
@@ -312,7 +344,54 @@
         console.error('[EH Reader] Failed to fetch initial imgkeys:', error);
       }
       
-      console.log('[EH Reader] Imagelist sample:', imagelist.slice(0, 3));
+      debugLog('[EH Reader] Imagelist sample:', imagelist.slice(0, 3));
+      
+      // 2.5 检查是否有保存的阅读进度，如果恢复页不在第 0 页范围内，预加载该页的 imgkey
+      let savedProgressPage = null;
+      try {
+        const LS_KEY = `eh_progress_${pageData.gid}`;
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed === 'object' && parsed.currentPage) {
+            savedProgressPage = parsed.currentPage;
+          } else if (typeof parsed === 'number') {
+            savedProgressPage = parsed;
+          }
+        }
+      } catch {}
+      
+      // 如果恢复页超出第 0 页范围，预加载该页所在的 Gallery 分页
+      if (savedProgressPage && savedProgressPage > detectedThumbsPerPage) {
+        const targetGalleryPage = Math.floor((savedProgressPage - 1) / detectedThumbsPerPage);
+        debugLog(`[EH Reader] Saved progress at page ${savedProgressPage}, pre-fetching gallery page ${targetGalleryPage}...`);
+        
+        try {
+          const galleryUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${targetGalleryPage}`;
+          const response = await fetch(galleryUrl);
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          
+          const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
+          debugLog(`[EH Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${targetGalleryPage}`);
+          
+          thumbnailLinks.forEach((link) => {
+            const href = link.getAttribute('href');
+            const match = href.match(/\/s\/([a-f0-9]+)\/\d+-(\d+)/);
+            if (match) {
+              const imgkey = match[1];
+              const pageNum = parseInt(match[2]) - 1;
+              if (imagelist[pageNum]) {
+                imagelist[pageNum].k = imgkey;
+              }
+            }
+          });
+          debugLog(`[EH Reader] Pre-fetched imgkeys for saved progress page ${savedProgressPage}`);
+        } catch (error) {
+          console.warn('[EH Reader] Failed to pre-fetch imgkeys for saved progress:', error);
+        }
+      }
       
       // 3. 构建 pageData（与 content.js 格式兼容）
       const readerPageData = {
@@ -330,7 +409,7 @@
       window.__ehReaderData = readerPageData;
       
       // 5. 创建标记，让 content.js 知道是从 Gallery 启动的
-      console.log('[EH Reader] Injecting reader UI...');
+      debugLog('[EH Reader] Injecting reader UI...');
       
       window.__ehGalleryBootstrap = {
         enabled: true,
@@ -343,7 +422,7 @@
         detail: readerPageData 
       });
       document.dispatchEvent(event);
-      console.log('[EH Reader] Gallery reader ready event dispatched');
+      debugLog('[EH Reader] Gallery reader ready event dispatched');
       
     } catch (error) {
       console.error('[EH Reader] Failed to launch reader:', error);
@@ -364,7 +443,7 @@
 
     // 检查是否已经有 MPV 链接
     if (mpvLink) {
-      console.log('[EH Reader] MPV link already exists, user has permission');
+      debugLog('[EH Reader] MPV link already exists, user has permission');
       // 如果有 MPV 权限，可以选择不添加按钮，或者添加一个备用入口
       // 这里我们仍然添加，作为备选方案
     }
@@ -378,10 +457,13 @@
     const icon = document.createElement('img');
     icon.src = 'https://ehgt.org/g/mr.gif';
     
+    // 检测是否有 EhSyringe 等中文翻译插件（检测"多页查看器"等中文文本）
+    const hasChineseUI = !!document.querySelector('#gd5')?.textContent?.match(/多页查看器|申请|收藏/);
+    
     // 创建按钮
   const button = document.createElement('a');
     button.href = '#';
-    button.textContent = 'EH Modern Reader';
+    button.textContent = hasChineseUI ? '现代阅读器' : 'EH Modern Reader';
   // 使用站点默认链接样式，避免突兀
   button.style.cssText = '';
     button.onclick = (e) => {
@@ -406,7 +488,7 @@
       actionPanel.insertBefore(buttonContainer, actionPanel.firstChild);
     }
 
-    console.log('[EH Reader] Launch button added');
+    debugLog('[EH Reader] Launch button added');
   }
 
   // 页面加载完成后添加按钮
@@ -462,5 +544,5 @@
   
   ensureInterception();
 
-  console.log('[EH Reader] Gallery page script initialized');
+  debugLog('[EH Reader] Gallery page script initialized');
 })();
