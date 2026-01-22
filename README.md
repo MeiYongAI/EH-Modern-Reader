@@ -2,7 +2,7 @@
 
 现代化的 E-Hentai / ExHentai 阅读器扩展，支持 MPV 与 Gallery 双模式、智能节流、持久缓存与永久阅读进度。
 
-![Version](https://img.shields.io/badge/version-2.3.7-blue)
+![Version](https://img.shields.io/badge/version-2.3.8-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 

@@ -5,6 +5,10 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.8] - 2026-01-23
+### Fixed
+- **超大画廊保护**：超过 500 页的画廊在进入连续模式前会弹出警告，避免浏览器因创建过多 DOM 元素而崩溃（`ERR_INSUFFICIENT_RESOURCES`）。用户可选择继续或切回单页模式。
+
 ## [2.3.7] - 2026-01-23
 ### Added
 - **缩略图拖动支持**：缩略图栏现在可以用鼠标拖动滚动，操作更便捷。

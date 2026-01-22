@@ -3455,9 +3455,28 @@
 
   // （双页模式已删除，仅保留单页与横向连续）
 
+    // 🎯 超大画廊阈值：超过此页数时，连续模式可能导致内存不足
+    const CONTINUOUS_MODE_MAX_PAGES = 500;
+    
     // 连续模式：横向 MVP（懒加载 + 观察器）
     let continuous = { container: null, observer: null };
     async function enterContinuousHorizontalMode() {
+      // 🎯 超大画廊检测：超过阈值时警告用户
+      if (state.pageCount > CONTINUOUS_MODE_MAX_PAGES) {
+        const confirmed = confirm(
+          `⚠️ 此画廊有 ${state.pageCount} 页，连续模式可能导致浏览器卡顿或崩溃。\n\n` +
+          `建议使用单页模式阅读超大画廊。\n\n` +
+          `确定要继续使用连续模式吗？`
+        );
+        if (!confirmed) {
+          // 切回单页模式
+          state.settings.readMode = 'single';
+          if (elements.modeSelect) elements.modeSelect.value = 'single';
+          saveSettings();
+          return;
+        }
+      }
+      
   // 仅处理横向模式容器
       // 若已存在则直接显示
       if (!continuous.container) {
@@ -3754,6 +3773,22 @@
     }
 
     async function enterContinuousVerticalMode() {
+      // 🎯 超大画廊检测：超过阈值时警告用户
+      if (state.pageCount > CONTINUOUS_MODE_MAX_PAGES) {
+        const confirmed = confirm(
+          `⚠️ 此画廊有 ${state.pageCount} 页，连续模式可能导致浏览器卡顿或崩溃。\n\n` +
+          `建议使用单页模式阅读超大画廊。\n\n` +
+          `确定要继续使用连续模式吗？`
+        );
+        if (!confirmed) {
+          // 切回单页模式
+          state.settings.readMode = 'single';
+          if (elements.modeSelect) elements.modeSelect.value = 'single';
+          saveSettings();
+          return;
+        }
+      }
+      
       // 纵向连续模式：垂直滚动
       if (!continuous.container) {
         // 预加载所有图片的宽高比（阻塞等待完成，避免加载时布局抖动）
