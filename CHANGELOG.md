@@ -5,6 +5,10 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Fixed
+- **画廊缩略图跳转修复**：修复从画廊详情页点击缩略图后，阅读器显示错误页面的问题。现在点击任意缩略图都会正确跳转到对应页面，不会被 localStorage 的阅读进度覆盖。
+
 ## [2.3.6] - 2026-01-21
 ### Added
 - **纵向连续阅读模式**：新增"纵向连续"阅读模式，支持上下滚动浏览所有页面。

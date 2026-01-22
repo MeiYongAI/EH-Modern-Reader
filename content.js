@@ -137,17 +137,6 @@
         try { pageData.imagelist = JSON.parse(mlist[1]); } catch {}
       }
     } catch {}
-    // 标题清理：去掉站点后缀，避免出现 "- E-Hentai Galleries"、"- E" 等残留
-    let cleanedTitle = (pageData.title || '').replace(/\s*-\s*(?:Ex)?Hentai(?: Galleries)?$/i, '').trim();
-    // 若仍以 "-" 开头（无有效文本），继续剔除前导破折号
-    cleanedTitle = cleanedTitle.replace(/^\s*-\s*/, '').trim();
-    if (cleanedTitle) {
-      pageData.title = cleanedTitle;
-    } else if (pageData.gid) {
-      pageData.title = `GID ${pageData.gid}`;
-    } else {
-      pageData.title = '未知画廊';
-    }
     // gallery_url 兜底：DOM 链接或 referrer
     try {
       const a = document.querySelector('a[href^="/g/"], a[href*="/g/"]');
@@ -3925,9 +3914,8 @@
     generateThumbnails();
     
     // 阅读记忆：优先使用外部启动指定页，其次恢复“永久”进度（chrome.storage.local / localStorage）
-    let savedPage = (typeof pageData.startAt === 'number' && pageData.startAt >= 1 && pageData.startAt <= state.pageCount)
-      ? pageData.startAt
-      : 1;
+    const hasExplicitStartPage = (typeof pageData.startAt === 'number' && pageData.startAt >= 1 && pageData.startAt <= state.pageCount);
+    let savedPage = hasExplicitStartPage ? pageData.startAt : 1;
     const gid = pageData.gid || 'nogid';
     const LS_KEY = `eh_reader_lastpage_permanent_${gid}`;
     const loadLastPagePermanent = () => new Promise((resolve) => {
@@ -3959,7 +3947,8 @@
     };
     try {
       loadLastPagePermanent().then((v) => {
-        if (savedPage === 1 && typeof v === 'number' && v >= 1 && v <= state.pageCount) {
+        // 只有在没有明确指定起始页时，才使用 localStorage 的进度
+        if (!hasExplicitStartPage && typeof v === 'number' && v >= 1 && v <= state.pageCount) {
           savedPage = v;
         }
         // hook showPage，在每次成功显示后写入永久存储
