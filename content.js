@@ -2188,7 +2188,7 @@
               
               canvas.setAttribute('role', 'img');
               canvas.setAttribute('aria-label', `Page ${pageNum}: ${title}`);
-              canvas.style.display = 'block';
+              canvas.style.display = 'inline-block';
               
               // 替换占位符
               thumb.style.background = 'none';
