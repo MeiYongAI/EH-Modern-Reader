@@ -272,29 +272,39 @@
         <!-- 主内容区:图片显示 -->
         <main id="eh-main">
           <section id="eh-viewer">
-            <div id="eh-image-container">
-              <!-- 旧加载动画已移除，统一使用环形进度覆盖层 -->
-              <!-- 图片加载进度覆盖层 -->
-              <div id="eh-image-loading-overlay" class="eh-image-loading-overlay" style="display: none;">
-                <div class="eh-circular-progress">
-                  <!-- 使用 SVG 绘制空心环进度 -->
-                  <svg width="80" height="80" viewBox="0 0 80 80">
-                    <!-- 背景环 -->
-                    <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
-                    <!-- 进度环 -->
-                    <circle id="eh-progress-ring" cx="40" cy="40" r="32" fill="none" 
-                            stroke="#FF6B9D" stroke-width="8" 
-                            stroke-linecap="round"
-                            stroke-dasharray="201.06 201.06"
-                            stroke-dashoffset="201.06"
-                            transform="rotate(-90 40 40)"
-                            style="transition: stroke-dashoffset 0.15s ease"/>
-                  </svg>
+            <!-- 串珠式滑轨容器（单页模式拖拽翻页） -->
+            <div id="eh-page-slider" class="eh-page-slider">
+              <div id="eh-page-track" class="eh-page-track">
+                <!-- 前一页 -->
+                <div class="eh-page-slide eh-slide-prev" data-slide="prev">
+                  <img class="eh-slide-image" alt="前一页" />
                 </div>
-                <div class="eh-loading-hint">Loading</div>
-                <div id="eh-loading-page-number" class="eh-loading-page-number">Page 1</div>
+                <!-- 当前页 -->
+                <div class="eh-page-slide eh-slide-current" data-slide="current">
+                  <!-- 图片加载进度覆盖层 -->
+                  <div id="eh-image-loading-overlay" class="eh-image-loading-overlay" style="display: none;">
+                    <div class="eh-circular-progress">
+                      <svg width="80" height="80" viewBox="0 0 80 80">
+                        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="8"/>
+                        <circle id="eh-progress-ring" cx="40" cy="40" r="32" fill="none" 
+                                stroke="#FF6B9D" stroke-width="8" 
+                                stroke-linecap="round"
+                                stroke-dasharray="201.06 201.06"
+                                stroke-dashoffset="201.06"
+                                transform="rotate(-90 40 40)"
+                                style="transition: stroke-dashoffset 0.15s ease"/>
+                      </svg>
+                    </div>
+                    <div class="eh-loading-hint">Loading</div>
+                    <div id="eh-loading-page-number" class="eh-loading-page-number">Page 1</div>
+                  </div>
+                  <img id="eh-current-image" class="eh-slide-image" alt="当前页" />
+                </div>
+                <!-- 后一页 -->
+                <div class="eh-page-slide eh-slide-next" data-slide="next">
+                  <img class="eh-slide-image" alt="后一页" />
+                </div>
               </div>
-              <img id="eh-current-image" alt="当前页" />
             </div>
 
             <!-- 翻页按钮 -->
@@ -739,9 +749,18 @@
       }
     }
 
-    // 读取/保存进度（关闭阅读记忆：总是从第1页开始，且不写入存储）
+    // 读取/保存进度
     function loadProgress() { return 1; }
-    function saveProgress(page) { /* no-op: disabled progress memory */ }
+    // 🎯 连续模式阅读记忆：通过 saveProgress 触发永久存储
+    let _persistTimer = null;
+    function saveProgress(page) {
+      if (_persistTimer) clearTimeout(_persistTimer);
+      _persistTimer = setTimeout(() => {
+        if (typeof _saveLastPagePermanent === 'function') {
+          _saveLastPagePermanent(page);
+        }
+      }, 400);
+    }
 
     // 获取 DOM 元素（带判空）
       const elements = {
@@ -1614,6 +1633,23 @@
         : null;
       if (horizontalContainer) {
         const idx = pageNum - 1;
+        
+        // 横向虚拟滚动模式：使用专用跳转函数
+        if (virtualScrollH.enabled) {
+          debugLog('[EH VirtualH] 跳转请求 -> page=', pageNum);
+          jumpToVirtualPageH(pageNum);
+          state.currentPage = pageNum;
+          if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+          if (elements.progressBar) elements.progressBar.value = pageNum;
+          updateThumbnailHighlight(pageNum);
+          preloadAdjacentPages(pageNum);
+          saveProgress(pageNum);
+          const eager = [idx, idx-1, idx+1].filter(i => i >=0 && i < state.pageCount);
+          enqueuePrefetch(eager, true);
+          return;
+        }
+        
+        // 普通横向连续模式
         const img = horizontalContainer.querySelector(`img[data-page-index="${idx}"]`);
         if (img) {
           const wrapper = img.closest('.eh-ch-wrapper') || img.parentElement || img;
@@ -1647,6 +1683,25 @@
         : null;
       if (verticalContainer) {
         const idx = pageNum - 1;
+        
+        // 虚拟滚动模式：使用专用跳转函数
+        if (virtualScroll.enabled) {
+          debugLog('[EH Virtual] 跳转请求 -> page=', pageNum);
+          jumpToVirtualPage(pageNum);
+          // 同步页码与缩略图高亮
+          state.currentPage = pageNum;
+          if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+          if (elements.progressBar) elements.progressBar.value = pageNum;
+          updateThumbnailHighlight(pageNum);
+          preloadAdjacentPages(pageNum);
+          saveProgress(pageNum);
+          // 提前加载目标与相邻图片
+          const eager = [idx, idx-1, idx+1].filter(i => i >=0 && i < state.pageCount);
+          enqueuePrefetch(eager, true);
+          return;
+        }
+        
+        // 普通连续纵向模式
         const img = verticalContainer.querySelector(`img[data-page-index="${idx}"]`);
         if (img) {
           const wrapper = img.closest('.eh-cv-wrapper') || img.parentElement || img;
@@ -1812,6 +1867,11 @@
 
         // 预加载策略：预加载下一页和上一页（提升切换体验）
         preloadAdjacentPages(pageNum);
+        
+        // 更新串珠滑轨的相邻图片（单页模式拖拽翻页用）
+        if (pageSlider.isSinglePageMode()) {
+          pageSlider.updateAdjacentImages();
+        }
 
       } catch (error) {
         console.error('[EH Modern Reader] 加载图片失败:', error);
@@ -2489,6 +2549,12 @@
     // 点击图片左右区域翻页（适用所有模式）
     if (elements.viewer) {
       elements.viewer.onclick = (e) => {
+        // 如果刚结束拖拽，忽略此次 click 事件（防止拖拽后触发菜单切换）
+        if (pageSlider.justDragged) {
+          e.stopPropagation();
+          return;
+        }
+        
         // 排除按钮、缩略图、进度条的点击
         if (e.target.tagName === 'BUTTON' || 
             e.target.closest('button') || 
@@ -2548,92 +2614,476 @@
       };
     }
 
-    // 触摸手势支持（单页模式）
-    if (elements.viewer) {
-      let touchStartX = 0;
-      let touchStartY = 0;
-      let touchStartTime = 0;
-      const MIN_SWIPE_DISTANCE = 50; // 最小滑动距离
-      const MAX_SWIPE_TIME = 300; // 最大滑动时间（ms）
-
+    // 🎯 串珠式拖拽翻页系统（单页模式）
+    // 参考 JHenTai 的 PhotoViewGallery - 像拉珠一样前后图片串在一起
+    const pageSlider = {
+      // DOM 元素
+      slider: null,
+      track: null,
+      slides: { prev: null, current: null, next: null },
+      images: { prev: null, current: null, next: null },
+      
+      // 状态
+      isDragging: false,
+      isAnimating: false,
+      justDragged: false,  // 刚结束拖拽，用于阻止 click 事件
+      startX: 0,
+      startY: 0,
+      currentOffset: 0,  // 当前拖拽偏移（像素）
+      startTime: 0,
+      velocityX: 0,
+      velocityY: 0,
+      lastMoveTime: 0,
+      lastMoveX: 0,
+      lastMoveY: 0,
+      baseOffset: 0,     // 基础偏移（用于计算百分比）
+      
+      // 配置
+      threshold: 0.15,         // 翻页阈值（相对于容器宽/高的比例）
+      velocityThreshold: 0.5,  // 速度阈值（像素/毫秒）
+      elasticity: 0.25,        // 边界弹性系数
+      animDuration: 280,       // 动画时长（毫秒）
+      
+      // 初始化
+      init() {
+        this.slider = document.getElementById('eh-page-slider');
+        this.track = document.getElementById('eh-page-track');
+        if (!this.slider || !this.track) return false;
+        
+        this.slides.prev = this.track.querySelector('[data-slide="prev"]');
+        this.slides.current = this.track.querySelector('[data-slide="current"]');
+        this.slides.next = this.track.querySelector('[data-slide="next"]');
+        
+        this.images.prev = this.slides.prev?.querySelector('.eh-slide-image');
+        this.images.current = this.slides.current?.querySelector('#eh-current-image');
+        this.images.next = this.slides.next?.querySelector('.eh-slide-image');
+        
+        return true;
+      },
+      
+      // 判断当前是否为单页模式
+      isSinglePageMode() {
+        return state.settings.readMode === 'single' || state.settings.readMode === 'single-vertical';
+      },
+      
+      // 判断是否为横向单页模式
+      isHorizontalMode() {
+        return state.settings.readMode === 'single';
+      },
+      
+      // 更新滑轨方向
+      updateTrackDirection() {
+        if (!this.track) return;
+        if (this.isHorizontalMode()) {
+          this.track.classList.remove('eh-track-vertical');
+        } else {
+          this.track.classList.add('eh-track-vertical');
+        }
+      },
+      
+      // 显示/隐藏滑轨（连续模式时隐藏）
+      setVisible(visible) {
+        if (this.slider) {
+          this.slider.classList.toggle('eh-slider-hidden', !visible);
+        }
+      },
+      
+      // 获取容器尺寸
+      getContainerSize() {
+        if (!this.slider) return { width: 0, height: 0 };
+        const rect = this.slider.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      },
+      
+      // 更新相邻页图片
+      async updateAdjacentImages() {
+        const prevIndex = state.currentPage - 2; // 0-based
+        const nextIndex = state.currentPage;     // 0-based (当前页是 currentPage-1)
+        
+        // 更新前一页图片
+        if (this.images.prev) {
+          if (prevIndex >= 0) {
+            const cached = state.imageCache.get(prevIndex);
+            if (cached && cached.status === 'loaded' && cached.img?.src) {
+              this.images.prev.src = cached.img.src;
+            } else {
+              // 尝试加载
+              try {
+                const img = await loadImage(prevIndex);
+                if (img?.src) this.images.prev.src = img.src;
+              } catch {
+                this.images.prev.src = '';
+              }
+            }
+          } else {
+            this.images.prev.src = '';
+          }
+        }
+        
+        // 更新后一页图片
+        if (this.images.next) {
+          if (nextIndex < state.pageCount) {
+            const cached = state.imageCache.get(nextIndex);
+            if (cached && cached.status === 'loaded' && cached.img?.src) {
+              this.images.next.src = cached.img.src;
+            } else {
+              // 尝试加载
+              try {
+                const img = await loadImage(nextIndex);
+                if (img?.src) this.images.next.src = img.src;
+              } catch {
+                this.images.next.src = '';
+              }
+            }
+          } else {
+            this.images.next.src = '';
+          }
+        }
+      },
+      
+      // 重置滑轨位置到中间
+      resetPosition(instant = false) {
+        if (!this.track) return;
+        const isHorizontal = this.isHorizontalMode();
+        
+        if (instant) {
+          this.track.style.transition = 'none';
+        } else {
+          this.track.style.transition = '';
+        }
+        
+        this.track.style.transform = isHorizontal 
+          ? 'translateX(-33.333%)' 
+          : 'translateY(-33.333%)';
+        this.currentOffset = 0;
+        
+        if (instant) {
+          // 强制重绘后恢复 transition
+          this.track.offsetHeight;
+          this.track.style.transition = '';
+        }
+      },
+      
+      // 设置拖拽偏移
+      setDragOffset(offsetPx) {
+        if (!this.track) return;
+        const size = this.getContainerSize();
+        const mainSize = this.isHorizontalMode() ? size.width : size.height;
+        if (mainSize === 0) return;
+        
+        // 计算百分比偏移（相对于滑轨总宽度 = 3 * 容器宽度）
+        const trackSize = mainSize * 3;
+        const offsetPercent = (offsetPx / trackSize) * 100;
+        
+        // 基础位置是 -33.333%（中间页）
+        const totalPercent = -33.333 + offsetPercent;
+        
+        this.track.style.transition = 'none';
+        this.track.style.transform = this.isHorizontalMode()
+          ? `translateX(${totalPercent}%)`
+          : `translateY(${totalPercent}%)`;
+        this.currentOffset = offsetPx;
+      },
+      
+      // 动画到指定位置
+      animateTo(targetPercent, duration, callback) {
+        if (!this.track) return;
+        
+        this.isAnimating = true;
+        this.track.style.transition = `transform ${duration}ms cubic-bezier(0.25, 0.1, 0.25, 1)`;
+        this.track.style.transform = this.isHorizontalMode()
+          ? `translateX(${targetPercent}%)`
+          : `translateY(${targetPercent}%)`;
+        
+        setTimeout(() => {
+          this.isAnimating = false;
+          if (callback) callback();
+        }, duration);
+      },
+      
+      // 回弹动画
+      animateBounceBack(callback) {
+        if (!this.track) return;
+        
+        this.isAnimating = true;
+        this.track.style.transition = 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)';
+        this.track.style.transform = this.isHorizontalMode()
+          ? 'translateX(-33.333%)'
+          : 'translateY(-33.333%)';
+        
+        setTimeout(() => {
+          this.isAnimating = false;
+          this.currentOffset = 0;
+          this.track.style.transition = '';
+          if (callback) callback();
+        }, 200);
+      }
+    };
+    
+    // 初始化串珠滑轨
+    pageSlider.init();
+    
+    if (elements.viewer && pageSlider.slider) {
+      // 触摸/鼠标开始
+      const handleDragStart = (clientX, clientY, e) => {
+        // 排除按钮、菜单等元素
+        if (e.target.tagName === 'BUTTON' || 
+            e.target.closest('button') || 
+            e.target.closest('#eh-bottom-menu') ||
+            e.target.closest('#eh-thumbnails-container') ||
+            e.target.closest('.eh-slider-container')) {
+          return false;
+        }
+        
+        // 检查点击位置是否在中间 1/3（用于切换菜单）
+        const rect = elements.viewer.getBoundingClientRect();
+        const relX = clientX - rect.left;
+        pageSlider.isInCenterZone = (relX >= rect.width / 3 && relX <= rect.width * 2 / 3);
+        
+        // 非单页模式不处理
+        if (!pageSlider.isSinglePageMode()) return false;
+        
+        // 正在动画中不处理
+        if (pageSlider.isAnimating) return false;
+        
+        pageSlider.isDragging = true;
+        pageSlider.startX = clientX;
+        pageSlider.startY = clientY;
+        pageSlider.currentOffset = 0;
+        pageSlider.startTime = performance.now();
+        pageSlider.lastMoveTime = pageSlider.startTime;
+        pageSlider.lastMoveX = clientX;
+        pageSlider.lastMoveY = clientY;
+        pageSlider.velocityX = 0;
+        pageSlider.velocityY = 0;
+        
+        // 预加载相邻页图片
+        pageSlider.updateAdjacentImages();
+        
+        return true;
+      };
+      
+      // 触摸/鼠标移动
+      const handleDragMove = (clientX, clientY, e) => {
+        if (!pageSlider.isDragging || !pageSlider.isSinglePageMode()) return;
+        
+        const now = performance.now();
+        const dt = now - pageSlider.lastMoveTime;
+        
+        // 计算位移
+        const deltaX = clientX - pageSlider.startX;
+        const deltaY = clientY - pageSlider.startY;
+        
+        // 判断主方向
+        const isHorizontal = pageSlider.isHorizontalMode();
+        const mainDelta = isHorizontal ? deltaX : deltaY;
+        const crossDelta = isHorizontal ? deltaY : deltaX;
+        
+        // 如果交叉方向移动更大，取消拖拽
+        if (Math.abs(crossDelta) > Math.abs(mainDelta) * 1.5 && Math.abs(crossDelta) > 20) {
+          if (Math.abs(mainDelta) < 30) {
+            pageSlider.isDragging = false;
+            pageSlider.resetPosition(true);
+            return;
+          }
+        }
+        
+        // 计算速度
+        if (dt > 0) {
+          pageSlider.velocityX = (clientX - pageSlider.lastMoveX) / dt;
+          pageSlider.velocityY = (clientY - pageSlider.lastMoveY) / dt;
+        }
+        pageSlider.lastMoveTime = now;
+        pageSlider.lastMoveX = clientX;
+        pageSlider.lastMoveY = clientY;
+        
+        // 计算带弹性的位移
+        let displayDelta = mainDelta;
+        
+        // 检查是否到达边界
+        const canGoPrev = state.currentPage > 1;
+        const canGoNext = state.currentPage < state.pageCount;
+        const isReverse = state.settings.reverse;
+        
+        // 判断滑动方向对应的翻页方向
+        let wouldGoPrev, wouldGoNext;
+        if (isHorizontal) {
+          wouldGoPrev = isReverse ? (mainDelta < 0) : (mainDelta > 0);
+          wouldGoNext = isReverse ? (mainDelta > 0) : (mainDelta < 0);
+        } else {
+          wouldGoPrev = mainDelta > 0;
+          wouldGoNext = mainDelta < 0;
+        }
+        
+        // 边界弹性
+        if ((wouldGoPrev && !canGoPrev) || (wouldGoNext && !canGoNext)) {
+          displayDelta = mainDelta * pageSlider.elasticity;
+        }
+        
+        // 应用位移到滑轨
+        pageSlider.setDragOffset(displayDelta);
+        
+        // 阻止默认行为
+        if (Math.abs(mainDelta) > 10) {
+          e.preventDefault();
+        }
+      };
+      
+      // 触摸/鼠标结束
+      const handleDragEnd = (clientX, clientY, e) => {
+        if (!pageSlider.isDragging) return;
+        
+        pageSlider.isDragging = false;
+        
+        if (!pageSlider.isSinglePageMode()) {
+          pageSlider.resetPosition(true);
+          return;
+        }
+        
+        const isHorizontal = pageSlider.isHorizontalMode();
+        const size = pageSlider.getContainerSize();
+        const mainSize = isHorizontal ? size.width : size.height;
+        const mainDelta = pageSlider.currentOffset;
+        const mainVelocity = isHorizontal ? pageSlider.velocityX : pageSlider.velocityY;
+        
+        // 判断是否在中间区域的轻触（用于切换菜单）
+        const totalMove = Math.max(
+          Math.abs(clientX - pageSlider.startX),
+          Math.abs(clientY - pageSlider.startY)
+        );
+        
+        if (totalMove < 15 && pageSlider.isInCenterZone) {
+          // 这是一个点击，恢复位置
+          pageSlider.animateBounceBack();
+          return;
+        }
+        
+        // 判断是否应该翻页（基于位移比例或速度）
+        const ratio = Math.abs(mainDelta) / mainSize;
+        const shouldFlip = ratio > pageSlider.threshold || 
+                          Math.abs(mainVelocity) > pageSlider.velocityThreshold;
+        
+        // 确定翻页方向
+        let direction = 0;
+        if (shouldFlip && Math.abs(mainDelta) > 5) {
+          const isReverse = state.settings.reverse;
+          if (isHorizontal) {
+            if (mainDelta > 0) {
+              direction = isReverse ? 1 : -1;
+            } else {
+              direction = isReverse ? -1 : 1;
+            }
+          } else {
+            direction = mainDelta > 0 ? -1 : 1;
+          }
+        }
+        
+        // 检查边界
+        const targetPage = state.currentPage + direction;
+        const canFlip = targetPage >= 1 && targetPage <= state.pageCount;
+        
+        if (canFlip && direction !== 0) {
+          // 翻页：滑动到目标位置
+          // direction = -1 (上一页): 滑轨向右/下移动，显示 prev -> 目标是 0%
+          // direction = +1 (下一页): 滑轨向左/上移动，显示 next -> 目标是 -66.666%
+          const targetPercent = direction < 0 ? 0 : -66.666;
+          
+          // 设置 justDragged 阻止后续 click 事件
+          pageSlider.justDragged = true;
+          setTimeout(() => { pageSlider.justDragged = false; }, 50);
+          
+          pageSlider.animateTo(targetPercent, pageSlider.animDuration, async () => {
+            // 🎯 重置图片缩放状态（与 scheduleShowPage 行为一致）
+            resetImageZoom();
+            
+            // 🎯 关键修复：先将目标 slide 的图片复制到 current slide
+            // 使用 decode() 确保图片已解码后再重置位置，避免尺寸闪跳
+            const sourceSlide = direction < 0 ? pageSlider.images.prev : pageSlider.images.next;
+            if (sourceSlide && sourceSlide.src && pageSlider.images.current) {
+              pageSlider.images.current.src = sourceSlide.src;
+              
+              // 等待图片解码完成（最多等待 100ms，避免卡顿）
+              try {
+                await Promise.race([
+                  pageSlider.images.current.decode(),
+                  new Promise(resolve => setTimeout(resolve, 100))
+                ]);
+              } catch {
+                // 解码失败也继续，避免阻塞
+              }
+            }
+            
+            // 重置滑轨到中间（瞬间）- 此时 current 已经是新图片且已解码
+            pageSlider.resetPosition(true);
+            
+            // 更新 state 和 UI（但不重新加载当前图片，因为已经在上面设置了）
+            state.currentPage = targetPage;
+            if (elements.pageInfo) elements.pageInfo.textContent = `${targetPage} / ${state.pageCount}`;
+            updateThumbnailHighlight(targetPage);
+            
+            // 触发预取相邻页面
+            enqueuePrefetch([targetPage - 2, targetPage], false);
+            
+            // 更新相邻图片（为下次翻页准备）
+            pageSlider.updateAdjacentImages();
+            debugLog('[EH Modern Reader] 串珠翻页:', direction > 0 ? '下一页' : '上一页', '-> 页', targetPage);
+          });
+        } else {
+          // 回弹，也设置 justDragged 阻止菜单切换（如果有明显移动）
+          if (totalMove > 15) {
+            pageSlider.justDragged = true;
+            setTimeout(() => { pageSlider.justDragged = false; }, 50);
+          }
+          pageSlider.animateBounceBack();
+        }
+      };
+      
+      // 触摸事件
       elements.viewer.addEventListener('touchstart', (e) => {
-        // 排除按钮、菜单等元素
-        if (e.target.tagName === 'BUTTON' || 
-            e.target.closest('button') || 
-            e.target.closest('#eh-bottom-menu')) {
-          return;
-        }
-        
+        if (e.touches.length !== 1) return;
         const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        touchStartTime = Date.now();
+        handleDragStart(touch.clientX, touch.clientY, e);
       }, { passive: true });
-
-      elements.viewer.addEventListener('touchend', (e) => {
-        // 排除按钮、菜单等元素
-        if (e.target.tagName === 'BUTTON' || 
-            e.target.closest('button') || 
-            e.target.closest('#eh-bottom-menu')) {
-          return;
-        }
-
-        const touch = e.changedTouches[0];
-        const touchEndX = touch.clientX;
-        const touchEndY = touch.clientY;
-        const touchEndTime = Date.now();
-        
-        const deltaX = touchEndX - touchStartX;
-        const deltaY = touchEndY - touchStartY;
-        const deltaTime = touchEndTime - touchStartTime;
-        
-        // 检查是否为有效滑动
-        if (deltaTime > MAX_SWIPE_TIME) return;
-        
-        const absDeltaX = Math.abs(deltaX);
-        const absDeltaY = Math.abs(deltaY);
-        
-        // 横向单页模式 (single)：响应左右滑动
-        if (state.settings.readMode === 'single') {
-          if (absDeltaX > MIN_SWIPE_DISTANCE && absDeltaX > absDeltaY * 1.5) {
-            // 横向滑动
-            let direction = 0;
-            if (deltaX > 0) {
-              // 向右滑动：反向时向后翻（+1），正常时向前翻（-1）
-              direction = state.settings.reverse ? 1 : -1;
-            } else {
-              // 向左滑动：反向时向前翻（-1），正常时向后翻（+1）
-              direction = state.settings.reverse ? -1 : 1;
-            }
-            
-            const target = state.currentPage + direction;
-            if (target >= 1 && target <= state.pageCount) {
-              scheduleShowPage(target);
-              debugLog('[EH Modern Reader] 触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
-            }
-          }
-        }
-        // 纵向单页模式 (single-vertical)：响应上下滑动
-        else if (state.settings.readMode === 'single-vertical') {
-          if (absDeltaY > MIN_SWIPE_DISTANCE && absDeltaY > absDeltaX * 1.5) {
-            // 纵向滑动
-            let direction = 0;
-            if (deltaY > 0) {
-              // 向下滑动：向前翻（-1）
-              direction = -1;
-            } else {
-              // 向上滑动：向后翻（+1）
-              direction = 1;
-            }
-            
-            const target = state.currentPage + direction;
-            if (target >= 1 && target <= state.pageCount) {
-              scheduleShowPage(target);
-              debugLog('[EH Modern Reader] 纵向触摸手势翻页:', direction > 0 ? '下一页' : '上一页');
-            }
-          }
-        }
+      
+      elements.viewer.addEventListener('touchmove', (e) => {
+        if (e.touches.length !== 1) return;
+        const touch = e.touches[0];
+        handleDragMove(touch.clientX, touch.clientY, e);
       }, { passive: false });
+      
+      elements.viewer.addEventListener('touchend', (e) => {
+        const touch = e.changedTouches[0];
+        handleDragEnd(touch.clientX, touch.clientY, e);
+      }, { passive: true });
+      
+      elements.viewer.addEventListener('touchcancel', (e) => {
+        if (pageSlider.isDragging) {
+          pageSlider.isDragging = false;
+          pageSlider.animateBounceBack();
+        }
+      }, { passive: true });
+      
+      // 鼠标事件（桌面端支持）
+      let isMouseDragging = false;
+      
+      elements.viewer.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (handleDragStart(e.clientX, e.clientY, e)) {
+          isMouseDragging = true;
+          e.preventDefault();
+        }
+      });
+      
+      document.addEventListener('mousemove', (e) => {
+        if (!isMouseDragging) return;
+        handleDragMove(e.clientX, e.clientY, e);
+      });
+      
+      document.addEventListener('mouseup', (e) => {
+        if (!isMouseDragging) return;
+        isMouseDragging = false;
+        handleDragEnd(e.clientX, e.clientY, e);
+      });
     }
 
     // 主题图标切换（深色：月亮；浅色：太阳）
@@ -3052,10 +3502,31 @@
           const newMode = radio.value;
           const oldMode = state.settings.readMode;
           if (newMode === oldMode) return;
+          
+          // 🎯 保存当前页码（参考 JHenTai 的 initialIndex = currentImageIndex）
+          const savedPage = state.currentPage;
+          console.log('[EH Modern Reader] 阅读模式切换:', oldMode, '→', newMode, ', 当前页:', savedPage);
+          
           state.settings.readMode = newMode;
-          console.log('[EH Modern Reader] 阅读模式切换:', oldMode, '→', newMode);
-          // 退出旧模式（可能是 continuous-horizontal、continuous-vertical 或 single）
+          
+          // 退出旧模式 - 清理虚拟滚动状态
           if (oldMode === 'continuous-horizontal' || oldMode === 'continuous-vertical') {
+            // 清理虚拟滚动状态（但不重置 state.currentPage）
+            if (virtualScroll.enabled) {
+              virtualScroll.enabled = false;
+              virtualScroll.scrollContainer = null;
+              virtualScroll.contentContainer = null;
+              virtualScroll.itemsContainer = null;
+              virtualScroll.renderedRange = { start: -1, end: -1 };
+            }
+            if (virtualScrollH.enabled) {
+              virtualScrollH.enabled = false;
+              virtualScrollH.scrollContainer = null;
+              virtualScrollH.contentContainer = null;
+              virtualScrollH.itemsContainer = null;
+              virtualScrollH.renderedRange = { start: -1, end: -1 };
+            }
+            
             const singleViewer = document.getElementById('eh-viewer');
             if (singleViewer) singleViewer.style.display = '';
             if (continuous.observer) { continuous.observer.disconnect(); continuous.observer = null; }
@@ -3064,18 +3535,34 @@
             }
             continuous.container = null;
           }
+          
+          // 🎯 恢复页码（确保进入新模式前页码是正确的）
+          state.currentPage = savedPage;
+          
           // 进入新模式
           if (newMode === 'continuous-horizontal') {
+            // 隐藏串珠滑轨
+            if (pageSlider.slider) pageSlider.setVisible(false);
             enterContinuousHorizontalMode();
           } else if (newMode === 'continuous-vertical') {
+            // 隐藏串珠滑轨
+            if (pageSlider.slider) pageSlider.setVisible(false);
             enterContinuousVerticalMode();
           } else {
             const singleViewer = document.getElementById('eh-viewer');
             if (singleViewer) singleViewer.style.display = '';
+            // 显示串珠滑轨并更新方向
+            if (pageSlider.slider) {
+              pageSlider.setVisible(true);
+              pageSlider.updateTrackDirection();
+              pageSlider.resetPosition(true);
+            }
             // 切换到单页模式时，强制显示当前页（从连续模式带来的 state.currentPage）
             console.log('[EH Modern Reader] 切换到单页模式，当前页:', state.currentPage);
             // 直接调用 internalShowPage 绕过延时，确保立即加载正确的页面
             internalShowPage(state.currentPage, { force: true });
+            // 更新相邻页图片
+            pageSlider.updateAdjacentImages();
           }
           saveSettings(); // 保存设置
         };
@@ -3117,27 +3604,69 @@
           state.settings.verticalSidePadding = v;
           const verticalContainer = document.getElementById('eh-continuous-vertical');
           if (verticalContainer) {
-            const topBottom = 12;
             const currentPageBefore = state.currentPage;
-            verticalContainer.style.padding = `${topBottom}px ${v}px`;
-            requestAnimationFrame(() => {
-              const targetIdx = currentPageBefore - 1;
-              const targetImg = verticalContainer.querySelector(`img[data-page-index="${targetIdx}"]`);
-              if (targetImg) {
-                requestAnimationFrame(() => {
-                  try {
-                    const wrapper = targetImg.closest('.eh-cv-wrapper') || targetImg.parentElement;
-                    if (wrapper) {
-                      wrapper.scrollIntoView({
-                        behavior: 'auto',
-                        block: 'center',
-                        inline: 'center'
-                      });
-                    }
-                  } catch {}
-                });
-              }
-            });
+            
+            // 🎯 检测是否为虚拟滚动模式
+            if (virtualScroll.enabled && virtualScroll.scrollContainer) {
+              // 虚拟滚动模式：更新 vs.sidePadding 并重新计算布局
+              virtualScroll.sidePadding = v;
+              // 以当前页为锚点稳定重算
+              virtualScroll.pendingJumpTarget = currentPageBefore - 1;
+              // 读最新容器宽度（滚动条/视口变化）
+              virtualScroll.containerWidth = virtualScroll.scrollContainer.clientWidth;
+              calculateVirtualLayout();
+              virtualScroll.contentContainer.style.height = virtualScroll.totalHeight + 'px';
+              
+              // 更新所有已渲染卡片的 padding/位置/高度
+              const items = virtualScroll.itemsContainer.querySelectorAll('.eh-virtual-item');
+              items.forEach(item => {
+                item.style.padding = `0 ${v}px`;
+                const idx = parseInt(item.getAttribute('data-virtual-index'));
+                if (virtualScroll.itemOffsets[idx] !== undefined) {
+                  item.style.top = virtualScroll.itemOffsets[idx] + 'px';
+                  item.style.height = virtualScroll.itemHeights[idx] + 'px';
+                }
+              });
+              // 立即更新渲染范围，避免等待滚动事件
+              updateVirtualRendering();
+              // 跳转回当前页（pendingJumpTarget 已设）
+              jumpToVirtualPage(currentPageBefore);
+            } else {
+              // 非虚拟滚动模式：直接更新 CSS padding
+              const topBottom = 12;
+              verticalContainer.style.padding = `${topBottom}px ${v}px`;
+              
+              // 🎯 重新计算所有已加载图片的高度（因为可用宽度变了）
+              const availableWidth = verticalContainer.clientWidth - v * 2;
+              verticalContainer.querySelectorAll('.eh-cv-wrapper').forEach(wrap => {
+                const ratio = parseFloat(wrap.style.getPropertyValue('--eh-aspect'));
+                if (ratio && ratio > 0) {
+                  const newHeight = Math.round(availableWidth / ratio);
+                  wrap.style.height = newHeight + 'px';
+                  const card = wrap.parentElement;
+                  if (card) card.style.height = newHeight + 'px';
+                }
+              });
+              
+              requestAnimationFrame(() => {
+                const targetIdx = currentPageBefore - 1;
+                const targetImg = verticalContainer.querySelector(`img[data-page-index="${targetIdx}"]`);
+                if (targetImg) {
+                  requestAnimationFrame(() => {
+                    try {
+                      const wrapper = targetImg.closest('.eh-cv-wrapper') || targetImg.parentElement;
+                      if (wrapper) {
+                        wrapper.scrollIntoView({
+                          behavior: 'auto',
+                          block: 'center',
+                          inline: 'center'
+                        });
+                      }
+                    } catch {}
+                  });
+                }
+              });
+            }
           }
           saveSettings();
         }
@@ -3204,9 +3733,33 @@
         const v = parseInt(elements.horizontalGapInput.value);
         if (!isNaN(v) && v >= 0 && v <= 100) {
           state.settings.horizontalGap = v;
-          const horizontalContainer = document.getElementById('eh-continuous-horizontal');
-          if (horizontalContainer) {
-            horizontalContainer.style.gap = `${v}px`;
+          // 虚拟横向滚动与非虚拟分别处理
+          if (virtualScrollH.enabled && virtualScrollH.scrollContainer) {
+            // 更新虚拟布局的 gap 并重算偏移/总宽度
+            virtualScrollH.gap = v;
+            calculateVirtualLayoutH();
+            if (virtualScrollH.contentContainer) {
+              virtualScrollH.contentContainer.style.width = virtualScrollH.totalWidth + 'px';
+            }
+            // 更新已渲染元素的位置
+            if (virtualScrollH.itemsContainer) {
+              const items = virtualScrollH.itemsContainer.querySelectorAll('.eh-virtual-item-h');
+              items.forEach(item => {
+                const idx = parseInt(item.getAttribute('data-virtual-index'));
+                if (!isNaN(idx) && virtualScrollH.itemOffsets[idx] !== undefined) {
+                  item.style.left = virtualScrollH.itemOffsets[idx] + 'px';
+                  item.style.width = virtualScrollH.itemWidths[idx] + 'px';
+                }
+              });
+            }
+            // 回到当前页，保持视图稳定
+            jumpToVirtualPageH(state.currentPage);
+          } else {
+            // 非虚拟：直接设置容器 gap
+            const horizontalContainer = document.getElementById('eh-continuous-horizontal');
+            if (horizontalContainer) {
+              horizontalContainer.style.gap = `${v}px`;
+            }
           }
           saveSettings();
         }
@@ -3227,7 +3780,32 @@
           state.settings.verticalGap = v;
           const verticalContainer = document.getElementById('eh-continuous-vertical');
           if (verticalContainer) {
-            verticalContainer.style.gap = `${v}px`;
+            // 零间距时移除骨架边线，视觉完全贴合
+            verticalContainer.classList.toggle('eh-no-gap-vertical', v === 0);
+            const currentPageBefore = state.currentPage;
+            
+            // 🎯 检测是否为虚拟滚动模式
+            if (virtualScroll.enabled && virtualScroll.scrollContainer) {
+              // 虚拟滚动模式：更新 vs.gap 并重新计算布局
+              virtualScroll.gap = v;
+              calculateVirtualLayout();
+              virtualScroll.contentContainer.style.height = virtualScroll.totalHeight + 'px';
+              
+              // 更新所有已渲染卡片的位置
+              const items = virtualScroll.itemsContainer.querySelectorAll('.eh-virtual-item');
+              items.forEach(item => {
+                const idx = parseInt(item.getAttribute('data-virtual-index'));
+                if (virtualScroll.itemOffsets[idx] !== undefined) {
+                  item.style.top = virtualScroll.itemOffsets[idx] + 'px';
+                }
+              });
+              
+              // 跳转回当前页
+              jumpToVirtualPage(currentPageBefore);
+            } else {
+              // 非虚拟滚动模式：直接更新 CSS gap
+              verticalContainer.style.gap = `${v}px`;
+            }
           }
           saveSettings();
         }
@@ -3461,23 +4039,19 @@
     // 连续模式：横向 MVP（懒加载 + 观察器）
     let continuous = { container: null, observer: null };
     async function enterContinuousHorizontalMode() {
-      // 🎯 超大画廊检测：超过阈值时警告用户
-      if (state.pageCount > CONTINUOUS_MODE_MAX_PAGES) {
-        const confirmed = confirm(
-          `⚠️ 此画廊有 ${state.pageCount} 页，连续模式可能导致浏览器卡顿或崩溃。\n\n` +
-          `建议使用单页模式阅读超大画廊。\n\n` +
-          `确定要继续使用连续模式吗？`
-        );
-        if (!confirmed) {
-          // 切回单页模式
-          state.settings.readMode = 'single';
-          if (elements.modeSelect) elements.modeSelect.value = 'single';
-          saveSettings();
-          return;
-        }
+      // 隐藏串珠滑轨（连续模式不需要）
+      if (pageSlider.slider) pageSlider.setVisible(false);
+      
+      // 判断是否使用虚拟滚动
+      const useVirtualScroll = state.pageCount > VIRTUAL_SCROLL_THRESHOLD;
+      
+      if (useVirtualScroll) {
+        debugLog('[EH Modern Reader] 启用横向虚拟滚动模式，页数:', state.pageCount);
+        await enterVirtualHorizontalMode();
+        return;
       }
       
-  // 仅处理横向模式容器
+  // 仅处理横向模式容器（非虚拟滚动，小画廊使用）
       // 若已存在则直接显示
       if (!continuous.container) {
         // 预加载所有图片的宽高比（阻塞等待完成，避免加载时布局抖动）
@@ -3635,8 +4209,57 @@
           }
         }, { passive: false });
 
+        // 🖱️ 鼠标拖拽滚动支持（JHenTai 同款手感）
+        let isMouseDragging = false;
+        let dragStartX = 0;
+        let dragScrollLeft = 0;
+        let dragMoved = false; // 标记是否真正移动过
+
+        continuous.container.addEventListener('mousedown', (e) => {
+          // 排除按钮和菜单
+          if (e.button !== 0) return; // 只响应左键
+          if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) return;
+          
+          isMouseDragging = true;
+          dragMoved = false;
+          dragStartX = e.pageX;
+          dragScrollLeft = continuous.container.scrollLeft;
+          continuous.container.style.cursor = 'grabbing';
+          continuous.container.style.userSelect = 'none';
+          e.preventDefault();
+        });
+
+        const onMouseMove = (e) => {
+          if (!isMouseDragging) return;
+          const deltaX = e.pageX - dragStartX;
+          if (Math.abs(deltaX) > 5) dragMoved = true; // 超过5px认为是拖拽
+          // 反向模式需要反转拖拽方向
+          const dirVisual = state.settings.reverse ? 1 : -1;
+          continuous.container.scrollLeft = dragScrollLeft + deltaX * dirVisual;
+        };
+
+        const onMouseUp = () => {
+          if (!isMouseDragging) return;
+          isMouseDragging = false;
+          continuous.container.style.cursor = '';
+          continuous.container.style.userSelect = '';
+          // 如果拖拽过，短暂阻止点击事件
+          if (dragMoved) {
+            setTimeout(() => { dragMoved = false; }, 50);
+          }
+        };
+
+        // 在 document 上监听，以便鼠标移出容器时仍能继续拖拽
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
         // 连续横向模式：左/中/右三分区点击（中间需同步隐藏/显示底部菜单与缩略图区）
         continuous.container.addEventListener('click', (e) => {
+          // 如果刚拖拽过，忽略这次点击
+          if (dragMoved) {
+            e.stopPropagation();
+            return;
+          }
           // 排除底部菜单与按钮
           if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
             return;
@@ -3772,23 +4395,1071 @@
       }
     }
 
-    async function enterContinuousVerticalMode() {
-      // 🎯 超大画廊检测：超过阈值时警告用户
-      if (state.pageCount > CONTINUOUS_MODE_MAX_PAGES) {
-        const confirmed = confirm(
-          `⚠️ 此画廊有 ${state.pageCount} 页，连续模式可能导致浏览器卡顿或崩溃。\n\n` +
-          `建议使用单页模式阅读超大画廊。\n\n` +
-          `确定要继续使用连续模式吗？`
-        );
-        if (!confirmed) {
-          // 切回单页模式
-          state.settings.readMode = 'single';
-          if (elements.modeSelect) elements.modeSelect.value = 'single';
-          saveSettings();
-          return;
+    // ==================== 虚拟滚动纵向模式 ====================
+    // 核心思路：只渲染可视区域 ± 缓冲区的元素，用占位容器维持总滚动高度
+    // 参考 JHenTai 的 ScrollablePositionedList 实现
+    
+    const virtualScroll = {
+      enabled: false,           // 是否启用虚拟滚动
+      itemHeights: [],          // 每个元素的预估高度
+      itemOffsets: [],          // 每个元素的累计偏移量
+      totalHeight: 0,           // 总内容高度
+      renderedRange: { start: -1, end: -1 }, // 当前渲染的元素范围
+      bufferCount: 5,           // 前后缓冲区元素数量（减少以提高性能）
+      viewportHeight: 0,        // 视口高度
+      gap: 0,                   // 元素间距
+      sidePadding: 0,           // 两侧内边距
+      containerWidth: 0,        // 容器宽度（用于计算高度）
+      scrollContainer: null,    // 滚动容器
+      contentContainer: null,   // 内容容器（用于占位高度）
+      itemsContainer: null,     // 实际元素容器
+      rafId: null,              // requestAnimationFrame ID
+      lastScrollTop: 0,         // 上次滚动位置
+      isJumping: false,         // 是否正在跳转
+      defaultItemHeight: 0,     // 默认元素高度（基于视口）
+      knownHeights: new Map(),  // 已知的真实高度
+      pendingJumpTarget: -1,    // 🎯 待跳转的目标页索引（-1表示无）
+      jumpStabilizeTimer: null, // 跳转稳定计时器
+    };
+    
+    // 虚拟滚动阈值：超过此页数启用虚拟滚动
+    const VIRTUAL_SCROLL_THRESHOLD = 200;
+    
+    // =====================================================
+    // 横向虚拟滚动状态对象
+    // =====================================================
+    const virtualScrollH = {
+      enabled: false,           // 是否启用横向虚拟滚动
+      itemWidths: [],           // 每个元素的预估宽度
+      itemOffsets: [],          // 每个元素的累计偏移量
+      totalWidth: 0,            // 总内容宽度
+      renderedRange: { start: -1, end: -1 }, // 当前渲染的元素范围
+      bufferCount: 5,           // 前后缓冲区元素数量
+      viewportWidth: 0,         // 视口宽度
+      viewportHeight: 0,        // 视口高度（用于计算元素宽度）
+      gap: 0,                   // 元素间距
+      scrollContainer: null,    // 滚动容器
+      contentContainer: null,   // 内容容器（用于占位宽度）
+      itemsContainer: null,     // 实际元素容器
+      isJumping: false,         // 是否正在跳转
+      defaultItemWidth: 0,      // 默认元素宽度
+      knownWidths: new Map(),   // 已知的真实宽度
+      pendingJumpTarget: -1,    // 🎯 待跳转的目标页索引（-1表示无）
+      jumpStabilizeTimer: null, // 跳转稳定计时器
+    };
+    
+    // 计算横向虚拟滚动布局
+    // 🎯 参考 JHenTai 的 clearImageContainerSized：模式切换时统一使用默认宽度
+    // 但会先从 imageCache 提取已知尺寸，保证已加载图片的宽度一致
+    function calculateVirtualLayoutH() {
+      const vh = virtualScrollH;
+      vh.itemWidths = [];
+      vh.itemOffsets = [];
+      
+      // 默认宽度：基于视口高度和默认宽高比 0.7
+      vh.defaultItemWidth = Math.round(vh.viewportHeight * 0.7);
+      
+      // 🎯 先从 imageCache 提取所有已加载图片的真实尺寸到 knownWidths
+      for (let i = 0; i < state.pageCount; i++) {
+        const cached = state.imageCache.get(i);
+        if (cached && cached.status === 'loaded' && cached.img) {
+          const w = cached.img.naturalWidth || cached.img.width;
+          const h = cached.img.naturalHeight || cached.img.height;
+          if (w && h && h > 0) {
+            const ratio = w / h;
+            const realWidth = Math.round(vh.viewportHeight * ratio);
+            vh.knownWidths.set(i, realWidth);
+          }
         }
       }
       
+      let currentOffset = 0;
+      for (let i = 0; i < state.pageCount; i++) {
+        // 优先使用已知宽度（从 imageCache 提取或图片加载后设置的），否则用默认宽度
+        let width;
+        if (vh.knownWidths.has(i)) {
+          width = vh.knownWidths.get(i);
+        } else {
+          width = vh.defaultItemWidth;
+        }
+        
+        vh.itemWidths.push(width);
+        vh.itemOffsets.push(currentOffset);
+        currentOffset += width + vh.gap;
+      }
+      
+      vh.totalWidth = currentOffset - vh.gap;
+      debugLog('[EH VirtualH] 横向布局计算完成, 总宽度:', vh.totalWidth, '默认宽度:', vh.defaultItemWidth);
+    }
+    
+    // 根据滚动位置计算横向可见范围
+    function getVisibleRangeH(scrollLeft) {
+      const vh = virtualScrollH;
+      const viewportEnd = scrollLeft + vh.viewportWidth;
+      
+      let start = 0;
+      let end = state.pageCount - 1;
+      while (start < end) {
+        const mid = Math.floor((start + end) / 2);
+        if (vh.itemOffsets[mid] + vh.itemWidths[mid] < scrollLeft) {
+          start = mid + 1;
+        } else {
+          end = mid;
+        }
+      }
+      const firstVisible = Math.max(0, start - vh.bufferCount);
+      
+      end = state.pageCount - 1;
+      while (start < end) {
+        const mid = Math.floor((start + end + 1) / 2);
+        if (vh.itemOffsets[mid] > viewportEnd) {
+          end = mid - 1;
+        } else {
+          start = mid;
+        }
+      }
+      const lastVisible = Math.min(state.pageCount - 1, start + vh.bufferCount);
+      
+      return { start: firstVisible, end: lastVisible };
+    }
+    
+    // 创建横向虚拟元素
+    function createVirtualItemH(index) {
+      const vh = virtualScrollH;
+      
+      const card = document.createElement('div');
+      card.className = 'eh-ch-card eh-virtual-item-h';
+      card.setAttribute('data-virtual-index', String(index));
+      card.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: ${vh.itemOffsets[index]}px;
+        width: ${vh.itemWidths[index]}px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        contain: layout;
+        pointer-events: auto;
+      `;
+      
+      // 反向模式下每个图片翻转
+      if (state.settings.reverse) {
+        card.style.transform = 'scaleX(-1)';
+      }
+      
+      const wrapper = document.createElement('div');
+      wrapper.className = 'eh-ch-wrapper eh-ch-skeleton';
+      // 使用 aspect-ratio 来保持比例，与非虚拟模式一致
+      const cachedR = ratioCache.get(index);
+      wrapper.style.cssText = `
+        height: 100%;
+        aspect-ratio: ${cachedR || 0.7};
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      `;
+      
+      const img = document.createElement('img');
+      // 使用宽高100%以便 object-fit:contain 真实填充 wrapper（与非虚拟模式一致）
+      img.style.cssText = 'width: 100%; height: 100%; display: block; object-fit: contain;';
+      img.setAttribute('data-page-index', String(index));
+      
+      wrapper.appendChild(img);
+      card.appendChild(wrapper);
+      
+      // 加载图片
+      loadVirtualImageH(img, index, card);
+      
+      return card;
+    }
+    
+    // 加载横向虚拟滚动图片
+    function loadVirtualImageH(img, index, card) {
+      const cached = state.imageCache.get(index);
+      if (cached && cached.status === 'loaded' && cached.img && cached.img.src) {
+        img.src = cached.img.src;
+        updateCardWidthFromUrl(cached.img.src, index, card);
+        applyVirtualAspectH(img, cached.img, card, index);
+        return;
+      }
+      
+      if (cached && cached.status === 'loading' && cached.promise) {
+        cached.promise.then(loadedImg => {
+          if (loadedImg && loadedImg.src) {
+            img.src = loadedImg.src;
+            updateCardWidthFromUrl(loadedImg.src, index, card);
+          }
+          applyVirtualAspectH(img, loadedImg, card, index);
+        }).catch(() => {});
+        return;
+      }
+      
+      loadImage(index).then(loadedImg => {
+        if (loadedImg && loadedImg.src) {
+          img.src = loadedImg.src;
+          updateCardWidthFromUrl(loadedImg.src, index, card);
+        }
+        applyVirtualAspectH(img, loadedImg, card, index);
+      }).catch(() => {});
+    }
+    
+    // 从 URL 提取尺寸更新卡片宽度
+    function updateCardWidthFromUrl(url, index, card) {
+      const sizeInfo = extractSizeFromUrl(url);
+      if (!sizeInfo) return;
+      
+      const vh = virtualScrollH;
+      const newWidth = Math.round(vh.viewportHeight * sizeInfo.ratio);
+      const oldWidth = vh.itemWidths[index];
+      
+      if (Math.abs(newWidth - oldWidth) < 10) return;
+      
+      const scrollLeft = vh.scrollContainer ? vh.scrollContainer.scrollLeft : 0;
+      const elementRight = vh.itemOffsets[index] + oldWidth;
+      
+      vh.itemWidths[index] = newWidth;
+      vh.knownWidths.set(index, newWidth);
+      
+      // 如果元素在视口左边，补偿滚动位置
+      if (elementRight <= scrollLeft + 50) {
+        const diff = newWidth - oldWidth;
+        if (vh.scrollContainer && Math.abs(diff) > 5) {
+          vh.isJumping = true;
+          vh.scrollContainer.scrollLeft = scrollLeft + diff;
+          setTimeout(() => { vh.isJumping = false; }, 50);
+          debugLog('[EH VirtualH] 宽度补偿, index:', index, 'diff:', diff);
+        }
+      }
+      
+      if (card) {
+        card.style.width = newWidth + 'px';
+      }
+      
+      scheduleLayoutRecalcH();
+    }
+    
+    // 应用横向虚拟元素的真实尺寸
+    // 🎯 如果有 pendingJumpTarget，不做即时滚动补偿，由 recalcVirtualOffsetsH 统一处理
+    function applyVirtualAspectH(imgEl, loadedImg, card, index) {
+      if (!imgEl || !loadedImg) return;
+      
+      const wrapper = imgEl.parentElement;
+      if (wrapper) {
+        wrapper.classList.remove('eh-ch-skeleton');
+      }
+      
+      const w = loadedImg.naturalWidth || loadedImg.width;
+      const h = loadedImg.naturalHeight || loadedImg.height;
+      if (!w || !h || h <= 0) return;
+      
+      const ratio = w / h;
+      
+      // 更新 wrapper 的 aspect-ratio
+      if (wrapper) {
+        wrapper.style.aspectRatio = String(ratio);
+      }
+      
+      const vh = virtualScrollH;
+      const newWidth = Math.round(vh.viewportHeight * ratio);
+      const oldWidth = vh.itemWidths[index];
+      
+      if (Math.abs(newWidth - oldWidth) < 10) return;
+      
+      vh.itemWidths[index] = newWidth;
+      vh.knownWidths.set(index, newWidth);
+      
+      // 🎯 关键：如果有跳转目标，不做即时补偿，交给 recalcVirtualOffsetsH 统一处理
+      if (vh.pendingJumpTarget < 0) {
+        const scrollLeft = vh.scrollContainer ? vh.scrollContainer.scrollLeft : 0;
+        const elementRight = vh.itemOffsets[index] + oldWidth;
+        
+        if (elementRight <= scrollLeft + 50) {
+          const diff = newWidth - oldWidth;
+          if (vh.scrollContainer && Math.abs(diff) > 5) {
+            vh.isJumping = true;
+            vh.scrollContainer.scrollLeft = scrollLeft + diff;
+            setTimeout(() => { vh.isJumping = false; }, 50);
+          }
+        }
+      } else {
+        debugLog('[EH VirtualH] 跳转中，跳过即时补偿, index:', index);
+      }
+      
+      if (card) {
+        card.style.width = newWidth + 'px';
+      }
+      
+      ratioCache.set(index, ratio);
+      scheduleLayoutRecalcH();
+    }
+    
+    // 横向布局重算（防抖）
+    let layoutRecalcTimerH = null;
+    function scheduleLayoutRecalcH() {
+      if (layoutRecalcTimerH) return;
+      layoutRecalcTimerH = setTimeout(() => {
+        layoutRecalcTimerH = null;
+        recalcVirtualOffsetsH();
+      }, 150);
+    }
+    
+    // 重算横向虚拟滚动偏移量
+    // 🎯 如果有 pendingJumpTarget，优先以目标页为锚点保持位置稳定
+    function recalcVirtualOffsetsH() {
+      const vh = virtualScrollH;
+      if (!vh.enabled || !vh.scrollContainer) return;
+      
+      const scrollLeft = vh.scrollContainer.scrollLeft;
+      
+      // 🎯 确定锚点索引：优先使用跳转目标，否则使用第一个可见元素
+      let anchorIndex;
+      if (vh.pendingJumpTarget >= 0 && vh.pendingJumpTarget < state.pageCount) {
+        anchorIndex = vh.pendingJumpTarget;
+      } else {
+        anchorIndex = findFirstVisibleIndexH(scrollLeft);
+      }
+      const oldAnchorOffset = vh.itemOffsets[anchorIndex] || 0;
+      const oldScrollLeft = scrollLeft;
+      
+      let currentOffset = 0;
+      for (let i = 0; i < state.pageCount; i++) {
+        vh.itemOffsets[i] = currentOffset;
+        currentOffset += vh.itemWidths[i] + vh.gap;
+      }
+      vh.totalWidth = currentOffset - vh.gap;
+      
+      if (vh.contentContainer) {
+        vh.contentContainer.style.width = vh.totalWidth + 'px';
+      }
+      
+      // 🎯 关键：调整滚动位置，保持锚点元素（目标页或第一个可见）位置稳定
+      if (vh.scrollContainer && anchorIndex >= 0) {
+        const newAnchorOffset = vh.itemOffsets[anchorIndex] || 0;
+        const scrollDelta = newAnchorOffset - oldAnchorOffset;
+        if (Math.abs(scrollDelta) > 5) {
+          // 如果有跳转目标，直接将目标元素对齐到视口左侧附近
+          if (vh.pendingJumpTarget >= 0) {
+            const targetScroll = Math.max(0, newAnchorOffset - 20);
+            vh.scrollContainer.scrollLeft = targetScroll;
+            debugLog('[EH VirtualH] 跳转目标位置校正:', vh.pendingJumpTarget + 1, '新滚动位置:', targetScroll);
+          } else {
+            // 非跳转状态：保持第一个可见元素相对位置
+            vh.isJumping = true;
+            vh.scrollContainer.scrollLeft = oldScrollLeft + scrollDelta;
+            setTimeout(() => { vh.isJumping = false; }, 50);
+          }
+        }
+      }
+      
+      if (vh.itemsContainer) {
+        const items = vh.itemsContainer.querySelectorAll('.eh-virtual-item-h');
+        items.forEach(item => {
+          const idx = parseInt(item.getAttribute('data-virtual-index'));
+          if (idx >= 0 && idx < state.pageCount) {
+            item.style.left = vh.itemOffsets[idx] + 'px';
+            item.style.width = vh.itemWidths[idx] + 'px';
+          }
+        });
+      }
+      
+      debugLog('[EH VirtualH] 偏移量重算完成, 新总宽度:', vh.totalWidth);
+    }
+    
+    // 找到横向视口中第一个可见的元素索引 (JHenTai 模式)
+    function findFirstVisibleIndexH(scrollLeft) {
+      const vh = virtualScrollH;
+      const viewportLeft = scrollLeft;
+      const viewportRight = scrollLeft + vh.viewportWidth;
+      const viewportMid = scrollLeft + vh.viewportWidth / 2;
+      
+      for (let i = 0; i < state.pageCount; i++) {
+        const itemLeft = vh.itemOffsets[i];
+        const itemRight = itemLeft + vh.itemWidths[i];
+        
+        // 元素在视口内可见
+        if (itemRight > viewportLeft && itemLeft < viewportRight) {
+          // 选择第一个左边缘在视口前半部分，或覆盖视口左边缘的元素
+          if (itemLeft <= viewportMid || itemLeft <= viewportLeft) {
+            return i;
+          }
+        }
+      }
+      return 0;
+    }
+    
+    // 更新横向虚拟渲染
+    function updateVirtualRenderingH() {
+      const vh = virtualScrollH;
+      if (!vh.scrollContainer || !vh.itemsContainer) return;
+      
+      const scrollLeft = vh.scrollContainer.scrollLeft;
+      const range = getVisibleRangeH(scrollLeft);
+      
+      if (range.start === vh.renderedRange.start && range.end === vh.renderedRange.end) {
+        return;
+      }
+      
+      debugLog('[EH VirtualH] 更新渲染范围:', range.start, '-', range.end, '(之前:', vh.renderedRange.start, '-', vh.renderedRange.end, ')');
+      
+      // 移除不在范围内的元素
+      const existingItems = vh.itemsContainer.querySelectorAll('.eh-virtual-item-h');
+      existingItems.forEach(item => {
+        const idx = parseInt(item.getAttribute('data-virtual-index'));
+        if (idx < range.start || idx > range.end) {
+          item.remove();
+        }
+      });
+      
+      // 添加新元素
+      for (let i = range.start; i <= range.end; i++) {
+        const existing = vh.itemsContainer.querySelector(`[data-virtual-index="${i}"]`);
+        if (!existing) {
+          const newItem = createVirtualItemH(i);
+          vh.itemsContainer.appendChild(newItem);
+        }
+      }
+      
+      vh.renderedRange = range;
+      
+      // 更新当前页码（跳转中不更新，避免跳动）
+      if (!vh.isJumping) {
+        const firstVisibleIndex = findFirstVisibleIndexH(scrollLeft);
+        const newPage = firstVisibleIndex + 1;
+        if (newPage !== state.currentPage) {
+          state.currentPage = newPage;
+          if (elements.pageInfo) elements.pageInfo.textContent = `${newPage} / ${state.pageCount}`;
+          if (elements.progressBar) elements.progressBar.value = newPage;
+          updateThumbnailHighlight(newPage);
+          saveProgress(newPage);
+        }
+      }
+      
+      // 预取相邻图片
+      const prefetchTargets = [];
+      for (let i = range.start - 3; i <= range.end + 3; i++) {
+        if (i >= 0 && i < state.pageCount) prefetchTargets.push(i);
+      }
+      enqueuePrefetch(prefetchTargets, false);
+    }
+    
+    // 跳转到横向虚拟滚动指定页
+    // 🎯 参考 JHenTai 的 scrollTo(index:) - 基于索引定位，支持布局变化时自动校正
+    function jumpToVirtualPageH(pageNum) {
+      const vh = virtualScrollH;
+      if (!vh.scrollContainer) return;
+      
+      const idx = pageNum - 1;
+      if (idx < 0 || idx >= state.pageCount) return;
+      
+      vh.isJumping = true;
+      
+      // 🎯 关键：记录跳转目标索引，用于后续布局变化时的位置校正
+      vh.pendingJumpTarget = idx;
+      
+      // 清除之前的稳定计时器
+      if (vh.jumpStabilizeTimer) {
+        clearTimeout(vh.jumpStabilizeTimer);
+        vh.jumpStabilizeTimer = null;
+      }
+      
+      // 计算目标滚动位置（使元素左边缘对齐视口左侧，留少许边距）
+      const itemOffset = vh.itemOffsets[idx];
+      const targetScroll = Math.max(0, itemOffset - 20);
+      
+      vh.scrollContainer.scrollLeft = targetScroll;
+      
+      // 立即更新页码，不等待滚动事件
+      state.currentPage = pageNum;
+      if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+      if (elements.progressBar) elements.progressBar.value = pageNum;
+      updateThumbnailHighlight(pageNum);
+      
+      updateVirtualRenderingH();
+      
+      // 🎯 跳转后等待更长时间让图片加载完成，期间持续校正位置
+      vh.jumpStabilizeTimer = setTimeout(() => {
+        vh.pendingJumpTarget = -1;
+        vh.isJumping = false;
+        vh.jumpStabilizeTimer = null;
+        debugLog('[EH VirtualH] 跳转稳定完成');
+      }, 2000);
+      
+      debugLog('[EH VirtualH] 跳转到页:', pageNum, '滚动位置:', targetScroll, '目标索引:', idx);
+    }
+    
+    // =====================================================
+    // 纵向虚拟滚动函数（原有）
+    // =====================================================
+    
+    // 计算元素高度和偏移量（使用固定默认高度，加载后更新）
+    // 🎯 参考 JHenTai 的 clearImageContainerSized：模式切换时统一使用默认高度
+    // 但会先从 imageCache 提取已知尺寸，保证已加载图片的高度一致
+    function calculateVirtualLayout() {
+      const vs = virtualScroll;
+      vs.itemHeights = [];
+      vs.itemOffsets = [];
+      
+      // 默认高度：视口高度的 1.4 倍（适合大多数漫画页面）
+      vs.defaultItemHeight = Math.round(vs.viewportHeight * 1.4);
+      const availableWidth = vs.containerWidth - vs.sidePadding * 2;
+      
+      // 🎯 先从 imageCache 提取所有已加载图片的真实尺寸到 knownHeights
+      // 这样初始布局就会使用真实尺寸，避免已缓存和未缓存图片高度不一致
+      for (let i = 0; i < state.pageCount; i++) {
+        const cached = state.imageCache.get(i);
+        if (cached && cached.status === 'loaded' && cached.img) {
+          const w = cached.img.naturalWidth || cached.img.width;
+          const h = cached.img.naturalHeight || cached.img.height;
+          if (w && h && h > 0) {
+            const ratio = w / h;
+            const realHeight = Math.round(availableWidth / ratio);
+            vs.knownHeights.set(i, realHeight);
+          }
+        }
+      }
+      
+      let currentOffset = 0;
+      for (let i = 0; i < state.pageCount; i++) {
+        // 优先使用已知高度（从 imageCache 提取或图片加载后设置的），否则用默认高度
+        let height;
+        if (vs.knownHeights.has(i)) {
+          height = vs.knownHeights.get(i);
+        } else {
+          height = vs.defaultItemHeight;
+        }
+        
+        vs.itemHeights.push(height);
+        vs.itemOffsets.push(currentOffset);
+        currentOffset += height + vs.gap;
+      }
+      
+      // 总高度
+      vs.totalHeight = currentOffset - vs.gap; // 最后一个不需要间距
+      
+      debugLog('[EH Virtual] 布局计算完成, 总高度:', vs.totalHeight, '默认高度:', vs.defaultItemHeight);
+    }
+    
+    // 根据滚动位置计算可见范围
+    function getVisibleRange(scrollTop) {
+      const vs = virtualScroll;
+      const viewportEnd = scrollTop + vs.viewportHeight;
+      
+      // 二分查找起始元素
+      let start = 0;
+      let end = state.pageCount - 1;
+      while (start < end) {
+        const mid = Math.floor((start + end) / 2);
+        if (vs.itemOffsets[mid] + vs.itemHeights[mid] < scrollTop) {
+          start = mid + 1;
+        } else {
+          end = mid;
+        }
+      }
+      const firstVisible = Math.max(0, start - vs.bufferCount);
+      
+      // 查找结束元素
+      end = state.pageCount - 1;
+      while (start < end) {
+        const mid = Math.floor((start + end + 1) / 2);
+        if (vs.itemOffsets[mid] > viewportEnd) {
+          end = mid - 1;
+        } else {
+          start = mid;
+        }
+      }
+      const lastVisible = Math.min(state.pageCount - 1, start + vs.bufferCount);
+      
+      return { start: firstVisible, end: lastVisible };
+    }
+    
+    // 创建单个元素
+    function createVirtualItem(index) {
+      const vs = virtualScroll;
+      const availableWidth = vs.containerWidth - vs.sidePadding * 2;
+      
+      const card = document.createElement('div');
+      card.className = 'eh-cv-card eh-virtual-item';
+      card.setAttribute('data-virtual-index', String(index));
+      card.style.cssText = `
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: ${vs.itemOffsets[index]}px;
+        height: ${vs.itemHeights[index]}px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 0 ${vs.sidePadding}px;
+        box-sizing: border-box;
+        overflow: hidden;
+      `;
+      
+      const wrapper = document.createElement('div');
+      wrapper.className = 'eh-cv-wrapper eh-cv-skeleton';
+      wrapper.style.cssText = `
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      `;
+      
+      // 反向模式
+      if (state.settings.reverse) {
+        wrapper.style.transform = 'scaleY(-1)';
+      }
+      
+      const img = document.createElement('img');
+      img.style.cssText = `
+        width: 100%;
+        height: auto;
+        display: block;
+      `;
+      img.setAttribute('data-page-index', String(index));
+      
+      wrapper.appendChild(img);
+      card.appendChild(wrapper);
+      
+      // 立即加载图片
+      loadVirtualImage(img, index, card);
+      
+      return card;
+    }
+    
+    // 从图片 URL 中提取尺寸信息
+    // URL 格式示例: .../hash-size-720-5070-jpg/...
+    function extractSizeFromUrl(url) {
+      if (!url) return null;
+      // 匹配格式: -width-height-format (如 -720-5070-jpg 或 -720-5070-wbp)
+      const match = url.match(/-(\d+)-(\d+)-(jpg|png|gif|webp|wbp)/i);
+      if (match) {
+        const width = parseInt(match[1]);
+        const height = parseInt(match[2]);
+        if (width > 0 && height > 0 && width < 10000 && height < 50000) {
+          return { width, height, ratio: width / height };
+        }
+      }
+      return null;
+    }
+    
+    // 加载虚拟滚动中的图片
+    function loadVirtualImage(img, index, card) {
+      if (img.src || img.getAttribute('data-loading')) {
+        debugLog('[EH Virtual Load] 跳过加载 index:', index, '原因:', img.src ? 'already-has-src' : 'data-loading');
+        return;
+      }
+      
+      img.setAttribute('data-loading', 'true');
+      debugLog('[EH Virtual Load] 开始加载 index:', index);
+      
+      const cached = state.imageCache.get(index);
+      if (cached && cached.status === 'loaded' && cached.img && cached.img.src) {
+        // 🎯 先从 URL 提取尺寸，立即调整高度
+        debugLog('[EH Virtual Load] 使用缓存 index:', index, 'url:', cached.img.src.slice(-30));
+        updateCardHeightFromUrl(cached.img.src, index, card);
+        img.src = cached.img.src;
+        applyVirtualAspect(img, cached.img, index);
+        img.removeAttribute('data-loading');
+      } else if (cached && cached.status === 'loading' && cached.promise) {
+        debugLog('[EH Virtual Load] 等待加载中的 Promise index:', index);
+        cached.promise.then(loadedImg => {
+          if (loadedImg && loadedImg.src) {
+            debugLog('[EH Virtual Load] Promise 完成 index:', index, 'url:', loadedImg.src.slice(-30));
+            updateCardHeightFromUrl(loadedImg.src, index, card);
+            img.src = loadedImg.src;
+          } else {
+            console.warn('[EH Virtual Load] Promise 完成但无图片 index:', index);
+          }
+          applyVirtualAspect(img, loadedImg, index);
+        }).catch((err) => {
+          console.warn('[EH Virtual Load] Promise 失败 index:', index, err);
+        }).finally(() => img.removeAttribute('data-loading'));
+      } else {
+        debugLog('[EH Virtual Load] 新加载 index:', index);
+        loadImage(index).then(loadedImg => {
+          if (loadedImg && loadedImg.src) {
+            debugLog('[EH Virtual Load] 新加载完成 index:', index, 'url:', loadedImg.src.slice(-30));
+            updateCardHeightFromUrl(loadedImg.src, index, card);
+            img.src = loadedImg.src;
+          } else {
+            console.warn('[EH Virtual Load] 新加载完成但无图片 index:', index);
+          }
+          applyVirtualAspect(img, loadedImg, index);
+        }).catch((err) => {
+          console.warn('[EH Virtual Load] 新加载失败 index:', index, err);
+        }).finally(() => img.removeAttribute('data-loading'));
+      }
+    }
+    
+    // 从 URL 中提取尺寸并更新卡片高度（在图片下载前）
+    function updateCardHeightFromUrl(url, index, card) {
+      const vs = virtualScroll;
+      if (!vs.enabled || !card) return;
+      
+      const size = extractSizeFromUrl(url);
+      if (!size) return;
+      
+      const availableWidth = vs.containerWidth - vs.sidePadding * 2;
+      const realHeight = Math.round(availableWidth / size.ratio);
+      const oldHeight = vs.itemHeights[index];
+      const heightDiff = realHeight - oldHeight;
+      
+      // 只有高度变化显著才更新
+      if (Math.abs(heightDiff) > 50) {
+        vs.knownHeights.set(index, realHeight);
+        ratioCache.set(index, size.ratio);
+        vs.itemHeights[index] = realHeight;
+        card.style.height = realHeight + 'px';
+        
+        // 如果元素在视口上方，立即补偿滚动
+        const scrollTop = vs.scrollContainer?.scrollTop || 0;
+        const elementBottom = vs.itemOffsets[index] + oldHeight;
+        
+        if (elementBottom <= scrollTop + 50) {
+          vs.isJumping = true;
+          vs.scrollContainer.scrollTop = scrollTop + heightDiff;
+          setTimeout(() => { vs.isJumping = false; }, 30);
+          debugLog('[EH Virtual] URL尺寸补偿, index:', index, 'diff:', heightDiff);
+        }
+        
+        // 延迟重算偏移量
+        scheduleLayoutRecalc();
+      }
+    }
+    
+    // 应用真实宽高比（虚拟滚动版）- 只更新当前元素，不重排后续
+    // 🎯 如果有 pendingJumpTarget，不做即时滚动补偿，由 recalcVirtualOffsets 统一处理
+    function applyVirtualAspect(imgEl, loadedImg, index) {
+      try {
+        if (!imgEl) return;
+        const wrap = imgEl.parentElement;
+        const card = wrap?.parentElement;
+        const vs = virtualScroll;
+        const w = loadedImg?.naturalWidth || loadedImg?.width;
+        const h = loadedImg?.naturalHeight || loadedImg?.height;
+        
+        if (wrap && card && w && h && h > 0 && vs.enabled && vs.scrollContainer) {
+          wrap.classList.remove('eh-cv-skeleton');
+          
+          // 计算真实高度
+          const newRatio = Math.max(0.02, Math.min(5, w / h));
+          const availableWidth = vs.containerWidth - vs.sidePadding * 2;
+          const realHeight = Math.round(availableWidth / newRatio);
+          
+          // 保存真实高度
+          const oldHeight = vs.itemHeights[index];
+          const heightDiff = realHeight - oldHeight;
+          
+          // 只有高度变化超过 10px 才处理
+          if (Math.abs(heightDiff) > 10) {
+            vs.knownHeights.set(index, realHeight);
+            ratioCache.set(index, newRatio);
+            vs.itemHeights[index] = realHeight;
+            card.style.height = realHeight + 'px';
+            
+            // 🎯 关键：如果有跳转目标，不做即时补偿，交给 recalcVirtualOffsets 统一处理
+            // 这样可以避免多次补偿导致的累计误差
+            if (vs.pendingJumpTarget < 0) {
+              // 非跳转状态：如果这个元素在视口上方，立即补偿滚动位置
+              const scrollTop = vs.scrollContainer.scrollTop;
+              const elementBottom = vs.itemOffsets[index] + oldHeight;
+              
+              // 元素底部在视口顶部上方 = 这个元素在我们上面，高度变化会把我们挤走
+              if (elementBottom <= scrollTop + 50) {
+                // 立即补偿滚动位置
+                vs.isJumping = true;
+                vs.scrollContainer.scrollTop = scrollTop + heightDiff;
+                setTimeout(() => { vs.isJumping = false; }, 30);
+                debugLog('[EH Virtual] 补偿滚动, index:', index, 'diff:', heightDiff);
+              }
+            } else {
+              debugLog('[EH Virtual] 跳转中，跳过即时补偿, index:', index, 'diff:', heightDiff);
+            }
+            
+            // 延迟重算所有偏移量（合并多个更新）
+            scheduleLayoutRecalc();
+          }
+        }
+      } catch (e) {
+        console.warn('[EH Virtual] applyVirtualAspect error:', e);
+      }
+    }
+    
+    // 延迟重算布局（防抖）
+    let layoutRecalcTimer = null;
+    function scheduleLayoutRecalc() {
+      if (layoutRecalcTimer) return; // 已有计划中的重算
+      layoutRecalcTimer = setTimeout(() => {
+        layoutRecalcTimer = null;
+        recalcVirtualOffsets();
+      }, 150); // 150ms 后统一重算
+    }
+    
+    // 重新计算所有偏移量
+    // 🎯 如果有 pendingJumpTarget，优先以目标页为锚点保持位置稳定
+    function recalcVirtualOffsets() {
+      const vs = virtualScroll;
+      if (!vs.enabled) return;
+      
+      const oldScrollTop = vs.scrollContainer?.scrollTop || 0;
+      
+      // 🎯 确定锚点索引：优先使用跳转目标，否则使用视口中心元素
+      let anchorIndex;
+      if (vs.pendingJumpTarget >= 0 && vs.pendingJumpTarget < state.pageCount) {
+        anchorIndex = vs.pendingJumpTarget;
+      } else {
+        anchorIndex = findCenterIndex(oldScrollTop);
+      }
+      const oldAnchorOffset = vs.itemOffsets[anchorIndex] || 0;
+      
+      // 重新计算偏移量
+      let currentOffset = 0;
+      for (let i = 0; i < state.pageCount; i++) {
+        vs.itemOffsets[i] = currentOffset;
+        currentOffset += vs.itemHeights[i] + vs.gap;
+      }
+      vs.totalHeight = currentOffset - vs.gap;
+      
+      // 更新占位容器高度
+      if (vs.contentContainer) {
+        vs.contentContainer.style.height = vs.totalHeight + 'px';
+      }
+      
+      // 🎯 关键：调整滚动位置，保持锚点元素（目标页或视口中心）位置稳定
+      if (vs.scrollContainer && anchorIndex >= 0) {
+        const newAnchorOffset = vs.itemOffsets[anchorIndex] || 0;
+        const scrollDelta = newAnchorOffset - oldAnchorOffset;
+        if (Math.abs(scrollDelta) > 5) {
+          // 如果有跳转目标，直接将目标元素对齐到视口顶部附近
+          if (vs.pendingJumpTarget >= 0) {
+            const targetScroll = Math.max(0, newAnchorOffset - 20);
+            vs.scrollContainer.scrollTop = targetScroll;
+            debugLog('[EH Virtual] 跳转目标位置校正:', vs.pendingJumpTarget + 1, '新滚动位置:', targetScroll);
+          } else {
+            // 非跳转状态：保持中心元素相对位置
+            vs.isJumping = true;
+            vs.scrollContainer.scrollTop = oldScrollTop + scrollDelta;
+            setTimeout(() => { vs.isJumping = false; }, 50);
+          }
+        }
+      }
+      
+      // 更新已渲染元素的位置
+      if (vs.itemsContainer) {
+        const items = vs.itemsContainer.querySelectorAll('.eh-virtual-item');
+        items.forEach(item => {
+          const idx = parseInt(item.getAttribute('data-virtual-index'));
+          if (idx >= 0 && idx < state.pageCount) {
+            item.style.top = vs.itemOffsets[idx] + 'px';
+            item.style.height = vs.itemHeights[idx] + 'px';
+          }
+        });
+      }
+      
+      debugLog('[EH Virtual] 偏移量重算完成, 新总高度:', vs.totalHeight);
+    }
+    
+    // 找到视口中心的元素索引
+    function findCenterIndex(scrollTop) {
+      const vs = virtualScroll;
+      const centerY = scrollTop + vs.viewportHeight / 2;
+      
+      for (let i = 0; i < state.pageCount; i++) {
+        const top = vs.itemOffsets[i];
+        const bottom = top + vs.itemHeights[i];
+        if (centerY >= top && centerY < bottom) {
+          return i;
+        }
+      }
+      return 0;
+    }
+    
+    // 从指定索引开始更新布局（废弃，改用 recalcVirtualOffsets）
+    function updateVirtualLayoutFrom(fromIndex) {
+      const vs = virtualScroll;
+      const availableWidth = vs.containerWidth - vs.sidePadding * 2;
+      
+      for (let i = fromIndex; i < state.pageCount; i++) {
+        const ratio = ratioCache.get(i) || 0.7;
+        const height = Math.round(availableWidth / ratio);
+        vs.itemHeights[i] = height;
+        
+        const offset = i === 0 ? 0 : vs.itemOffsets[i - 1] + vs.itemHeights[i - 1] + vs.gap;
+        vs.itemOffsets[i] = offset;
+      }
+      
+      vs.totalHeight = vs.itemOffsets[state.pageCount - 1] + vs.itemHeights[state.pageCount - 1];
+      
+      // 更新占位容器高度
+      if (vs.contentContainer) {
+        vs.contentContainer.style.height = vs.totalHeight + 'px';
+      }
+      
+      // 更新已渲染元素的位置
+      if (vs.itemsContainer) {
+        const items = vs.itemsContainer.querySelectorAll('.eh-virtual-item');
+        items.forEach(item => {
+          const idx = parseInt(item.getAttribute('data-virtual-index'));
+          if (idx >= fromIndex) {
+            item.style.top = vs.itemOffsets[idx] + 'px';
+            item.style.height = vs.itemHeights[idx] + 'px';
+          }
+        });
+      }
+    }
+    
+    // 更新渲染的元素
+    function updateVirtualRendering() {
+      const vs = virtualScroll;
+      if (!vs.scrollContainer || !vs.itemsContainer) return;
+      
+      const scrollTop = vs.scrollContainer.scrollTop;
+      const range = getVisibleRange(scrollTop);
+      
+      // 如果范围没变，不需要更新
+      if (range.start === vs.renderedRange.start && range.end === vs.renderedRange.end) {
+        return;
+      }
+      
+      debugLog('[EH Virtual] 更新渲染范围:', range.start, '-', range.end, '(之前:', vs.renderedRange.start, '-', vs.renderedRange.end, ')');
+      
+      // 移除不在范围内的元素
+      const existingItems = vs.itemsContainer.querySelectorAll('.eh-virtual-item');
+      existingItems.forEach(item => {
+        const idx = parseInt(item.getAttribute('data-virtual-index'));
+        if (idx < range.start || idx > range.end) {
+          item.remove();
+        }
+      });
+      
+      // 添加新的元素
+      for (let i = range.start; i <= range.end; i++) {
+        const existing = vs.itemsContainer.querySelector(`[data-virtual-index="${i}"]`);
+        if (!existing) {
+          const item = createVirtualItem(i);
+          vs.itemsContainer.appendChild(item);
+        }
+      }
+      
+      vs.renderedRange = range;
+      
+      // 更新当前页码（仅当不在跳转中时）
+      if (!vs.isJumping) {
+        updateVirtualCurrentPage(scrollTop);
+      }
+    }
+    
+    // 根据滚动位置更新当前页码（参考 JHenTai 的 filterAndSortItems + firstOrNull）
+    // 使用第一个"主要可见"的元素作为当前页（元素顶部在视口上半部分）
+    function updateVirtualCurrentPage(scrollTop) {
+      const vs = virtualScroll;
+      
+      // 找到第一个在视口内的元素（顶部边缘在视口内或元素占据视口上半部分）
+      const viewportTop = scrollTop;
+      const viewportMid = scrollTop + vs.viewportHeight / 2;
+      
+      let firstVisibleIndex = -1;
+      for (let i = 0; i < state.pageCount; i++) {
+        const itemTop = vs.itemOffsets[i];
+        const itemBottom = itemTop + vs.itemHeights[i];
+        
+        // 元素在视口内（部分或全部可见）
+        if (itemBottom > viewportTop && itemTop < viewportTop + vs.viewportHeight) {
+          // 如果元素顶部在视口上半部分，或元素覆盖了视口顶部
+          if (itemTop <= viewportMid || itemTop <= viewportTop) {
+            firstVisibleIndex = i;
+            break;
+          }
+        }
+      }
+      
+      if (firstVisibleIndex < 0) {
+        // 回退：使用二分查找
+        firstVisibleIndex = 0;
+        let end = state.pageCount - 1;
+        while (firstVisibleIndex < end) {
+          const mid = Math.floor((firstVisibleIndex + end) / 2);
+          if (vs.itemOffsets[mid] + vs.itemHeights[mid] < viewportTop) {
+            firstVisibleIndex = mid + 1;
+          } else {
+            end = mid;
+          }
+        }
+      }
+      
+      const pageNum = firstVisibleIndex + 1;
+      if (pageNum !== state.currentPage) {
+        state.currentPage = pageNum;
+        if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+        if (elements.progressBar) elements.progressBar.value = pageNum;
+        updateThumbnailHighlight(pageNum);
+        saveProgress(pageNum);
+      }
+    }
+    
+    // 跳转到指定页（虚拟滚动版）
+    // 🎯 参考 JHenTai 的 scrollTo(index:) - 基于索引定位，支持布局变化时自动校正
+    function jumpToVirtualPage(pageNum) {
+      const vs = virtualScroll;
+      if (!vs.scrollContainer) return;
+      
+      const index = pageNum - 1;
+      if (index < 0 || index >= state.pageCount) return;
+      
+      vs.isJumping = true;
+      
+      // 🎯 关键：记录跳转目标索引，用于后续布局变化时的位置校正
+      vs.pendingJumpTarget = index;
+      
+      // 清除之前的稳定计时器
+      if (vs.jumpStabilizeTimer) {
+        clearTimeout(vs.jumpStabilizeTimer);
+        vs.jumpStabilizeTimer = null;
+      }
+      
+      // 计算目标滚动位置（让元素顶部靠近视口顶部，留一点边距）
+      const itemTop = vs.itemOffsets[index];
+      const targetScroll = Math.max(0, itemTop - 20);
+      
+      vs.scrollContainer.scrollTop = targetScroll;
+      
+      // 立即更新渲染但不更新页码
+      updateVirtualRendering();
+      
+      // 手动设置页码
+      state.currentPage = pageNum;
+      if (elements.pageInfo) elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+      if (elements.progressBar) elements.progressBar.value = pageNum;
+      updateThumbnailHighlight(pageNum);
+      saveProgress(pageNum);
+      
+      // 🎯 跳转后等待更长时间让图片加载完成，期间持续校正位置
+      // 2秒后清除 pendingJumpTarget，认为跳转已稳定
+      vs.jumpStabilizeTimer = setTimeout(() => {
+        vs.pendingJumpTarget = -1;
+        vs.isJumping = false;
+        vs.jumpStabilizeTimer = null;
+        debugLog('[EH Virtual] 跳转稳定完成');
+      }, 2000);
+      
+      debugLog('[EH Virtual] 跳转到页:', pageNum, '滚动位置:', targetScroll, '目标索引:', index);
+    }
+
+    async function enterContinuousVerticalMode() {
+      // 隐藏串珠滑轨（连续模式不需要）
+      if (pageSlider.slider) pageSlider.setVisible(false);
+      
+      // 判断是否使用虚拟滚动
+      const useVirtualScroll = state.pageCount > VIRTUAL_SCROLL_THRESHOLD;
+      
+      if (useVirtualScroll) {
+        debugLog('[EH Modern Reader] 启用虚拟滚动模式，页数:', state.pageCount);
+        await enterVirtualVerticalMode();
+        return;
+      }
+      
+      // 原有的非虚拟滚动模式（保留给小画廊使用）
       // 纵向连续模式：垂直滚动
       if (!continuous.container) {
         // 预加载所有图片的宽高比（阻塞等待完成，避免加载时布局抖动）
@@ -3804,6 +5475,10 @@
         const CV_PAD = 12; // 上下内边距
         const userSidePad = Math.max(0, Math.min(1000, Number(state.settings.verticalSidePadding ?? 0)));
         continuous.container.style.cssText = `display:flex; flex-direction:column; align-items:center; gap:${CV_GAP}px; overflow-y:auto; overflow-x:hidden; height:100%; width:100%; padding:${CV_PAD}px ${userSidePad}px; overflow-anchor:none;`;
+        // 零间距时添加 class，移除骨架边线
+        if (CV_GAP === 0) {
+          continuous.container.classList.add('eh-no-gap-vertical');
+        }
         
         // 反向模式下整体垂直翻转
         if (state.settings.reverse) {
@@ -3857,6 +5532,7 @@
           try {
             if (!imgEl) return;
             const wrap = imgEl.parentElement;
+            const card = wrap?.parentElement;
             const w = loadedImg?.naturalWidth || loadedImg?.width;
             const h = loadedImg?.naturalHeight || loadedImg?.height;
             if (wrap && w && h && h > 0) {
@@ -3871,6 +5547,18 @@
               const diff = Math.abs(newRatio - currentRatio) / currentRatio;
               if (diff > 0.05 || currentRatio === 0.7) {
                 wrap.style.setProperty('--eh-aspect', String(newRatio));
+              }
+              // 显式写高度，确保少数浏览器未应用 aspect-ratio 时也保持等比
+              const container = continuous.container;
+              if (container) {
+                // 🎯 使用实时设置值而非闭包捕获值，确保侧边留白调整立即生效
+                const currentSidePad = state.settings.verticalSidePadding ?? 0;
+                const availableWidth = container.clientWidth - currentSidePad * 2;
+                const realHeight = Math.round(availableWidth / newRatio);
+                wrap.style.height = realHeight + 'px';
+                if (card) {
+                  card.style.height = realHeight + 'px';
+                }
               }
               wrap.classList.remove('eh-cv-skeleton');
             }
@@ -3939,8 +5627,57 @@
           if (targets.length) enqueuePrefetch(targets, true);
         }, { passive: true });
 
+        // 🖱️ 鼠标拖拽滚动支持（JHenTai 同款手感）
+        let isMouseDraggingV = false;
+        let dragStartY = 0;
+        let dragScrollTop = 0;
+        let dragMovedV = false; // 标记是否真正移动过
+
+        continuous.container.addEventListener('mousedown', (e) => {
+          // 排除按钮和菜单
+          if (e.button !== 0) return; // 只响应左键
+          if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) return;
+          
+          isMouseDraggingV = true;
+          dragMovedV = false;
+          dragStartY = e.pageY;
+          dragScrollTop = continuous.container.scrollTop;
+          continuous.container.style.cursor = 'grabbing';
+          continuous.container.style.userSelect = 'none';
+          e.preventDefault();
+        });
+
+        const onMouseMoveV = (e) => {
+          if (!isMouseDraggingV) return;
+          const deltaY = e.pageY - dragStartY;
+          if (Math.abs(deltaY) > 5) dragMovedV = true; // 超过5px认为是拖拽
+          // 反向模式需要反转拖拽方向
+          const dirVisual = state.settings.reverse ? 1 : -1;
+          continuous.container.scrollTop = dragScrollTop + deltaY * dirVisual;
+        };
+
+        const onMouseUpV = () => {
+          if (!isMouseDraggingV) return;
+          isMouseDraggingV = false;
+          continuous.container.style.cursor = '';
+          continuous.container.style.userSelect = '';
+          // 如果拖拽过，短暂阻止点击事件
+          if (dragMovedV) {
+            setTimeout(() => { dragMovedV = false; }, 50);
+          }
+        };
+
+        // 在 document 上监听，以便鼠标移出容器时仍能继续拖拽
+        document.addEventListener('mousemove', onMouseMoveV);
+        document.addEventListener('mouseup', onMouseUpV);
+
         // 连续纵向模式：上/中/下三分区点击
         continuous.container.addEventListener('click', (e) => {
+          // 如果刚拖拽过，忽略这次点击
+          if (dragMovedV) {
+            e.stopPropagation();
+            return;
+          }
           if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
             return;
           }
@@ -4067,9 +5804,456 @@
         }
       }
     }
+    
+    // ==================== 虚拟滚动横向模式入口 ====================
+    async function enterVirtualHorizontalMode() {
+      const vh = virtualScrollH;
+      
+      // 🎯 保存当前页码（参考 JHenTai 的 initialIndex = currentImageIndex）
+      const savedPage = state.currentPage;
+      debugLog('[EH VirtualH] 保存当前页码:', savedPage);
+      
+      // 设置跳转标志，防止初始化期间页码被覆盖
+      vh.isJumping = true;
+      
+      // 清理之前的状态
+      vh.knownWidths.clear();
+      vh.renderedRange = { start: -1, end: -1 };
+      
+      // 获取设置
+      vh.gap = Math.max(0, Math.min(100, Number(state.settings.horizontalGap ?? 0)));
+      
+      // 创建滚动容器
+      vh.scrollContainer = document.createElement('div');
+      vh.scrollContainer.id = 'eh-continuous-horizontal';
+      vh.scrollContainer.style.cssText = `
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: 100%;
+        width: 100%;
+        position: relative;
+      `;
+      
+      // 反向模式
+      if (state.settings.reverse) {
+        vh.scrollContainer.style.transform = 'scaleX(-1)';
+      }
+      
+      // 创建内容占位容器（撑开滚动宽度）
+      vh.contentContainer = document.createElement('div');
+      vh.contentContainer.style.cssText = `
+        position: relative;
+        height: 100%;
+        display: inline-block;
+      `;
+      
+      // 创建实际元素容器
+      vh.itemsContainer = document.createElement('div');
+      vh.itemsContainer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+      `;
+      
+      vh.contentContainer.appendChild(vh.itemsContainer);
+      vh.scrollContainer.appendChild(vh.contentContainer);
+      
+      // 放入主区域
+      const main = document.getElementById('eh-main');
+      if (main) {
+        main.appendChild(vh.scrollContainer);
+        const singleViewer = document.getElementById('eh-viewer');
+        if (singleViewer) singleViewer.style.display = 'none';
+      }
+      
+      // 计算布局
+      vh.viewportWidth = vh.scrollContainer.clientWidth;
+      vh.viewportHeight = vh.scrollContainer.clientHeight;
+      calculateVirtualLayoutH();
+      vh.contentContainer.style.width = vh.totalWidth + 'px';
+      
+      // 让子元素可点击
+      vh.itemsContainer.style.pointerEvents = 'auto';
+      
+      // 滚动事件处理
+      let ticking = false;
+      vh.scrollContainer.addEventListener('scroll', () => {
+        if (!ticking && !vh.isJumping) {
+          ticking = true;
+          requestAnimationFrame(() => {
+            updateVirtualRenderingH();
+            ticking = false;
+          });
+        }
+      }, { passive: true });
+      
+      // 滚轮映射为水平滚动 + 预取
+      vh.scrollContainer.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+          const dirVisual = state.settings.reverse ? -1 : 1;
+          vh.scrollContainer.scrollLeft += e.deltaY * dirVisual;
+          e.preventDefault();
+          
+          const forward = e.deltaY > 0;
+          const logicalDir = forward ? 1 : -1;
+          const base = state.currentPage - 1;
+          const targets = [];
+          for (let i = 1; i <= 6; i++) {
+            const idx = base + logicalDir * i;
+            if (idx >= 0 && idx < state.pageCount) targets.push(idx);
+          }
+          if (targets.length) enqueuePrefetch(targets, true);
+        }
+      }, { passive: false });
+
+      // 🖱️ 横向虚拟滚动鼠标拖拽支持（JHenTai 同款手感）
+      let isMouseDraggingVH = false;
+      let dragStartXVH = 0;
+      let dragScrollLeftVH = 0;
+      let dragMovedVH = false;
+
+      vh.scrollContainer.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) return;
+        
+        isMouseDraggingVH = true;
+        dragMovedVH = false;
+        dragStartXVH = e.pageX;
+        dragScrollLeftVH = vh.scrollContainer.scrollLeft;
+        vh.scrollContainer.style.cursor = 'grabbing';
+        vh.scrollContainer.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      const onMouseMoveVH = (e) => {
+        if (!isMouseDraggingVH) return;
+        const deltaX = e.pageX - dragStartXVH;
+        if (Math.abs(deltaX) > 5) dragMovedVH = true;
+        const dirVisual = state.settings.reverse ? 1 : -1;
+        vh.scrollContainer.scrollLeft = dragScrollLeftVH + deltaX * dirVisual;
+      };
+
+      const onMouseUpVH = () => {
+        if (!isMouseDraggingVH) return;
+        isMouseDraggingVH = false;
+        vh.scrollContainer.style.cursor = '';
+        vh.scrollContainer.style.userSelect = '';
+        if (dragMovedVH) {
+          setTimeout(() => { dragMovedVH = false; }, 50);
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMoveVH);
+      document.addEventListener('mouseup', onMouseUpVH);
+      
+      // 点击处理
+      vh.scrollContainer.addEventListener('click', (e) => {
+        // 如果刚拖拽过，忽略这次点击
+        if (dragMovedVH) {
+          e.stopPropagation();
+          return;
+        }
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
+          return;
+        }
+        const rect = vh.scrollContainer.getBoundingClientRect();
+        const rawX = e.clientX - rect.left;
+        const width = rect.width;
+        const clickX = state.settings.reverse ? (width - rawX) : rawX;
+        const leftThreshold = width / 3;
+        const rightThreshold = width * 2 / 3;
+        
+        if (clickX >= leftThreshold && clickX <= rightThreshold) {
+          const header = document.getElementById('eh-header');
+          const mainEl = document.getElementById('eh-main');
+          const bottom = elements.bottomMenu;
+          if (header) {
+            const isHidden = header.classList.toggle('eh-hidden');
+            if (mainEl) mainEl.classList.toggle('eh-fullheight', isHidden);
+            if (bottom) bottom.classList.toggle('eh-menu-hidden', isHidden);
+          }
+          e.stopPropagation();
+          return;
+        }
+        
+        let direction = 0;
+        if (clickX < leftThreshold) {
+          direction = state.settings.reverse ? 1 : -1;
+        } else if (clickX > rightThreshold) {
+          direction = state.settings.reverse ? -1 : 1;
+        } else {
+          return;
+        }
+        const target = Math.max(1, Math.min(state.pageCount, state.currentPage + direction));
+        jumpToVirtualPageH(target);
+        e.stopPropagation();
+      });
+      
+      // 初始渲染
+      updateVirtualRenderingH();
+      
+      // 跳转到保存的页码（而不是可能已被修改的 state.currentPage）
+      state.currentPage = savedPage; // 恢复页码
+      jumpToVirtualPageH(savedPage);
+      
+      // 标记为虚拟滚动模式
+      vh.enabled = true;
+      continuous.container = vh.scrollContainer; // 兼容退出逻辑
+      
+      // 应用反向状态
+      try { if (typeof applyReverseState === 'function') applyReverseState(); } catch {}
+      
+      debugLog('[EH VirtualH] 横向虚拟滚动模式已启动');
+    }
+    
+    // ==================== 虚拟滚动纵向模式入口 ====================
+    async function enterVirtualVerticalMode() {
+      const vs = virtualScroll;
+      
+      // 不再预加载宽高比 - 使用默认高度，图片加载后动态调整
+      // 这样可以立即显示界面，不会卡顿
+      
+      // 🎯 保存当前页码（参考 JHenTai 的 initialIndex = currentImageIndex）
+      const savedPage = state.currentPage;
+      debugLog('[EH Virtual] 保存当前页码:', savedPage);
+      
+      // 设置跳转标志，防止初始化期间页码被覆盖
+      vs.isJumping = true;
+      
+      // 清理之前的状态
+      vs.knownHeights.clear();
+      vs.renderedRange = { start: -1, end: -1 };
+      
+      // 获取设置
+      vs.gap = Math.max(0, Math.min(100, Number(state.settings.verticalGap ?? 0)));
+      vs.sidePadding = Math.max(0, Math.min(1000, Number(state.settings.verticalSidePadding ?? 0)));
+      
+      // 创建滚动容器
+      vs.scrollContainer = document.createElement('div');
+      vs.scrollContainer.id = 'eh-continuous-vertical';
+      vs.scrollContainer.style.cssText = `
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: 100%;
+        width: 100%;
+        position: relative;
+      `;
+      // 零间距时添加 class，移除骨架边线
+      if ((state.settings.verticalGap ?? 0) === 0) {
+        vs.scrollContainer.classList.add('eh-no-gap-vertical');
+      }
+      
+      // 反向模式
+      if (state.settings.reverse) {
+        vs.scrollContainer.style.transform = 'scaleY(-1)';
+      }
+      
+      // 创建内容占位容器（撑开滚动高度）
+      vs.contentContainer = document.createElement('div');
+      vs.contentContainer.style.cssText = `
+        position: relative;
+        width: 100%;
+      `;
+      
+      // 创建实际元素容器
+      vs.itemsContainer = document.createElement('div');
+      vs.itemsContainer.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+      `;
+      // 允许子元素接收事件
+      vs.itemsContainer.querySelectorAll = vs.itemsContainer.querySelectorAll.bind(vs.itemsContainer);
+      
+      vs.contentContainer.appendChild(vs.itemsContainer);
+      vs.scrollContainer.appendChild(vs.contentContainer);
+      
+      // 放入主区域
+      const main = document.getElementById('eh-main');
+      if (main) {
+        main.appendChild(vs.scrollContainer);
+        const singleViewer = document.getElementById('eh-viewer');
+        if (singleViewer) singleViewer.style.display = 'none';
+      }
+      
+      // 计算布局
+      vs.viewportHeight = vs.scrollContainer.clientHeight;
+      vs.containerWidth = vs.scrollContainer.clientWidth;
+      calculateVirtualLayout();
+      vs.contentContainer.style.height = vs.totalHeight + 'px';
+      
+      // 让子元素可点击
+      vs.itemsContainer.style.pointerEvents = 'auto';
+      
+      // 滚动事件处理
+      let ticking = false;
+      vs.scrollContainer.addEventListener('scroll', () => {
+        if (!ticking && !vs.isJumping) {
+          ticking = true;
+          requestAnimationFrame(() => {
+            updateVirtualRendering();
+            ticking = false;
+          });
+        }
+      }, { passive: true });
+      
+      // 滚轮预取
+      vs.scrollContainer.addEventListener('wheel', (e) => {
+        const forward = e.deltaY > 0;
+        const logicalDir = forward ? 1 : -1;
+        const base = state.currentPage - 1;
+        const targets = [];
+        for (let i = 1; i <= 6; i++) {
+          const idx = base + logicalDir * i;
+          if (idx >= 0 && idx < state.pageCount) targets.push(idx);
+        }
+        if (targets.length) enqueuePrefetch(targets, true);
+      }, { passive: true });
+
+      // 🖱️ 虚拟滚动模式鼠标拖拽支持（JHenTai 同款手感）
+      let isMouseDraggingVS = false;
+      let dragStartYVS = 0;
+      let dragScrollTopVS = 0;
+      let dragMovedVS = false;
+
+      vs.scrollContainer.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) return;
+        
+        isMouseDraggingVS = true;
+        dragMovedVS = false;
+        dragStartYVS = e.pageY;
+        dragScrollTopVS = vs.scrollContainer.scrollTop;
+        vs.scrollContainer.style.cursor = 'grabbing';
+        vs.scrollContainer.style.userSelect = 'none';
+        e.preventDefault();
+      });
+
+      const onMouseMoveVS = (e) => {
+        if (!isMouseDraggingVS) return;
+        const deltaY = e.pageY - dragStartYVS;
+        if (Math.abs(deltaY) > 5) dragMovedVS = true;
+        const dirVisual = state.settings.reverse ? 1 : -1;
+        vs.scrollContainer.scrollTop = dragScrollTopVS + deltaY * dirVisual;
+      };
+
+      const onMouseUpVS = () => {
+        if (!isMouseDraggingVS) return;
+        isMouseDraggingVS = false;
+        vs.scrollContainer.style.cursor = '';
+        vs.scrollContainer.style.userSelect = '';
+        if (dragMovedVS) {
+          setTimeout(() => { dragMovedVS = false; }, 50);
+        }
+      };
+
+      document.addEventListener('mousemove', onMouseMoveVS);
+      document.addEventListener('mouseup', onMouseUpVS);
+      
+      // 点击处理
+      vs.scrollContainer.addEventListener('click', (e) => {
+        // 如果刚拖拽过，忽略这次点击
+        if (dragMovedVS) {
+          e.stopPropagation();
+          return;
+        }
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.closest('#eh-bottom-menu')) {
+          return;
+        }
+        const rect = vs.scrollContainer.getBoundingClientRect();
+        const rawY = e.clientY - rect.top;
+        const height = rect.height;
+        const clickY = state.settings.reverse ? (height - rawY) : rawY;
+        const topThreshold = height / 3;
+        const bottomThreshold = height * 2 / 3;
+        
+        if (clickY >= topThreshold && clickY <= bottomThreshold) {
+          const header = document.getElementById('eh-header');
+          const mainEl = document.getElementById('eh-main');
+          const bottom = elements.bottomMenu;
+          if (header) {
+            const isHidden = header.classList.toggle('eh-hidden');
+            if (mainEl) mainEl.classList.toggle('eh-fullheight', isHidden);
+            if (bottom) bottom.classList.toggle('eh-menu-hidden', isHidden);
+          }
+          e.stopPropagation();
+          return;
+        }
+        
+        let direction = 0;
+        if (clickY < topThreshold) {
+          direction = state.settings.reverse ? 1 : -1;
+        } else if (clickY > bottomThreshold) {
+          direction = state.settings.reverse ? -1 : 1;
+        } else {
+          return;
+        }
+        const target = Math.max(1, Math.min(state.pageCount, state.currentPage + direction));
+        jumpToVirtualPage(target);
+        e.stopPropagation();
+      });
+      
+      // 初始渲染
+      updateVirtualRendering();
+      
+      // 跳转到保存的页码（而不是可能已被修改的 state.currentPage）
+      state.currentPage = savedPage; // 恢复页码
+      jumpToVirtualPage(savedPage);
+      
+      // 标记为虚拟滚动模式
+      vs.enabled = true;
+      continuous.container = vs.scrollContainer; // 兼容退出逻辑
+      
+      // 应用反向状态
+      try { if (typeof applyReverseState === 'function') applyReverseState(); } catch {}
+      
+      debugLog('[EH Virtual] 虚拟滚动模式已启动');
+    }
 
     function exitContinuousMode() {
-  // 退出横向模式
+      // 退出连续模式（包括普通模式和虚拟滚动模式）
+      
+      // 清理布局重算定时器
+      if (layoutRecalcTimer) {
+        clearTimeout(layoutRecalcTimer);
+        layoutRecalcTimer = null;
+      }
+      if (layoutRecalcTimerH) {
+        clearTimeout(layoutRecalcTimerH);
+        layoutRecalcTimerH = null;
+      }
+      
+      // 清理纵向虚拟滚动状态
+      if (virtualScroll.enabled) {
+        virtualScroll.enabled = false;
+        virtualScroll.scrollContainer = null;
+        virtualScroll.contentContainer = null;
+        virtualScroll.itemsContainer = null;
+        virtualScroll.renderedRange = { start: -1, end: -1 };
+        virtualScroll.itemHeights = [];
+        virtualScroll.itemOffsets = [];
+        virtualScroll.knownHeights.clear();
+        debugLog('[EH Virtual] 虚拟滚动模式已退出');
+      }
+      
+      // 清理横向虚拟滚动状态
+      if (virtualScrollH.enabled) {
+        virtualScrollH.enabled = false;
+        virtualScrollH.scrollContainer = null;
+        virtualScrollH.contentContainer = null;
+        virtualScrollH.itemsContainer = null;
+        virtualScrollH.renderedRange = { start: -1, end: -1 };
+        virtualScrollH.itemWidths = [];
+        virtualScrollH.itemOffsets = [];
+        virtualScrollH.knownWidths.clear();
+        debugLog('[EH VirtualH] 横向虚拟滚动模式已退出');
+      }
       
       // 显示单页 viewer，移除连续容器
       const singleViewer = document.getElementById('eh-viewer');
@@ -4079,12 +6263,12 @@
         continuous.container.parentElement.removeChild(continuous.container);
       }
       continuous.container = null;
-      // 退出横向模式时，取消除当前页外的预取与加载，避免占用带宽
+      // 退出连续模式时，取消除当前页外的预取与加载，避免占用带宽
       try {
         cancelPrefetchExcept(state.currentPage - 1);
         state.imageRequests.forEach((entry, idx) => {
           if (idx !== state.currentPage - 1 && entry && entry.controller) {
-            try { entry.controller.abort('exit-horizontal'); } catch {}
+            try { entry.controller.abort('exit-continuous'); } catch {}
           }
         });
       } catch {}
@@ -4267,7 +6451,8 @@
         resolve(raw ? parseInt(raw, 10) : null);
       } catch { resolve(null); }
     });
-    const saveLastPagePermanent = (page) => {
+    // 🎯 提取为模块级变量，供 saveProgress 和 showPage hook 共用
+    const _saveLastPagePermanent = (page) => {
       try {
         if (chrome && chrome.storage && chrome.storage.local) {
           const obj = {}; obj[LS_KEY] = page;
@@ -4287,7 +6472,7 @@
         let persistTimer = null;
         const persistLastPage = () => {
           if (persistTimer) clearTimeout(persistTimer);
-          persistTimer = setTimeout(() => { saveLastPagePermanent(state.currentPage); }, 400);
+          persistTimer = setTimeout(() => { _saveLastPagePermanent(state.currentPage); }, 400);
         };
         const _origShowPage = showPage;
         showPage = async function(pageNum, tokenCheck){

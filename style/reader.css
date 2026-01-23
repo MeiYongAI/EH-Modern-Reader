@@ -303,6 +303,11 @@ body.eh-dark-mode .eh-icon-btn-small:hover {
   border-radius: 4px;
 }
 
+/* 纵向连续模式在零间距时移除骨架边线，视觉完全贴合 */
+#eh-continuous-vertical.eh-no-gap-vertical .eh-cv-skeleton {
+  border: none;
+}
+
 /* ========== 全局移动端点击/选择优化 ========== */
 body.eh-modern-reader, body.eh-dark-mode, #eh-reader-container, #eh-reader-container * {
   -webkit-tap-highlight-color: rgba(0,0,0,0); /* 移除手机点击蓝色闪烁 */
@@ -522,6 +527,69 @@ body.eh-dark-mode #eh-comment-page .eh-fab { background: #2962ff; color: #fff; b
 
 body.eh-dark-mode #eh-viewer {
   background: #1a1a1a;
+}
+
+/* ==================== 串珠式滑轨（单页模式拖拽翻页） ==================== */
+
+.eh-page-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.eh-page-track {
+  display: flex;
+  flex-direction: row;
+  width: 300%; /* 前页 + 当前 + 后页 */
+  height: 100%;
+  transform: translateX(-33.333%); /* 初始位置：显示中间的当前页 */
+  will-change: transform;
+}
+
+/* 纵向单页模式的滑轨 */
+.eh-page-track.eh-track-vertical {
+  flex-direction: column;
+  width: 100%;
+  height: 300%;
+  transform: translateY(-33.333%);
+}
+
+.eh-page-slide {
+  flex: 0 0 33.333%;
+  width: 33.333%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.eh-page-track.eh-track-vertical .eh-page-slide {
+  width: 100%;
+  height: 33.333%;
+}
+
+.eh-slide-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+/* 当前页的图片容器需要相对定位以放置加载覆盖层 */
+.eh-slide-current {
+  position: relative;
+}
+
+/* 隐藏连续模式下的滑轨 */
+.eh-page-slider.eh-slider-hidden {
+  display: none;
 }
 
 /* ==================== 底部菜单(缩略图+进度条+按钮) ==================== */
