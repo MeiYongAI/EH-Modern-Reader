@@ -21,7 +21,7 @@ if (Test-Path $distDir) {
 }
 Write-Host "dist folder ready`n" -ForegroundColor Green
 
-$includeItems = @("manifest.json","content.js","gallery.js","nhentai.js","background.js","popup.html","popup.js","options.html","options.js","welcome.html","README.md","LICENSE","CHANGELOG.md","style","icons")
+$includeItems = @("manifest.json","content.js","gallery.js","nhentai.js","hitomi.js","background.js","popup.html","popup.js","options.html","options.js","welcome.html","README.md","LICENSE","CHANGELOG.md","style","icons")
 
 $rootDir = Join-Path $PSScriptRoot ".."
 $tempDir = Join-Path $rootDir "temp_build"

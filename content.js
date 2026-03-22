@@ -1156,6 +1156,16 @@
       }
       const pageUrl = getImageUrl(pageIndex);
       if (!pageUrl) throw new Error('图片页面 URL 不存在');
+
+      // 直链图站点（nhentai/hitomi 等）：无需 fetch HTML 提取真实图，直接返回 URL。
+      const isDirectImageUrl = /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
+      if (isDirectImageUrl) {
+        realUrlCache.set(pageIndex, pageUrl);
+        persistRealUrlCacheLater();
+        preconnectToOrigin(pageUrl);
+        return { url: pageUrl, controller: null };
+      }
+
       const inflight = realUrlRequests.get(pageIndex);
       if (inflight) return inflight.promise;
       const controller = new AbortController();
@@ -1452,13 +1462,23 @@
 
           // 更新 imagelist 中的 key
           if (window.__ehReaderData && window.__ehReaderData.imagelist[pageIndex]) {
-            window.__ehReaderData.imagelist[pageIndex].k = pageData.imgkey || '';
+            const direct = /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
+            // 仅 E-Hentai 单页链接需要 imgkey；直链图站（如 hitomi）不要写 k，避免被误判为 /s/ 页面。
+            if (!direct) {
+              window.__ehReaderData.imagelist[pageIndex].k = pageData.imgkey || '';
+            }
           }
 
           const isDirectImageUrl = /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
 
           // 直接图片 URL（如 nhentai）：不需要再抓取 HTML
           if (isDirectImageUrl) {
+            const tryDirectLoad = async (urlToLoad) => {
+              return loadImageWithProgress(urlToLoad, (progress) => {
+                updateImageLoadingProgress(progress);
+              });
+            };
+
             const pending = loadImageWithProgress(pageUrl, (progress) => {
               updateImageLoadingProgress(progress);
             }).then((img) => {
@@ -1466,8 +1486,31 @@
               state.imageCache.set(pageIndex, { status: 'loaded', img });
               state.imageRequests.delete(pageIndex);
               return img;
-            }).catch((error) => {
+            }).catch(async (error) => {
               console.error('[EH Modern Reader] Gallery 直接图片加载失败:', pageUrl, error);
+
+              // 命中站点桥脚本提供的候选地址时，按顺序重试以规避单域名抖动。
+              const entry = window.__ehReaderData && window.__ehReaderData.imagelist
+                ? window.__ehReaderData.imagelist[pageIndex]
+                : null;
+              const altUrls = entry && Array.isArray(entry.altUrls) ? entry.altUrls : [];
+
+              for (const altUrl of altUrls) {
+                if (!altUrl || altUrl === pageUrl) continue;
+                try {
+                  const img2 = await tryDirectLoad(altUrl);
+                  if (entry) {
+                    entry.url = altUrl;
+                  }
+                  debugLog('[EH Modern Reader] Gallery 直接图片回退成功:', altUrl);
+                  state.imageCache.set(pageIndex, { status: 'loaded', img: img2 });
+                  state.imageRequests.delete(pageIndex);
+                  return img2;
+                } catch (e2) {
+                  console.warn('[EH Modern Reader] Gallery 直接图片回退失败:', altUrl, e2);
+                }
+              }
+
               state.imageCache.delete(pageIndex);
               state.imageRequests.delete(pageIndex);
               throw new Error(`图片加载失败: ${pageUrl}`);
@@ -2472,7 +2515,26 @@
             const pageUrl = pageData && pageData.pageUrl;
             const isDirectImageUrl = typeof pageUrl === 'string' && /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
             if (isDirectImageUrl) {
-              return pageUrl;
+              const entry = window.__ehReaderData && window.__ehReaderData.imagelist
+                ? window.__ehReaderData.imagelist[idx]
+                : null;
+              const candidates = [pageUrl].concat(entry && Array.isArray(entry.altUrls) ? entry.altUrls : []);
+
+              let p = Promise.reject(new Error('init'));
+              candidates.forEach((candidate) => {
+                if (!candidate) return;
+                p = p.catch(() => new Promise((resolve, reject) => {
+                  const probe = new Image();
+                  probe.onload = () => resolve(candidate);
+                  probe.onerror = () => reject(new Error(`thumbnail direct url failed: ${candidate}`));
+                  probe.src = candidate;
+                }));
+              });
+
+              return p.then((okUrl) => {
+                if (entry) entry.url = okUrl;
+                return okUrl;
+              });
             }
             return fetchRealImageUrlAndToken(pageUrl, new AbortController().signal)
               .then(res => res && res.url);
@@ -2566,6 +2628,18 @@
     if (elements.closeBtn) {
       elements.closeBtn.onclick = () => {
         if (pageData.gallery_url) {
+          try {
+            const target = new URL(pageData.gallery_url, window.location.origin);
+            const current = new URL(window.location.href);
+
+            // 在画廊详情页内启动阅读器时，目标地址可能与当前完全一致；
+            // 这种情况下直接赋值 href 不会触发导航，需要强制刷新恢复原页面。
+            if (target.href === current.href) {
+              window.location.reload();
+              return;
+            }
+          } catch {}
+
           window.location.href = pageData.gallery_url;
         } else {
           window.history.back();

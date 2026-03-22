@@ -24,10 +24,10 @@
         } else if (currentTab.url.includes('exhentai.org')) {
           siteElement.textContent = 'ExHentai';
           siteElement.style.color = '#fbbf24';
-        } else if (currentTab.url.includes('nhentai.net/g/')) {
+        } else if (currentTab.url.includes('nhentai.net/g/') || currentTab.url.includes('nhentai.xxx/g/')) {
           siteElement.textContent = 'nhentai Gallery';
           siteElement.style.color = '#fbbf24';
-        } else if (currentTab.url.includes('nhentai.net')) {
+        } else if (currentTab.url.includes('nhentai.net') || currentTab.url.includes('nhentai.xxx')) {
           siteElement.textContent = 'nhentai';
           siteElement.style.color = '#fbbf24';
         } else {

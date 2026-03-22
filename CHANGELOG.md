@@ -5,6 +5,19 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.1] - 2026-03-22
+### Added
+- **hitomi.la 支持补全**：支持详情页与 reader 页面启动，缩略图直达指定页。
+
+### Fixed
+- **nhentai / nhentai.xxx 启动稳定性**：修复按钮挂载与缩略图入口在部分页面失效的问题。
+- **阅读起始页优先级**：显式缩略图跳转优先于阅读记忆；详情页按钮启动继续沿用阅读记忆。
+- **直接图片预取兼容**：绕过跨域页面抓取路径，减少 CORS 失败与错误噪声。
+
+### Changed
+- 打包脚本纳入 `hitomi.js`，避免发布包缺失站点桥接文件。
+- 清理根目录历史发布遗留文档，保留核心说明与开发文档。
+
 ## [2.5.0] - 2026-03-22
 ### Added
 - **nhentai 支持**：新增 `/g/{id}/` 与 `/g/{id}/{page}/` 页面启动能力，支持按钮启动与缩略图直达。

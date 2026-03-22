@@ -2,7 +2,7 @@
 
 现代化的 E-Hentai / ExHentai / nhentai 阅读器扩展，支持 MPV 与 Gallery 双模式、智能节流、持久缓存与永久阅读进度。
 
-![Version](https://img.shields.io/badge/version-2.5.0-blue)
+![Version](https://img.shields.io/badge/version-2.5.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
@@ -10,7 +10,8 @@
 
 - 多站点双模式：
     - E-Hentai / ExHentai：/mpv/ 自动接管；/g/ 右侧按钮启动（无需 300 Hath）
-    - nhentai：/g/{id}/ 与 /g/{id}/{page}/ 页面按钮/缩略图启动
+    - nhentai（含镜像 nhentai.xxx）：/g/{id}/ 与 /g/{id}/{page}/ 页面按钮/缩略图启动
+    - hitomi.la：详情页与 reader 页一键启动，缩略图直达指定页
 - 阅读体验：**三种阅读模式**（单页/横向连续/纵向连续），三区点击，预加载与延后请求取消
 - 安全限速：3 并发 + 250ms 间隔 + 跳页滚动锁
 - 持久缓存：
@@ -46,7 +47,8 @@ Chrome/Edge（开发者模式）
 
 - MPV 模式：进入 `/mpv/` 页面自动启用
 - Gallery 模式：在 `/g/` 页面点击右侧“EH Modern Reader”按钮；缩略图将一次性展开为单页，无需分页；点击任意缩略图进入阅读器并跳转到对应页
-- nhentai 模式：在 `/g/{id}/` 页面点击 “EH Modern Reader” 按钮，或直接点击任意缩略图进入阅读器；在 `/g/{id}/{page}/` 可从当前页启动
+- nhentai 模式（`nhentai.net` 与 `nhentai.xxx`）：在 `/g/{id}/` 页面点击 “EH Modern Reader” 按钮，或直接点击任意缩略图进入阅读器；在 `/g/{id}/{page}/` 可从当前页启动
+- hitomi 模式（`hitomi.la`）：在 `*-{id}.html` 详情页或 `reader/{id}.html` 页面点击 “EH Modern Reader” 启动；从缩略图进入时会优先跳转到该页
 
 ## 快捷键
 
@@ -78,7 +80,8 @@ EH-Modern-Reader/
 ├─ manifest.json
 ├─ content.js        # MPV 阅读器
 ├─ gallery.js        # 画廊增强与启动器
-├─ nhentai.js        # nhentai 启动桥接
+├─ nhentai.js        # nhentai / nhentai.xxx 启动桥接
+├─ hitomi.js         # hitomi.la 启动桥接
 ├─ style/            # 样式
 ├─ icons/            # 图标
 ├─ scripts/          # 构建/发布脚本
@@ -106,4 +109,4 @@ EH-Modern-Reader/
 
 —
 
-最后更新：2026-03-22
+最后更新：2026-03-22（v2.5.1）
