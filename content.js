@@ -1455,7 +1455,29 @@
             window.__ehReaderData.imagelist[pageIndex].k = pageData.imgkey || '';
           }
 
-          // 使用和 MPV 相同的方式：抓取单页 HTML 提取图片 URL
+          const isDirectImageUrl = /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
+
+          // 直接图片 URL（如 nhentai）：不需要再抓取 HTML
+          if (isDirectImageUrl) {
+            const pending = loadImageWithProgress(pageUrl, (progress) => {
+              updateImageLoadingProgress(progress);
+            }).then((img) => {
+              debugLog('[EH Modern Reader] Gallery 直接图片加载成功:', pageUrl);
+              state.imageCache.set(pageIndex, { status: 'loaded', img });
+              state.imageRequests.delete(pageIndex);
+              return img;
+            }).catch((error) => {
+              console.error('[EH Modern Reader] Gallery 直接图片加载失败:', pageUrl, error);
+              state.imageCache.delete(pageIndex);
+              state.imageRequests.delete(pageIndex);
+              throw new Error(`图片加载失败: ${pageUrl}`);
+            });
+
+            state.imageCache.set(pageIndex, { status: 'loading', promise: pending });
+            return pending;
+          }
+
+          // E-Hentai 单页链接：抓取 HTML 提取真实图片 URL
           const abortController = new AbortController();
           state.imageRequests.set(pageIndex, abortController);
 
@@ -2446,10 +2468,15 @@
         }
         
         imageUrlPromise = fetchFn(idx)
-          .then(pageData =>
-            fetchRealImageUrlAndToken(pageData.pageUrl, new AbortController().signal)
-              .then(res => res && res.url)
-          );
+          .then((pageData) => {
+            const pageUrl = pageData && pageData.pageUrl;
+            const isDirectImageUrl = typeof pageUrl === 'string' && /^https?:\/\//i.test(pageUrl) && /\.(?:jpg|jpeg|png|gif|webp|avif)(?:[?#].*)?$/i.test(pageUrl);
+            if (isDirectImageUrl) {
+              return pageUrl;
+            }
+            return fetchRealImageUrlAndToken(pageUrl, new AbortController().signal)
+              .then(res => res && res.url);
+          });
       } else {
         // MPV 模式：使用 ensureRealImageUrl
         imageUrlPromise = ensureRealImageUrl(idx).then(({ url }) => url);

@@ -24,6 +24,12 @@
         } else if (currentTab.url.includes('exhentai.org')) {
           siteElement.textContent = 'ExHentai';
           siteElement.style.color = '#fbbf24';
+        } else if (currentTab.url.includes('nhentai.net/g/')) {
+          siteElement.textContent = 'nhentai Gallery';
+          siteElement.style.color = '#fbbf24';
+        } else if (currentTab.url.includes('nhentai.net')) {
+          siteElement.textContent = 'nhentai';
+          siteElement.style.color = '#fbbf24';
         } else {
           siteElement.textContent = '非目标站点';
           siteElement.style.color = '#ef4444';

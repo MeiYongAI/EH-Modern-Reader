@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "EH Modern Reader",
-  "version": "2.4.9",
+  "version": "2.5.0",
   "description": "Modern E-Hentai Reader with MPV/Gallery modes, smart throttling, progress indicator",
   "permissions": [
     "storage",
@@ -9,7 +9,8 @@
   ],
   "host_permissions": [
     "https://e-hentai.org/*",
-    "https://exhentai.org/*"
+    "https://exhentai.org/*",
+    "https://nhentai.net/*"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -55,12 +56,19 @@
       ],
       "js": ["gallery.js", "content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": [
+        "https://nhentai.net/g/*"
+      ],
+      "js": ["content.js", "nhentai.js"],
+      "run_at": "document_end"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["style/reader.css", "content.js"],
-      "matches": ["https://e-hentai.org/*", "https://exhentai.org/*"]
+      "matches": ["https://e-hentai.org/*", "https://exhentai.org/*", "https://nhentai.net/*"]
     }
   ]
 }
