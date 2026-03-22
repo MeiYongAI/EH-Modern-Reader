@@ -5,6 +5,16 @@ All notable changes to EH Modern Reader will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-22
+### Added
+- **nhentai 支持**：新增 `/g/{id}/` 与 `/g/{id}/{page}/` 页面启动能力，支持按钮启动与缩略图直达。
+- 新增 `nhentai.js` 桥接脚本，复用现有阅读器 UI/交互能力。
+
+### Fixed
+- **页面变量读取修复**：内容脚本隔离环境下改为页面上下文桥接读取 `_gallery/_n_app`，修复 `nhentai bootstrap failed: no gallery data`。
+- **直接图片 URL 兼容**：Gallery 模式支持直接加载图片直链（jpg/png/gif/webp/avif），不再依赖 E-Hentai `\/s\/` 页面抓取。
+- **重复点击稳定性**：增加启动防抖与重试逻辑，避免连续点击触发重复报错。
+
 ## [2.4.9] - 2026-01-23
 ### Fixed
 - **连续模式阅读记忆修复**：修复了纵向/横向连续模式（包括虚拟滚动）不保存阅读进度的问题。之前阅读记忆只在单页模式生效（通过 hook `showPage` 实现），现在 `saveProgress` 函数也会触发永久存储。
