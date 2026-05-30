@@ -579,7 +579,6 @@ body.eh-dark-mode #eh-viewer {
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
-  pointer-events: none;
 }
 
 /* 当前页的图片容器需要相对定位以放置加载覆盖层 */
