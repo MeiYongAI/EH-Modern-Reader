@@ -2000,6 +2000,11 @@
         prevActiveThumb.classList.remove('active');
       }
 
+      // 清除所有滚动预览焦点（实际翻页时焦点应回到锚点）
+      if (currentThumb) {
+        currentThumb.classList.remove('eh-scroll-focus');
+      }
+
       // 添加新的高亮
       if (currentThumb) {
         currentThumb.classList.add('active');
@@ -2353,6 +2358,7 @@
         thumbnailScrollThrottle.throttle(() => {
           if (!thumbnailLoadQueue.isProgrammaticScroll) {
             triggerBatchLoad();
+            syncThumbnailPreviewUI();
           }
         });
       }, { passive: true });
@@ -2401,7 +2407,56 @@
       }
     }
 
-    // 手动加载当前缩略图容器“视口内”的缩略图，附带少量左右缓冲，忽略 programmatic scroll 锁
+    // 根据缩略图栏当前滚动位置，同步更新页码显示、进度条和缩略图高亮（不触发实际翻页）
+    function syncThumbnailPreviewUI() {
+      if (!elements.thumbnails) return;
+      const container = elements.thumbnails;
+      const containerRect = container.getBoundingClientRect();
+      const centerX = containerRect.left + containerRect.width / 2;
+
+      // 找到最接近视野中心的缩略图
+      const thumbnails = container.querySelectorAll('.eh-thumbnail');
+      let closestThumb = null;
+      let closestDistance = Infinity;
+      thumbnails.forEach(thumb => {
+        const thumbRect = thumb.getBoundingClientRect();
+        const thumbCenterX = thumbRect.left + thumbRect.width / 2;
+        const distance = Math.abs(thumbCenterX - centerX);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestThumb = thumb;
+        }
+      });
+      if (!closestThumb) return;
+      const pageNum = parseInt(closestThumb.dataset.page);
+      if (isNaN(pageNum)) return;
+
+      // 更新页码显示（始终跟随滚动预览位置）
+      if (elements.pageInfo) {
+        elements.pageInfo.textContent = `${pageNum} / ${state.pageCount}`;
+      }
+
+      // 更新进度条数值（始终跟随滚动预览位置）
+      if (elements.progressBar) {
+        elements.progressBar.value = pageNum;
+      }
+
+      // 更新进度条当前页码文字
+      const progressCurrent = document.getElementById('eh-progress-current');
+      if (progressCurrent) {
+        progressCurrent.textContent = pageNum;
+      }
+
+      // 清除之前所有滚动焦点，仅在非当前页的缩略图上添加新的弱焦点指示
+      container.querySelectorAll('.eh-thumbnail.eh-scroll-focus').forEach(t => {
+        t.classList.remove('eh-scroll-focus');
+      });
+      if (pageNum !== state.currentPage) {
+        closestThumb.classList.add('eh-scroll-focus');
+      }
+    }
+
+    // 手动加载当前缩略图容器"视口内"的缩略图，附带少量左右缓冲，忽略 programmatic scroll 锁
     // maxBatch：本次最多加载多少张；extraMargin：在上下文基础上扩展的像素缓冲
     function manualLoadVisibleThumbnails(maxBatch = 10, extraMargin = 120) {
       if (!elements.thumbnails) return;
