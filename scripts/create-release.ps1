@@ -46,11 +46,10 @@ $notesFile = New-TemporaryFile
 @"
 Gallery Reader $tag
 
-- Shortened the extension name to Gallery Reader.
-- Fixed hitomi.la AVIF/WebP CDN subdomain routing to match the native reader.
-- The hitomi.la detail page now enters the native reader URL before Gallery Reader takes over.
-- Reduced hitomi.la eager image loading to avoid flooding the CDN with simultaneous requests.
-- Kept background metadata and gg route fetching for hitomi.la.
+- Fixed hitomi.la full-image CDN routing after the latest gg.js route change.
+- Limited hitomi.la full-image candidates to the current official AVIF/WebP URLs.
+- Reduced eager full-image loading in hitomi.la continuous reading modes and throttled full-image loads in sequence.
+- Kept thumbnails on official hitomi.la small-thumbnail URLs with automatic atn / btn fallback.
 
 See README.md for the bilingual changelog.
 "@ | Set-Content -Path $notesFile -Encoding UTF8

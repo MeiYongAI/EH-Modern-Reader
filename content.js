@@ -1570,8 +1570,40 @@
     }
 
     // 加载图片（带重试机制）
+    function isHitomiReaderSource() {
+      return !!(window.__ehReaderData && window.__ehReaderData.source === 'hitomi');
+    }
+
+    const hitomiImageLoadQueue = {
+      tail: Promise.resolve(),
+      delayMs: 700,
+      run(task) {
+        const next = this.tail.catch(() => {}).then(async () => {
+          try {
+            return await task();
+          } finally {
+            await new Promise(resolve => setTimeout(resolve, this.delayMs));
+          }
+        });
+        this.tail = next.catch(() => {});
+        return next;
+      }
+    };
+
+    function hitomiMainImageCandidates(pageUrl, entry) {
+      const all = [pageUrl].concat(entry && Array.isArray(entry.altUrls) ? entry.altUrls : []);
+      const seen = new Set();
+      return all.filter((url) => {
+        if (typeof url !== 'string' || !url) return false;
+        if (seen.has(url)) return false;
+        seen.add(url);
+        return /\.(?:avif|webp)(?:[?#].*)?$/i.test(url);
+      });
+    }
+
     async function loadImage(pageIndex, retryCount = 0) {
-      const MAX_RETRIES = 3;
+      const hitomiSource = isHitomiReaderSource();
+      const MAX_RETRIES = hitomiSource ? 0 : 3;
       const TIMEOUT = 60000; // 增加到60秒
       
       try {
@@ -1622,6 +1654,42 @@
                 updateImageLoadingProgress(progress);
               });
             };
+
+            if (hitomiSource) {
+              const entry = window.__ehReaderData && window.__ehReaderData.imagelist
+                ? window.__ehReaderData.imagelist[pageIndex]
+                : null;
+              const candidates = hitomiMainImageCandidates(pageUrl, entry);
+              if (candidates.length === 0) {
+                candidates.push(pageUrl);
+              }
+
+              const pending = hitomiImageLoadQueue.run(async () => {
+                let lastError = null;
+                for (const candidate of candidates) {
+                  try {
+                    const img = await tryDirectLoad(candidate);
+                    if (entry) {
+                      entry.url = candidate;
+                    }
+                    debugLog('[Gallery Reader] hitomi main image loaded:', candidate);
+                    state.imageCache.set(pageIndex, { status: 'loaded', img });
+                    state.imageRequests.delete(pageIndex);
+                    return img;
+                  } catch (error) {
+                    lastError = error;
+                    debugLog('[Gallery Reader] hitomi main image candidate failed:', candidate, error && error.message ? error.message : error);
+                  }
+                }
+
+                state.imageCache.delete(pageIndex);
+                state.imageRequests.delete(pageIndex);
+                throw new Error(`${tr('imageLoadFailed')}: ${pageUrl}${lastError && lastError.message ? ` (${lastError.message})` : ''}`);
+              });
+
+              state.imageCache.set(pageIndex, { status: 'loading', promise: pending });
+              return pending;
+            }
 
             const pending = loadImageWithProgress(pageUrl, (progress) => {
               updateImageLoadingProgress(progress);
@@ -4559,6 +4627,7 @@
         }
 
         // 观察器懒加载 - 统一使用 loadImage 避免重复请求
+        const imageRootMargin = isHitomiReaderSource() ? '120px' : '1200px';
         continuous.observer = new IntersectionObserver((entries) => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -4603,7 +4672,7 @@
               }
             }
           });
-  }, { root: continuous.container, rootMargin: '1200px', threshold: 0.01 });
+  }, { root: continuous.container, rootMargin: imageRootMargin, threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {
@@ -5989,6 +6058,7 @@
         }
 
         // 懒加载观察器
+        const imageRootMargin = isHitomiReaderSource() ? '120px' : '1200px';
         continuous.observer = new IntersectionObserver((entries) => {
           entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -6029,7 +6099,7 @@
               }
             }
           });
-        }, { root: continuous.container, rootMargin: '1200px', threshold: 0.01 });
+        }, { root: continuous.container, rootMargin: imageRootMargin, threshold: 0.01 });
 
         // 观察所有图片
         continuous.container.querySelectorAll('img[data-page-index]').forEach(img => {

@@ -222,14 +222,8 @@
     return `${window.location.origin}/reader/${gid}.html#${pageNum}`;
   }
 
-  function extFromName(file) {
-    const name = (file && file.name) ? String(file.name) : '';
-    const m = name.match(/\.([a-z0-9]+)$/i);
-    return m ? m[1].toLowerCase() : 'jpg';
-  }
-
   const HITOMI_MEDIA_DOMAIN = 'gold-usergeneratedcontent.net';
-  const DEFAULT_GG_B = '1780905601/';
+  const DEFAULT_GG_B = '1780909201/';
   let ggMetaCache = null;
   let ggMetaPromise = null;
 
@@ -251,6 +245,11 @@
         const bMatch = text.match(/\bb:\s*'([^']+)'/);
         const routePrefix = bMatch ? bMatch[1] : DEFAULT_GG_B;
 
+        const defaultMatch = text.match(/var\s+o\s*=\s*(\d+)/);
+        const caseValueMatch = text.match(/o\s*=\s*(\d+)\s*;\s*break/);
+        const defaultM = defaultMatch ? parseInt(defaultMatch[1], 10) : 1;
+        const caseM = caseValueMatch ? parseInt(caseValueMatch[1], 10) : 0;
+
         const mSet = new Set();
         let m;
         const caseRe = /case\s+(\d+)\s*:/g;
@@ -258,11 +257,11 @@
           mSet.add(parseInt(m[1], 10));
         }
 
-        ggMetaCache = { routePrefix, mSet };
+        ggMetaCache = { routePrefix, mSet, defaultM, caseM };
         return ggMetaCache;
       } catch (e) {
         debugLog('[Gallery Reader] gg.js parse fallback:', e && e.message ? e.message : e);
-        ggMetaCache = { routePrefix: DEFAULT_GG_B, mSet: new Set() };
+        ggMetaCache = { routePrefix: DEFAULT_GG_B, mSet: new Set(), defaultM: 1, caseM: 0 };
         return ggMetaCache;
       }
     })().finally(() => {
@@ -270,6 +269,15 @@
     });
 
     return ggMetaPromise;
+  }
+
+  function ggValueFromHash(hash, ggMeta) {
+    const rv = hashRouteValue(hash);
+    if (!Number.isFinite(rv)) return 1;
+
+    const defaultM = ggMeta && Number.isFinite(ggMeta.defaultM) ? ggMeta.defaultM : 1;
+    const caseM = ggMeta && Number.isFinite(ggMeta.caseM) ? ggMeta.caseM : 0;
+    return ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? caseM : defaultM;
   }
 
   function imageSubdomainFromHash(hash, dir, ggMeta) {
@@ -280,10 +288,7 @@
       return '1';
     }
 
-    // hitomi's gg.m() defaults to 0 and returns 1 for values listed in case blocks.
-    // Reader AVIF/WebP sources call url_from_url_from_hash(..., dir) without base,
-    // so common.js generates a1/a2 and w1/w2. Original images use 1/2.
-    const ggM = ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? 1 : 0;
+    const ggM = ggValueFromHash(hash, ggMeta);
     if (dir === 'webp') {
       return `w${1 + ggM}`;
     }
@@ -320,38 +325,29 @@
     return `https://${sub}.${HITOMI_MEDIA_DOMAIN}/${dir}/${path}.${ext}`;
   }
 
-  function fallbackLegacyUrl(file) {
-    if (!file || !file.hash) return '';
-    const h = String(file.hash);
-    if (!h || h.length < 3) return '';
-    const d1 = h.slice(-1);
-    const d2 = h.slice(-3, -1);
-    const ext = extFromName(file);
-    return `https://a.hitomi.la/images/${d1}/${d2}/${h}.${ext}`;
-  }
-
-  function thumbnailSubdomainFromHash(hash, ggMeta) {
-    const rv = hashRouteValue(hash);
-    const ggM = Number.isFinite(rv) && ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? 1 : 0;
-    return `${String.fromCharCode(97 + ggM)}tn`;
-  }
-
-  function buildThumbnailUrlByDir(file, ggMeta, dir, ext) {
+  function buildThumbnailUrlBySubdomain(file, sub, dir, ext) {
     if (!file || !file.hash) return '';
     const path = realFullPathFromHash(file.hash);
     if (!path) return '';
-    const sub = thumbnailSubdomainFromHash(file.hash, ggMeta);
     return `https://${sub}.${HITOMI_MEDIA_DOMAIN}/${dir}/${path}.${ext}`;
   }
 
   function makeThumbnailCandidates(file, ggMeta) {
     const out = [];
+    const addThumbs = (sub, dir, ext) => {
+      out.push(buildThumbnailUrlBySubdomain(file, sub, dir, ext));
+    };
+
     if (file && file.hasavif) {
-      out.push(buildThumbnailUrlByDir(file, ggMeta, 'avifsmalltn', 'avif'));
-      out.push(buildThumbnailUrlByDir(file, ggMeta, 'avifsmallsmalltn', 'avif'));
+      addThumbs('atn', 'avifsmalltn', 'avif');
+      addThumbs('btn', 'avifsmalltn', 'avif');
+      addThumbs('atn', 'avifsmallsmalltn', 'avif');
+      addThumbs('btn', 'avifsmallsmalltn', 'avif');
     }
-    out.push(buildThumbnailUrlByDir(file, ggMeta, 'webpsmalltn', 'webp'));
-    out.push(buildThumbnailUrlByDir(file, ggMeta, 'webpsmallsmalltn', 'webp'));
+    addThumbs('atn', 'webpsmalltn', 'webp');
+    addThumbs('btn', 'webpsmalltn', 'webp');
+    addThumbs('atn', 'webpsmallsmalltn', 'webp');
+    addThumbs('btn', 'webpsmallsmalltn', 'webp');
 
     const uniq = [];
     const seen = new Set();
@@ -365,7 +361,6 @@
   }
 
   function makeImageCandidates(file, ggMeta) {
-    const ext = extFromName(file);
     const out = [];
 
     if (file && file.hasavif) {
@@ -373,8 +368,8 @@
     }
     // Hitomi's reader always uses WebP as the <img> fallback under AVIF <source>.
     out.push(buildImageUrlByDir(file, ggMeta, 'webp', 'webp'));
-    out.push(buildImageUrlByDir(file, ggMeta, 'images', ext));
-    out.push(fallbackLegacyUrl(file));
+    // Avoid legacy JPG fallback in-reader: it is noisy on current CDN routing and the
+    // official reader uses AVIF/WebP for these galleries.
 
     const uniq = [];
     const seen = new Set();
