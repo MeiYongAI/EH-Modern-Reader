@@ -2640,10 +2640,7 @@
 
     function loadThumbnail(thumb, imageData, pageNum) {
       if (window.__ehReaderData && window.__ehReaderData.source === 'hitomi') {
-        thumb.style.background = 'none';
-        thumb.replaceChildren();
-        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
-        return;
+        return loadHitomiThumbnail(thumb, imageData, pageNum);
       }
 
       const idx = pageNum - 1;
@@ -2653,6 +2650,69 @@
       // 🎯 统一使用真实图生成缩略图（MPV 和 Gallery 模式一致）
       // 雪碧图裁剪存在 tileH 计算不准确导致偏上的问题，直接跳过
       loadFullThumbnail(thumb, imageData, pageNum, idx, title, containerW, containerH);
+    }
+
+    function loadHitomiThumbnail(thumb, imageData, pageNum) {
+      const candidates = [];
+      if (imageData && Array.isArray(imageData.thumbUrls)) {
+        candidates.push(...imageData.thumbUrls);
+      }
+      if (imageData && imageData.thumbUrl) {
+        candidates.push(imageData.thumbUrl);
+      }
+
+      const urls = [];
+      const seen = new Set();
+      candidates.forEach((url) => {
+        if (typeof url !== 'string' || !url) return;
+        if (seen.has(url)) return;
+        seen.add(url);
+        urls.push(url);
+      });
+
+      if (urls.length === 0) {
+        thumb.style.background = 'none';
+        thumb.replaceChildren();
+        thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
+        return Promise.resolve();
+      }
+
+      return new Promise((resolve) => {
+        let index = 0;
+        const img = new Image();
+        img.decoding = 'async';
+        img.loading = 'lazy';
+        img.alt = `Page ${pageNum}`;
+
+        const finishWithNumber = () => {
+          thumb.style.background = 'none';
+          thumb.replaceChildren();
+          thumb.innerHTML = `<div class=\"eh-thumbnail-number\">${pageNum}</div>`;
+          resolve();
+        };
+
+        const loadNext = () => {
+          if (index >= urls.length) {
+            finishWithNumber();
+            return;
+          }
+          img.src = urls[index++];
+        };
+
+        img.onload = () => {
+          thumb.style.background = 'none';
+          thumb.replaceChildren();
+          thumb.appendChild(img);
+
+          const badge = document.createElement('div');
+          badge.className = 'eh-thumbnail-number';
+          badge.textContent = String(pageNum);
+          thumb.appendChild(badge);
+          resolve();
+        };
+        img.onerror = loadNext;
+        loadNext();
+      });
     }
     
     // 提取原有的完整图片加载逻辑为独立函数

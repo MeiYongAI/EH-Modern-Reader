@@ -75,6 +75,33 @@
     });
   }
 
+  function waitForBody(timeoutMs = 3000) {
+    if (document.body) return Promise.resolve();
+
+    return new Promise((resolve) => {
+      let done = false;
+      let observer = null;
+      let timer = null;
+
+      const finish = () => {
+        if (done) return;
+        done = true;
+        if (observer) observer.disconnect();
+        if (timer) clearTimeout(timer);
+        resolve();
+      };
+
+      try {
+        observer = new MutationObserver(() => {
+          if (document.body) finish();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+      } catch {}
+
+      timer = setTimeout(finish, timeoutMs);
+    });
+  }
+
   function getPathInfo() {
     const p = window.location.pathname || '';
     const hashPage = parseInt((window.location.hash || '').replace('#', ''), 10);
@@ -110,6 +137,58 @@
       if (document.body) {
         document.body.removeAttribute('onload');
       }
+    } catch {}
+  }
+
+  function installReaderBootMask() {
+    const info = getPathInfo();
+    if (!info || !info.isReaderPage) return;
+
+    try {
+      document.documentElement.classList.add('gallery-reader-hitomi-boot');
+
+      if (!document.getElementById('gallery-reader-hitomi-boot-style')) {
+        const style = document.createElement('style');
+        style.id = 'gallery-reader-hitomi-boot-style';
+        style.textContent = [
+          'html.gallery-reader-hitomi-boot,',
+          'html.gallery-reader-hitomi-boot body {',
+          '  background: #111317 !important;',
+          '}',
+          'html.gallery-reader-hitomi-boot body > :not(#eh-reader-container) {',
+          '  visibility: hidden !important;',
+          '}',
+          'html.gallery-reader-hitomi-boot #eh-reader-container,',
+          'html.gallery-reader-hitomi-boot #eh-reader-container * {',
+          '  visibility: visible !important;',
+          '}'
+        ].join('\n');
+        (document.head || document.documentElement).appendChild(style);
+      }
+    } catch {}
+
+    const stripNativeOnload = () => {
+      try {
+        if (document.body) {
+          document.body.removeAttribute('onload');
+        }
+      } catch {}
+    };
+
+    stripNativeOnload();
+    try {
+      const observer = new MutationObserver(() => {
+        stripNativeOnload();
+        if (document.getElementById('eh-reader-container')) {
+          try {
+            document.documentElement.classList.remove('gallery-reader-hitomi-boot');
+            const style = document.getElementById('gallery-reader-hitomi-boot-style');
+            if (style) style.remove();
+          } catch {}
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
     } catch {}
   }
 
@@ -223,6 +302,12 @@
     return `${routePrefix}${rv}/${h}`;
   }
 
+  function realFullPathFromHash(hash) {
+    const h = String(hash || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(h)) return '';
+    return `${h.slice(-1)}/${h.slice(-3, -1)}/${h}`;
+  }
+
   function buildImageUrlByDir(file, ggMeta, dir, ext) {
     if (!file || !file.hash) return '';
     const path = fullPathFromHash(file.hash, ggMeta);
@@ -243,6 +328,40 @@
     const d2 = h.slice(-3, -1);
     const ext = extFromName(file);
     return `https://a.hitomi.la/images/${d1}/${d2}/${h}.${ext}`;
+  }
+
+  function thumbnailSubdomainFromHash(hash, ggMeta) {
+    const rv = hashRouteValue(hash);
+    const ggM = Number.isFinite(rv) && ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? 1 : 0;
+    return `${String.fromCharCode(97 + ggM)}tn`;
+  }
+
+  function buildThumbnailUrlByDir(file, ggMeta, dir, ext) {
+    if (!file || !file.hash) return '';
+    const path = realFullPathFromHash(file.hash);
+    if (!path) return '';
+    const sub = thumbnailSubdomainFromHash(file.hash, ggMeta);
+    return `https://${sub}.${HITOMI_MEDIA_DOMAIN}/${dir}/${path}.${ext}`;
+  }
+
+  function makeThumbnailCandidates(file, ggMeta) {
+    const out = [];
+    if (file && file.hasavif) {
+      out.push(buildThumbnailUrlByDir(file, ggMeta, 'avifsmalltn', 'avif'));
+      out.push(buildThumbnailUrlByDir(file, ggMeta, 'avifsmallsmalltn', 'avif'));
+    }
+    out.push(buildThumbnailUrlByDir(file, ggMeta, 'webpsmalltn', 'webp'));
+    out.push(buildThumbnailUrlByDir(file, ggMeta, 'webpsmallsmalltn', 'webp'));
+
+    const uniq = [];
+    const seen = new Set();
+    for (const u of out) {
+      const n = normalizeUrl(u);
+      if (!n || seen.has(n)) continue;
+      seen.add(n);
+      uniq.push(n);
+    }
+    return uniq;
   }
 
   function makeImageCandidates(file, ggMeta) {
@@ -347,9 +466,12 @@
     const ggMeta = await resolveGgMeta();
     return files.map((f) => {
       const candidates = makeImageCandidates(f, ggMeta);
+      const thumbnails = makeThumbnailCandidates(f, ggMeta);
       return {
         primary: candidates[0] || '',
-        candidates
+        candidates,
+        thumbnail: thumbnails[0] || '',
+        thumbnails
       };
     });
   }
@@ -406,7 +528,9 @@
       return {
         n: String(idx + 1),
         url,
-        altUrls
+        altUrls,
+        thumbUrl: normalizeUrl(plan && plan.thumbnail ? plan.thumbnail : ''),
+        thumbUrls: (plan && Array.isArray(plan.thumbnails)) ? plan.thumbnails : []
       };
     });
 
@@ -479,6 +603,7 @@
       };
 
       await ensureReaderContentScript();
+      await waitForBody();
       document.dispatchEvent(new CustomEvent('ehGalleryReaderReady', { detail: data }));
       debugLog('[Gallery Reader] hitomi reader event dispatched');
     } finally {
@@ -545,6 +670,7 @@
 
   function boot() {
     if (!getPathInfo()) return;
+    installReaderBootMask();
     suppressNativeReaderInit();
     if (getPathInfo().isReaderPage) {
       resolveData().catch(() => {});
@@ -554,7 +680,10 @@
     autoLaunchOnReaderPage();
   }
 
-  if (document.readyState === 'loading') {
+  const initialInfo = getPathInfo();
+  if (initialInfo && initialInfo.isReaderPage) {
+    boot();
+  } else if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
