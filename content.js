@@ -372,7 +372,8 @@
                 </svg>
               </button>
             </div>
-            
+
+            <div class="eh-settings-body">
             <!-- 布局设置 -->
             <div class="eh-setting-group">
               <div class="eh-setting-label-group">布局模式</div>
@@ -454,9 +455,11 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- 恢复默认设置 -->
-            <div class="eh-setting-group" style="border-bottom: none; padding-bottom: 0; margin-bottom: 0;">
+            </div>
+
+            <div class="eh-panel-footer">
               <button id="eh-reset-settings" class="eh-reset-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
@@ -800,8 +803,7 @@
       settingsPanel: document.getElementById('eh-settings-panel'),
       settingsCloseBtn: document.getElementById('eh-settings-close'),
       resetSettingsBtn: document.getElementById('eh-reset-settings'),
-      resetSettingsBtn: document.getElementById('eh-reset-settings'),
-      
+
   readModeRadios: document.querySelectorAll('input[name="eh-read-mode-radio"]'),
   preloadCountInput: document.getElementById('eh-preload-count'),
   autoIntervalInput: document.getElementById('eh-auto-interval'),

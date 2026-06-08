@@ -21,7 +21,7 @@ if (Test-Path $distDir) {
 }
 Write-Host "dist folder ready`n" -ForegroundColor Green
 
-$includeItems = @("manifest.json","content.js","gallery.js","nhentai.js","hitomi.js","background.js","popup.html","popup.js","options.html","options.js","welcome.html","README.md","LICENSE","CHANGELOG.md","style","icons")
+$includeItems = @("manifest.json","content.js","gallery.js","nhentai.js","hitomi.js","background.js","popup.html","popup.js","options.html","options.js","welcome.html","README.md","LICENSE","style","icons")
 
 $rootDir = Join-Path $PSScriptRoot ".."
 $tempDir = Join-Path $rootDir "temp_build"
@@ -96,6 +96,6 @@ Write-Host "  * $($zipFile.Name) - ${size} KB" -ForegroundColor White
 Write-Host "`nNext steps:" -ForegroundColor Yellow
 Write-Host "  1. Test install the unpacked extension" -ForegroundColor White
 Write-Host "  2. Create GitHub Release and upload the ZIP" -ForegroundColor White
-Write-Host "  3. Paste release notes from RELEASE_NOTES.md" -ForegroundColor White
+Write-Host "  3. Use the latest update section from README.md for release notes" -ForegroundColor White
 
 Write-Host "`nBuild complete!" -ForegroundColor Cyan

@@ -1299,16 +1299,18 @@ body.eh-dark-mode #eh-page-input {
 
 .eh-panel-content {
   background: #fff;
-  width: 380px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
   height: 100%;
-  padding: 28px 24px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
   box-shadow: -4px 0 24px rgba(0,0,0,0.15);
   transition: transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
   transform: translateX(0);
   color: #333;
   display: flex;
   flex-direction: column;
+  border-left: 1px solid rgba(0,0,0,0.08);
 }
 
 .eh-panel.eh-hidden .eh-panel-content {
@@ -1316,9 +1318,10 @@ body.eh-dark-mode #eh-page-input {
 }
 
 body.eh-dark-mode .eh-panel-content {
-  background: #2a2a2a;
+  background: #242424;
   color: #e0e0e0;
   box-shadow: -4px 0 32px rgba(0,0,0,0.6);
+  border-left-color: rgba(255,255,255,0.08);
 }
 
 /* 面板头部：标题 + 关闭按钮 */
@@ -1326,7 +1329,16 @@ body.eh-dark-mode .eh-panel-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  flex-shrink: 0;
+  min-height: 64px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #ececec;
+  background: #fff;
+}
+
+body.eh-dark-mode .eh-panel-header {
+  background: #242424;
+  border-bottom-color: #363636;
 }
 
 .eh-panel-close {
@@ -1368,8 +1380,35 @@ body.eh-dark-mode .eh-panel-content h3 {
   color: #f0f0f0;
 }
 
+.eh-settings-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #f7f7f8;
+}
+
+body.eh-dark-mode .eh-settings-body {
+  background: #1f1f1f;
+}
+
+.eh-panel-footer {
+  flex-shrink: 0;
+  padding: 14px 22px 18px;
+  border-top: 1px solid #ececec;
+  background: #fff;
+}
+
+body.eh-dark-mode .eh-panel-footer {
+  background: #242424;
+  border-top-color: #363636;
+}
+
 .eh-setting-item {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1390,23 +1429,24 @@ body.eh-dark-mode .eh-setting-item label {
 
 /* 设置分组 */
 .eh-setting-group {
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e8e8e8;
+  margin-bottom: 0;
+  padding: 14px;
+  border: 1px solid #e6e6e8;
+  border-radius: 8px;
+  background: #fff;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
 }
 
 .eh-setting-group:last-of-type {
-  border-bottom: none;
   margin-bottom: 0;
-  padding-bottom: 0;
 }
 
 body.eh-dark-mode .eh-setting-group {
-  border-bottom-color: #3a3a3a;
+  background: #292929;
+  border-color: #383838;
 }
 
 /* 分组标签 */
@@ -1416,7 +1456,7 @@ body.eh-dark-mode .eh-setting-group {
   color: #FF6B9D;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1431,6 +1471,7 @@ body.eh-dark-mode .eh-setting-label-group {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 28px;
 }
 
 .eh-slider {
@@ -1518,29 +1559,29 @@ body.eh-dark-mode .eh-speed-label {
 }
 
 /* 自定义滚动条（视觉降噪） */
-.eh-panel-content::-webkit-scrollbar {
+.eh-settings-body::-webkit-scrollbar {
   width: 6px;
 }
 
-.eh-panel-content::-webkit-scrollbar-track {
+.eh-settings-body::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.eh-panel-content::-webkit-scrollbar-thumb {
+.eh-settings-body::-webkit-scrollbar-thumb {
   background: rgba(0,0,0,0.15);
   border-radius: 3px;
   transition: background 0.2s;
 }
 
-.eh-panel-content::-webkit-scrollbar-thumb:hover {
+.eh-settings-body::-webkit-scrollbar-thumb:hover {
   background: rgba(0,0,0,0.25);
 }
 
-body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb {
+body.eh-dark-mode .eh-settings-body::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.15);
 }
 
-body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
+body.eh-dark-mode .eh-settings-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.25);
 }
 
@@ -1560,7 +1601,7 @@ body.eh-dark-mode .eh-panel-content::-webkit-scrollbar-thumb:hover {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
 .eh-reset-btn:hover {
@@ -1895,6 +1936,11 @@ body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-
   .eh-nav-next {
     right: 16px;
   }
+
+  .eh-panel-content {
+    width: min(420px, 100vw);
+    max-width: 100vw;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1931,6 +1977,53 @@ body.eh-dark-mode .eh-toggle-switch input[type="checkbox"]:checked + .eh-toggle-
 
   .eh-nav-next {
     right: 8px;
+  }
+
+  .eh-panel {
+    justify-content: stretch;
+  }
+
+  .eh-panel-content {
+    width: 100vw;
+    max-width: 100vw;
+    border-left: none;
+  }
+
+  .eh-panel-header {
+    min-height: 56px;
+    padding: 14px 16px;
+  }
+
+  .eh-settings-body {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .eh-panel-footer {
+    padding: 12px 14px 14px;
+  }
+
+  .eh-setting-group {
+    padding: 12px;
+  }
+
+  .eh-radio-group {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .eh-radio-label {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .eh-slider-wrapper {
+    gap: 8px;
+  }
+
+  .eh-slider-value {
+    min-width: 50px;
+    font-size: 12px;
   }
 }
 

@@ -1,112 +1,80 @@
 # EH Modern Reader
 
-现代化的 E-Hentai / ExHentai / nhentai 阅读器扩展，支持 MPV 与 Gallery 双模式、智能节流、持久缓存与永久阅读进度。
+EH Modern Reader 是一个 Chrome / Edge 浏览器扩展，用于在 E-Hentai、ExHentai、nhentai 和 hitomi.la 上提供现代化阅读体验。
 
-![Version](https://img.shields.io/badge/version-2.5.2-blue)
+![Version](https://img.shields.io/badge/version-2.5.3-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
-## 核心特性
+## 功能
 
-- 多站点双模式：
-    - E-Hentai / ExHentai：/mpv/ 自动接管；/g/ 右侧按钮启动（无需 300 Hath）
-    - nhentai（含镜像 nhentai.xxx）：/g/{id}/ 与 /g/{id}/{page}/ 页面按钮/缩略图启动
-    - hitomi.la：详情页与 reader 页一键启动，缩略图直达指定页
-- 阅读体验：**三种阅读模式**（单页/横向连续/纵向连续），三区点击，预加载与延后请求取消
-- 安全限速：3 并发 + 250ms 间隔 + 跳页滚动锁
-- 持久缓存：
-    - MPV 主图真实 URL 本地持久化缓存（默认 24 小时 TTL，含会话回退）
-    - 返回画廊即时恢复已展开缩略图（会话级缓存，无需重新加载）
-- 永久进度：每个画廊的阅读历史持久保存（扩展本地存储），重启浏览器仍保留
-
-## 阅读模式
-
-- **单页模式**：传统的一次一页，支持键盘翻页和缩放
-- **单页竖向模式**：使用上下方向键/滚轮翻页，适合竖屏设备
-- **横向连续模式**：左右滚动浏览所有页面，支持自动滚动
-- **纵向连续模式**：上下滚动浏览所有页面，**特别适合条漫阅读**，v2.3.7 大幅优化滚动体验
-- 纵向模式支持在设置面板调整侧边边距（0-400px），适配不同屏宽
-- 缩略图栏支持鼠标拖动滚动（v2.3.7 新增）
-
-详细说明见 [docs/VERTICAL_MODE.md](docs/VERTICAL_MODE.md)。
+- 支持 E-Hentai / ExHentai MPV 页面自动接管。
+- 支持 E-Hentai / ExHentai Gallery 页面按钮启动和缩略图直达。
+- 支持 nhentai.net、nhentai.xxx 和 hitomi.la。
+- 支持横向单页、纵向单页、横向连续、纵向连续阅读模式。
+- 支持阅读进度记忆、真实图片 URL 缓存、缩略图懒加载、预加载和自动翻页。
+- Gallery / nhentai / Hitomi 页面默认只加载轻量入口脚本，启动阅读器时再注入核心脚本。
 
 ## 安装
 
-### 浏览器扩展版（推荐）
-
-Chrome/Edge（开发者模式）
-1. 在 Releases 页面下载 ZIP
-2. 打开 `chrome://extensions/` 或 `edge://extensions/`
-3. 打开"开发者模式"
-4. **方式一**：直接将 ZIP 文件拖入扩展页面（无需解压）
-5. **方式二**：解压后点击"加载已解压的扩展程序" → 选择解压文件夹
-
-详细见 `docs/INSTALL.md`。
+1. 在 GitHub Releases 下载最新 ZIP。
+2. 打开 `chrome://extensions/` 或 `edge://extensions/`。
+3. 开启开发者模式。
+4. 将 ZIP 拖入扩展页面，或解压后选择“加载已解压的扩展程序”。
 
 ## 使用
 
-- MPV 模式：进入 `/mpv/` 页面自动启用
-- Gallery 模式：在 `/g/` 页面点击右侧“EH Modern Reader”按钮；缩略图将一次性展开为单页，无需分页；点击任意缩略图进入阅读器并跳转到对应页
-- nhentai 模式（`nhentai.net` 与 `nhentai.xxx`）：在 `/g/{id}/` 页面点击 “EH Modern Reader” 按钮，或直接点击任意缩略图进入阅读器；在 `/g/{id}/{page}/` 可从当前页启动
-- hitomi 模式（`hitomi.la`）：在 `*-{id}.html` 详情页或 `reader/{id}.html` 页面点击 “EH Modern Reader” 启动；从缩略图进入时会优先跳转到该页
+- MPV 页面：进入 `/mpv/` 后自动启用阅读器。
+- Gallery 页面：点击页面右侧的 `EH Modern Reader`，或点击缩略图直达对应页。
+- nhentai 页面：在 `/g/{id}/` 或 `/g/{id}/{page}/` 页面启动阅读器。
+- hitomi 页面：在详情页或 `/reader/{id}.html` 页面启动阅读器。
 
 ## 快捷键
 
-- ←/→ 或 A/D/空格：翻页/横向滚动
-- Home / End：跳首页/末页
-- H / S：切换模式
-- P：自动播放
-- F11：全屏；Esc：关闭面板/退出
+- `←` / `→` / `A` / `D` / `Space`：翻页或连续模式滚动。
+- `Home` / `End`：跳到首页或末页。
+- `H` / `S`：切换阅读模式。
+- `P`：自动翻页或自动滚动。
+- `F11`：全屏。
+- `Esc`：退出全屏或关闭面板。
 
-## 发布与下载
+## 项目结构
 
-- 最新版本与变更说明见 GitHub Releases：`https://github.com/MeiYongAI/EH-Modern-Reader/releases`
-近期版本要点：
- - v2.3.7：纵向连续模式优化（条漫阅读体验提升）、图片加载挤压修复、缩略图拖动支持
- - v2.3.6：新增纵向连续阅读模式（上下滚动浏览）
- - v2.3.5：MPV 初始化性能优化 4-6 倍，轮询机制改进，CPU 占用降低 80%
- - v2.3.4：评论弹窗浮动"发评论"按钮（快速跳转与聚焦输入）
- - v2.3.3：评论"展开全部"不再跳出弹窗，拦截 ?hc=1 链接防止导航
-
-## 风控与提示
-
-- 避免频繁大幅跨页跳转，保持默认节流配置
-- 若遇 “Excessive request rate”，暂停操作，稍后再试
-
-## 项目结构（简）
-
-```
+```text
 EH-Modern-Reader/
 ├─ manifest.json
-├─ content.js        # MPV 阅读器
-├─ gallery.js        # 画廊增强与启动器
-├─ nhentai.js        # nhentai / nhentai.xxx 启动桥接
-├─ hitomi.js         # hitomi.la 启动桥接
-├─ style/            # 样式
-├─ icons/            # 图标
-├─ scripts/          # 构建/发布脚本
-├─ README.md / CHANGELOG.md / LICENSE
-└─ dist/             # 打包产物
+├─ content.js
+├─ gallery.js
+├─ nhentai.js
+├─ hitomi.js
+├─ background.js
+├─ popup.html / popup.js
+├─ options.html / options.js
+├─ welcome.html
+├─ style/
+├─ icons/
+├─ scripts/
+├─ dist/
+└─ README.md
 ```
 
-## 开发与构建
+## 构建
 
-- 打包：`scripts/build.ps1`
-- 一键发布（需安装 GitHub CLI gh）：`scripts/create-release.ps1`
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+```
 
-## 致谢
+构建产物会生成到 `dist/eh-modern-reader-v{version}.zip`。
 
-- 灵感来源与交互参考：JHenTai（`https://github.com/jiangtian616/JHenTai`）。感谢其对阅读体验与多端适配的优秀实践。
+## 最新更新
 
-## 许可与免责声明
+### v2.5.3 - 2026-06-08
 
-- 许可：MIT License
-- 免责声明：仅用于学习与研究目的，遵守当地法律与站点规则
+- 精简仓库文件，只保留根目录 `README.md` 作为 Markdown 文档。
+- `dist` 目录只保留最新发布包，移除历史包和测试解包目录。
+- 优化阅读器设置面板布局，让分组、滚动区域和移动端显示更清晰。
+- 更新构建和发布脚本，适配精简后的文档结构。
 
-—
+## License
 
-如果本项目对你有帮助，欢迎 Star ⭐
-
-—
-
-最后更新：2026-06-07（v2.5.2）
+MIT License
