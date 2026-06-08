@@ -1,11 +1,11 @@
-# Modern Gallery Reader - Build Script
+# Gallery Reader - Build Script
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-Write-Host "Modern Gallery Reader - Build Script" -ForegroundColor Cyan
-Write-Host "====================================`n" -ForegroundColor Cyan
+Write-Host "Gallery Reader - Build Script" -ForegroundColor Cyan
+Write-Host "=============================`n" -ForegroundColor Cyan
 
 $rootDir = Join-Path $PSScriptRoot ".."
 $manifestPath = Join-Path $rootDir "manifest.json"
@@ -64,7 +64,7 @@ foreach ($item in $includeItems) {
 
 Write-Host "`nCreate release zip..." -ForegroundColor Yellow
 
-$releaseZip = Join-Path $distDir "modern-gallery-reader-$version.zip"
+$releaseZip = Join-Path $distDir "gallery-reader-$version.zip"
 Write-Host "  Zipping $version ..." -ForegroundColor Cyan
 
 Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseZip -Force
@@ -97,7 +97,7 @@ try {
 Remove-Item $releaseZip -Force
 Move-Item $tempZip $releaseZip
 
-Write-Host "  Created: modern-gallery-reader-$version.zip (with forward slashes)" -ForegroundColor Green
+Write-Host "  Created: gallery-reader-$version.zip (with forward slashes)" -ForegroundColor Green
 
 Write-Host "`nClean temp files..." -ForegroundColor Yellow
 Remove-Item -Path $tempDir -Recurse -Force

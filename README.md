@@ -1,10 +1,10 @@
-# Modern Gallery Reader
+# Gallery Reader
 
-![Version](https://img.shields.io/badge/version-2.5.4-blue)
+![Version](https://img.shields.io/badge/version-2.5.5-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
-Modern Gallery Reader 是一个 Chrome / Edge 浏览器扩展，为 E-Hentai、ExHentai、nhentai 和 hitomi.la 提供现代化多站点阅读体验。
+Gallery Reader 是一个 Chrome / Edge 浏览器扩展，为 E-Hentai、ExHentai、nhentai 和 hitomi.la 提供多站点阅读体验。
 
 ## 中文
 
@@ -31,21 +31,21 @@ Modern Gallery Reader 是一个 Chrome / Edge 浏览器扩展，为 E-Hentai、E
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-构建产物会生成到 `dist/modern-gallery-reader-v{version}.zip`。
+构建产物会生成到 `dist/gallery-reader-v{version}.zip`。
 
 ### 最新更新
 
-#### v2.5.4 - 2026-06-08
+#### v2.5.5 - 2026-06-08
 
-- 扩展更名为 Modern Gallery Reader，并加入 Chrome i18n 中英文界面。
-- 修复 hitomi.la 图片 CDN 子域选择逻辑，补充候选地址回退和权限匹配。
-- 图片加载动画改为真实网络下载进度；可读取响应流时显示实际百分比，不再播放假循环动画。
-- 精简 popup、options 和 welcome 页面，设置面板文案接入中英双语。
-- README 改为中英双语，并只保留最新更新日志。
+- 扩展短名改为 Gallery Reader。
+- hitomi.la 改为接管原生 Read Online 和 `/reader/{id}.html` 页面，不再额外添加第二个阅读入口。
+- hitomi.la 的 `gg.js` 与 `galleries/{id}.js` 改由后台脚本代取，使用扩展 host permissions 避免页面 CORS 限制。
+- 修复当前 hitomi.la 图片 CDN 路由，包含 imageset 画廊的 AVIF/WebP/原图候选地址。
+- 图片加载动画继续跟随真实网络进度；无法读取响应流时降级为原生图片加载，不播放假循环动画。
 
 ## English
 
-Modern Gallery Reader is a Chrome / Edge extension that provides a modern multi-site reading experience for E-Hentai, ExHentai, nhentai, and hitomi.la.
+Gallery Reader is a Chrome / Edge extension that provides a multi-site reading experience for E-Hentai, ExHentai, nhentai, and hitomi.la.
 
 ### Features
 
@@ -70,17 +70,17 @@ Modern Gallery Reader is a Chrome / Edge extension that provides a modern multi-
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-The release package is generated at `dist/modern-gallery-reader-v{version}.zip`.
+The release package is generated at `dist/gallery-reader-v{version}.zip`.
 
 ### Latest Update
 
-#### v2.5.4 - 2026-06-08
+#### v2.5.5 - 2026-06-08
 
-- Renamed the extension to Modern Gallery Reader and added Chrome i18n for Chinese/English UI.
-- Fixed hitomi.la image CDN subdomain routing, with candidate URL fallback and expanded permissions.
-- Changed image loading animation to real network download progress; readable response streams now show actual percentage instead of a fake loop.
-- Simplified popup, options, and welcome pages; settings panel text now uses bilingual labels.
-- Reworked README as bilingual documentation with only the latest changelog entry.
+- Shortened the extension name to Gallery Reader.
+- hitomi.la now takes over the native Read Online entry and `/reader/{id}.html` pages instead of adding a second reader entry.
+- hitomi.la `gg.js` and `galleries/{id}.js` are fetched through the background service worker with extension host permissions to avoid page CORS limits.
+- Fixed current hitomi.la image CDN routing, including AVIF/WebP/original candidates for imageset galleries.
+- Image loading animation still follows real network progress; when a readable stream is unavailable, it falls back to native image loading without a fake loop.
 
 ## License
 

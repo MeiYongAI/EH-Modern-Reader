@@ -17,7 +17,7 @@
         versionEl.textContent = `v${manifest.version}`;
       }
     } catch (error) {
-      console.warn('[Modern Gallery Reader][options] Failed to read manifest version:', error);
+      console.warn('[Gallery Reader][options] Failed to read manifest version:', error);
     }
 
     const debugCheckbox = document.getElementById('opt-debug-mode');
@@ -29,7 +29,7 @@
 
     debugCheckbox.addEventListener('change', () => {
       chrome.storage.local.set({ eh_debug_mode: debugCheckbox.checked }, () => {
-        console.log('[Modern Gallery Reader] Debug mode:', debugCheckbox.checked ? 'on' : 'off');
+        console.log('[Gallery Reader] Debug mode:', debugCheckbox.checked ? 'on' : 'off');
       });
     });
   });

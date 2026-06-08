@@ -1,6 +1,6 @@
 /**
  * hitomi.la Bootstrap Script
- * Build page data from hitomi gallery/reader globals and launch Modern Gallery Reader.
+ * Build page data from hitomi gallery/reader globals and launch Gallery Reader.
  */
 
 (function() {
@@ -47,15 +47,44 @@
     });
   }
 
+  function fetchHitomiText(url) {
+    return new Promise((resolve, reject) => {
+      try {
+        if (!chrome || !chrome.runtime || typeof chrome.runtime.sendMessage !== 'function') {
+          reject(new Error('Extension runtime is unavailable'));
+          return;
+        }
+
+        chrome.runtime.sendMessage({ action: 'fetchHitomiText', url }, (response) => {
+          const lastError = chrome.runtime.lastError;
+          if (lastError) {
+            reject(new Error(lastError.message));
+            return;
+          }
+
+          if (!response || response.success !== true || typeof response.text !== 'string') {
+            reject(new Error((response && response.error) || 'Failed to fetch Hitomi text'));
+            return;
+          }
+
+          resolve(response.text);
+        });
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   function getPathInfo() {
     const p = window.location.pathname || '';
+    const hashPage = parseInt((window.location.hash || '').replace('#', ''), 10);
+    const normalizedHashPage = Number.isFinite(hashPage) && hashPage > 0 ? hashPage : null;
 
     const readerMatch = p.match(/^\/reader\/(\d+)\.html$/i);
     if (readerMatch) {
-      const hashPage = parseInt((window.location.hash || '').replace('#', ''), 10);
       return {
         gid: parseInt(readerMatch[1], 10),
-        startPage: Number.isFinite(hashPage) && hashPage > 0 ? hashPage : 1,
+        startPage: normalizedHashPage || 1,
         isReaderPage: true
       };
     }
@@ -64,7 +93,7 @@
     if (galleryMatch) {
       return {
         gid: parseInt(galleryMatch[1], 10),
-        startPage: null,
+        startPage: normalizedHashPage,
         isReaderPage: false
       };
     }
@@ -104,7 +133,7 @@
   }
 
   const HITOMI_MEDIA_DOMAIN = 'gold-usergeneratedcontent.net';
-  const DEFAULT_GG_B = '1774173602/';
+  const DEFAULT_GG_B = '1780902081/';
   let ggMetaCache = null;
   let ggMetaPromise = null;
 
@@ -122,14 +151,7 @@
       try {
         const host = detectAssetHost();
         const url = `https://${host}/gg.js`;
-        const resp = await fetch(url, {
-          method: 'GET',
-          credentials: 'omit',
-          cache: 'no-store'
-        });
-        if (!resp.ok) throw new Error(`fetch gg.js failed: ${resp.status}`);
-
-        const text = await resp.text();
+        const text = await fetchHitomiText(url);
         const bMatch = text.match(/\bb:\s*'([^']+)'/);
         const routePrefix = bMatch ? bMatch[1] : DEFAULT_GG_B;
 
@@ -143,7 +165,7 @@
         ggMetaCache = { routePrefix, mSet };
         return ggMetaCache;
       } catch (e) {
-        debugLog('[Modern Gallery Reader] gg.js parse fallback:', e && e.message ? e.message : e);
+        debugLog('[Gallery Reader] gg.js parse fallback:', e && e.message ? e.message : e);
         ggMetaCache = { routePrefix: DEFAULT_GG_B, mSet: new Set() };
         return ggMetaCache;
       }
@@ -290,16 +312,7 @@
     const host = detectAssetHost();
     const url = `https://${host}/galleries/${gid}.js`;
 
-    const resp = await fetch(url, {
-      method: 'GET',
-      credentials: 'omit',
-      cache: 'no-store'
-    });
-    if (!resp.ok) {
-      throw new Error(`fetch gallery script failed: ${resp.status}`);
-    }
-
-    const scriptText = await resp.text();
+    const scriptText = await fetchHitomiText(url);
     const galleryinfo = parseGalleryInfoFromScript(scriptText);
     if (!galleryinfo || !Array.isArray(galleryinfo.files) || galleryinfo.files.length === 0) {
       throw new Error('parse galleryinfo failed');
@@ -344,7 +357,7 @@
           dataCache = detail;
           return detail;
         } catch (e) {
-          debugLog('[Modern Gallery Reader] hitomi fetch retry:', i + 1, e && e.message ? e.message : e);
+          debugLog('[Gallery Reader] hitomi fetch retry:', i + 1, e && e.message ? e.message : e);
           await new Promise((r) => setTimeout(r, 350));
         }
       }
@@ -425,7 +438,7 @@
     try {
       const data = await buildReaderData(startAt);
       if (!data || !data.imagelist || data.imagelist.length === 0) {
-        console.warn('[Modern Gallery Reader] hitomi bootstrap failed: no gallery data');
+        console.warn('[Gallery Reader] hitomi bootstrap failed: no gallery data');
         return;
       }
 
@@ -444,57 +457,30 @@
 
       await ensureReaderContentScript();
       document.dispatchEvent(new CustomEvent('ehGalleryReaderReady', { detail: data }));
-      debugLog('[Modern Gallery Reader] hitomi reader event dispatched');
+      debugLog('[Gallery Reader] hitomi reader event dispatched');
     } finally {
       launchInFlight = false;
     }
   }
 
-  function addLaunchButton() {
+  function bindNativeEntryPoints() {
     const info = getPathInfo();
-    if (!info || document.getElementById('eh-hitomi-launch')) return;
+    if (!info) return;
 
     const isReaderPage = !!info.isReaderPage;
     const startPage = (typeof info.startPage === 'number' && info.startPage >= 1) ? info.startPage : undefined;
 
     if (!isReaderPage) {
       const readBtn = document.getElementById('read-online-button');
-      if (readBtn) {
-        const btn = document.createElement('a');
-        btn.id = 'eh-hitomi-launch';
-        btn.href = '#';
-        btn.innerHTML = `<h1>${window.MGR_I18N ? window.MGR_I18N.t('appName') : 'Modern Gallery Reader'}</h1>`;
-        btn.style.marginTop = '8px';
-        btn.addEventListener('click', (e) => {
+      if (readBtn && readBtn.dataset.galleryReaderBound !== 'true') {
+        readBtn.dataset.galleryReaderBound = 'true';
+        readBtn.addEventListener('click', (e) => {
           e.preventDefault();
+          e.stopImmediatePropagation();
           launchReader(startPage).catch(() => {});
-        });
-        readBtn.parentNode.insertBefore(btn, readBtn.nextSibling);
-        return;
+        }, true);
       }
     }
-
-    // reader 页或按钮容器不存在时，降级为悬浮按钮
-    const floating = document.createElement('button');
-    floating.id = 'eh-hitomi-launch';
-    floating.textContent = window.MGR_I18N ? window.MGR_I18N.t('appName') : 'Modern Gallery Reader';
-    floating.style.cssText = [
-      'position:fixed',
-      'top:12px',
-      'right:12px',
-      'z-index:2147483647',
-      'padding:8px 12px',
-      'border:none',
-      'border-radius:8px',
-      'background:#1f7ae0',
-      'color:#fff',
-      'font-size:13px',
-      'cursor:pointer'
-    ].join(';');
-    floating.addEventListener('click', () => {
-      launchReader(startPage).catch(() => {});
-    });
-    document.body.appendChild(floating);
   }
 
   function interceptClicks() {
@@ -503,19 +489,20 @@
     // 缩略图点击：通常是 /reader/{gid}.html#N
     document.addEventListener('click', (e) => {
       if (e.defaultPrevented || shouldBypass(e)) return;
-      const a = e.target && e.target.closest ? e.target.closest('a[href*="/reader/"]') : null;
+      const a = e.target && e.target.closest ? e.target.closest('a[href*="/reader/"], #read-online-button') : null;
       if (!a) return;
 
       const href = a.getAttribute('href') || '';
       const m = href.match(/\/reader\/(\d+)\.html(?:#(\d+))?/i);
-      if (!m) return;
 
       const path = getPathInfo();
       const gid = path ? path.gid : null;
-      if (!gid || parseInt(m[1], 10) !== gid) return;
+      if (!gid) return;
+      if (m && parseInt(m[1], 10) !== gid) return;
 
       e.preventDefault();
-      const pageNum = m[2] ? parseInt(m[2], 10) : 1;
+      e.stopImmediatePropagation();
+      const pageNum = m && m[2] ? parseInt(m[2], 10) : ((path && path.startPage) || 1);
       launchReader(pageNum).catch(() => {});
     }, true);
   }
@@ -531,7 +518,7 @@
   function boot() {
     if (!getPathInfo()) return;
     resolveData().catch(() => {});
-    addLaunchButton();
+    bindNativeEntryPoints();
     interceptClicks();
     autoLaunchOnReaderPage();
   }

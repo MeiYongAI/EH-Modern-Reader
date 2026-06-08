@@ -34,7 +34,7 @@ function debugLog(...args) {
       return i18n.t(key, params);
     }
     const fallback = {
-      appName: 'Modern Gallery Reader',
+      appName: 'Gallery Reader',
       launchFailed: 'Failed to launch reader: {message}'
     };
     let text = fallback[key] || key;
@@ -52,7 +52,7 @@ function debugLog(...args) {
   }
   window.ehGalleryBootstrapInjected = true;
 
-  debugLog('[Modern Gallery Reader] Gallery bootstrap script loaded');
+  debugLog('[Gallery Reader] Gallery bootstrap script loaded');
 
   function ensureReaderContentScript() {
     if (window.ehModernReaderInjected) {
@@ -104,7 +104,7 @@ function debugLog(...args) {
     if (urlMatch) {
       data.gid = parseInt(urlMatch[1]);
       data.token = urlMatch[2];
-      debugLog('[Modern Gallery Reader] Extracted from URL: gid=' + data.gid + ', token=' + data.token);
+      debugLog('[Gallery Reader] Extracted from URL: gid=' + data.gid + ', token=' + data.token);
     }
 
     // 遍历所有 script 标签（作为备选或补充）
@@ -152,14 +152,14 @@ function debugLog(...args) {
   }
 
   const pageData = extractPageVariables();
-  debugLog('[Modern Gallery Reader] Page data captured:', pageData);
+  debugLog('[Gallery Reader] Page data captured:', pageData);
 
   // 检查是否已经有 MPV 链接（有权限的用户）
   const mpvLink = document.querySelector('a[href*="/mpv/"]');
   
   // 如果没有 gid/token 则无法启动
   if (!pageData.gid || !pageData.token) {
-    console.warn('[Modern Gallery Reader] Missing gid or token, cannot initialize');
+    console.warn('[Gallery Reader] Missing gid or token, cannot initialize');
     return;
   }
 
@@ -188,7 +188,7 @@ function debugLog(...args) {
       
       if (data.gmetadata && data.gmetadata[0]) {
         const metadata = data.gmetadata[0];
-        debugLog('[Modern Gallery Reader] Gallery metadata:', metadata);
+        debugLog('[Gallery Reader] Gallery metadata:', metadata);
         
         // 如果返回了错误
         if (metadata.error) {
@@ -208,7 +208,7 @@ function debugLog(...args) {
       
       throw new Error('No metadata returned');
     } catch (error) {
-      console.error('[Modern Gallery Reader] Failed to fetch gallery metadata:', error);
+      console.error('[Gallery Reader] Failed to fetch gallery metadata:', error);
       throw error;
     }
   }
@@ -237,13 +237,13 @@ function debugLog(...args) {
       
       // 检查是否已有进行中的请求
       if (galleryPageFetchCache.has(galleryPageIndex)) {
-        debugLog(`[Modern Gallery Reader] Gallery page ${galleryPageIndex} fetch already in progress, reusing...`);
+        debugLog(`[Gallery Reader] Gallery page ${galleryPageIndex} fetch already in progress, reusing...`);
         return galleryPageFetchCache.get(galleryPageIndex);
       }
       
       const galleryUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${galleryPageIndex}`;
       
-      debugLog(`[Modern Gallery Reader] Fetching imgkeys from gallery page ${galleryPageIndex} (${thumbsPerPage} thumbs/page):`, galleryUrl);
+      debugLog(`[Gallery Reader] Fetching imgkeys from gallery page ${galleryPageIndex} (${thumbsPerPage} thumbs/page):`, galleryUrl);
       
       const fetchPromise = (async () => {
         const response = await fetch(galleryUrl);
@@ -257,7 +257,7 @@ function debugLog(...args) {
         
         // 从缩略图链接提取 imgkey
         const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
-        debugLog(`[Modern Gallery Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${galleryPageIndex}`);
+        debugLog(`[Gallery Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${galleryPageIndex}`);
         
         let updatedCount = 0;
         thumbnailLinks.forEach((link, index) => {
@@ -274,7 +274,7 @@ function debugLog(...args) {
           }
         });
         
-        debugLog(`[Modern Gallery Reader] Updated ${updatedCount} imgkeys for gallery page ${galleryPageIndex}`);
+        debugLog(`[Gallery Reader] Updated ${updatedCount} imgkeys for gallery page ${galleryPageIndex}`);
         
         // 完成后从缓存中移除
         galleryPageFetchCache.delete(galleryPageIndex);
@@ -285,7 +285,7 @@ function debugLog(...args) {
       
       return fetchPromise;
     } catch (error) {
-      console.error(`[Modern Gallery Reader] Failed to fetch imgkeys:`, error);
+      console.error(`[Gallery Reader] Failed to fetch imgkeys:`, error);
       throw error;
     }
   }
@@ -301,7 +301,7 @@ function debugLog(...args) {
       
       // 如果 imgkey 不存在，动态从 Gallery 页面抓取
       if (!imgkey) {
-        debugLog(`[Modern Gallery Reader] Page ${page} imgkey not cached, fetching from gallery...`);
+        debugLog(`[Gallery Reader] Page ${page} imgkey not cached, fetching from gallery...`);
         
         // 使用已保存的每页数量，或默认 20
         const thumbsPerPage = detectedThumbsPerPage > 0 ? detectedThumbsPerPage : 20;
@@ -321,7 +321,7 @@ function debugLog(...args) {
       // 构造单页 URL: https://e-hentai.org/s/{imgkey}/{gid}-{page}
       const pageUrl = `${window.location.origin}/s/${imgkey}/${pageData.gid}-${page + 1}`;
       
-      debugLog(`[Modern Gallery Reader] Page ${page} URL:`, pageUrl);
+      debugLog(`[Gallery Reader] Page ${page} URL:`, pageUrl);
       
       // 返回单页 URL，content.js 会自动抓取 HTML 提取图片
       return {
@@ -330,7 +330,7 @@ function debugLog(...args) {
         imgkey: imgkey
       };
     } catch (error) {
-      console.error(`[Modern Gallery Reader] Failed to construct page URL for ${page}:`, error);
+      console.error(`[Gallery Reader] Failed to construct page URL for ${page}:`, error);
       throw error;
     }
   }
@@ -339,19 +339,19 @@ function debugLog(...args) {
    * 启动阅读器
    */
   async function launchReader(startPage /* 1-based, optional */) {
-    debugLog('[Modern Gallery Reader] Launching reader from Gallery page...');
+    debugLog('[Gallery Reader] Launching reader from Gallery page...');
     
     try {
       // 0. 在 DOM 被替换前，检测并保存每页缩略图数量
       const initialThumbnails = document.querySelectorAll('#gdt a[href*="/s/"]').length;
       detectedThumbsPerPage = initialThumbnails > 0 ? initialThumbnails : 20;
-      debugLog(`[Modern Gallery Reader] Detected ${detectedThumbsPerPage} thumbs per gallery page`);
+      debugLog(`[Gallery Reader] Detected ${detectedThumbsPerPage} thumbs per gallery page`);
       
       // 1. 获取画廊元数据
       const metadata = await fetchGalleryMetadata();
       const pageCount = parseInt(metadata.filecount);
       
-      debugLog(`[Modern Gallery Reader] Gallery has ${pageCount} pages`);
+      debugLog(`[Gallery Reader] Gallery has ${pageCount} pages`);
       
       // 2. 构建图片列表（类似 MPV 的 imagelist 格式）
       const imagelist = [];
@@ -366,7 +366,7 @@ function debugLog(...args) {
       }
       
       // 从 Gallery 第 0 页提取前几张图片的 imgkey（确保第一页能正常加载）
-      debugLog('[Modern Gallery Reader] Fetching initial imgkeys from Gallery page 0...');
+      debugLog('[Gallery Reader] Fetching initial imgkeys from Gallery page 0...');
       
       try {
         const firstPageUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=0`;
@@ -376,7 +376,7 @@ function debugLog(...args) {
         const doc = parser.parseFromString(html, 'text/html');
         
         const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
-        debugLog(`[Modern Gallery Reader] Found ${thumbnailLinks.length} thumbnail links in first page`);
+        debugLog(`[Gallery Reader] Found ${thumbnailLinks.length} thumbnail links in first page`);
         
         thumbnailLinks.forEach((link) => {
           const href = link.getAttribute('href');
@@ -391,10 +391,10 @@ function debugLog(...args) {
           }
         });
       } catch (error) {
-        console.error('[Modern Gallery Reader] Failed to fetch initial imgkeys:', error);
+        console.error('[Gallery Reader] Failed to fetch initial imgkeys:', error);
       }
       
-      debugLog('[Modern Gallery Reader] Imagelist sample:', imagelist.slice(0, 3));
+      debugLog('[Gallery Reader] Imagelist sample:', imagelist.slice(0, 3));
       
       // 2.5 检查是否有保存的阅读进度，如果恢复页不在第 0 页范围内，预加载该页的 imgkey
       let savedProgressPage = null;
@@ -414,7 +414,7 @@ function debugLog(...args) {
       // 如果恢复页超出第 0 页范围，预加载该页所在的 Gallery 分页
       if (savedProgressPage && savedProgressPage > detectedThumbsPerPage) {
         const targetGalleryPage = Math.floor((savedProgressPage - 1) / detectedThumbsPerPage);
-        debugLog(`[Modern Gallery Reader] Saved progress at page ${savedProgressPage}, pre-fetching gallery page ${targetGalleryPage}...`);
+        debugLog(`[Gallery Reader] Saved progress at page ${savedProgressPage}, pre-fetching gallery page ${targetGalleryPage}...`);
         
         try {
           const galleryUrl = `${window.location.origin}/g/${pageData.gid}/${pageData.token}/?p=${targetGalleryPage}`;
@@ -424,7 +424,7 @@ function debugLog(...args) {
           const doc = parser.parseFromString(html, 'text/html');
           
           const thumbnailLinks = doc.querySelectorAll('#gdt a[href*="/s/"]');
-          debugLog(`[Modern Gallery Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${targetGalleryPage}`);
+          debugLog(`[Gallery Reader] Found ${thumbnailLinks.length} thumbnails in gallery page ${targetGalleryPage}`);
           
           thumbnailLinks.forEach((link) => {
             const href = link.getAttribute('href');
@@ -437,9 +437,9 @@ function debugLog(...args) {
               }
             }
           });
-          debugLog(`[Modern Gallery Reader] Pre-fetched imgkeys for saved progress page ${savedProgressPage}`);
+          debugLog(`[Gallery Reader] Pre-fetched imgkeys for saved progress page ${savedProgressPage}`);
         } catch (error) {
-          console.warn('[Modern Gallery Reader] Failed to pre-fetch imgkeys for saved progress:', error);
+          console.warn('[Gallery Reader] Failed to pre-fetch imgkeys for saved progress:', error);
         }
       }
       
@@ -459,7 +459,7 @@ function debugLog(...args) {
       window.__ehReaderData = readerPageData;
       
       // 5. 创建标记，让 content.js 知道是从 Gallery 启动的
-      debugLog('[Modern Gallery Reader] Injecting reader UI...');
+      debugLog('[Gallery Reader] Injecting reader UI...');
       
       window.__ehGalleryBootstrap = {
         enabled: true,
@@ -474,10 +474,10 @@ function debugLog(...args) {
         detail: readerPageData 
       });
       document.dispatchEvent(event);
-      debugLog('[Modern Gallery Reader] Gallery reader ready event dispatched');
+      debugLog('[Gallery Reader] Gallery reader ready event dispatched');
       
     } catch (error) {
-      console.error('[Modern Gallery Reader] Failed to launch reader:', error);
+      console.error('[Gallery Reader] Failed to launch reader:', error);
       alert(tr('launchFailed', { message: error.message || String(error) }));
     }
   }
@@ -489,13 +489,13 @@ function debugLog(...args) {
     // 找到右侧操作区域（#gd5）
     const actionPanel = document.querySelector('#gd5');
     if (!actionPanel) {
-      console.warn('[Modern Gallery Reader] Cannot find action panel (#gd5)');
+      console.warn('[Gallery Reader] Cannot find action panel (#gd5)');
       return;
     }
 
     // 检查是否已经有 MPV 链接
     if (mpvLink) {
-      debugLog('[Modern Gallery Reader] MPV link already exists, user has permission');
+      debugLog('[Gallery Reader] MPV link already exists, user has permission');
       // 如果有 MPV 权限，可以选择不添加按钮，或者添加一个备用入口
       // 这里我们仍然添加，作为备选方案
     }
@@ -537,7 +537,7 @@ function debugLog(...args) {
       actionPanel.insertBefore(buttonContainer, actionPanel.firstChild);
     }
 
-    debugLog('[Modern Gallery Reader] Launch button added');
+    debugLog('[Gallery Reader] Launch button added');
   }
 
   // 页面加载完成后添加按钮
@@ -593,5 +593,5 @@ function debugLog(...args) {
   
   ensureInterception();
 
-  debugLog('[Modern Gallery Reader] Gallery page script initialized');
+  debugLog('[Gallery Reader] Gallery page script initialized');
 })();

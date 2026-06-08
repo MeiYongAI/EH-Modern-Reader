@@ -1,6 +1,6 @@
 /**
  * nhentai Bootstrap Script
- * Parse gallery data and launch Modern Gallery Reader via Gallery mode bridge.
+ * Parse gallery data and launch Gallery Reader via Gallery mode bridge.
  */
 
 (function() {
@@ -20,7 +20,7 @@
   function appName() {
     return window.MGR_I18N && typeof window.MGR_I18N.t === 'function'
       ? window.MGR_I18N.t('appName')
-      : 'Modern Gallery Reader';
+      : 'Gallery Reader';
   }
 
   function ensureReaderContentScript() {
@@ -400,7 +400,7 @@
     try {
       const data = await buildReaderData(startAt);
       if (!data || !Array.isArray(data.imagelist) || data.imagelist.length === 0) {
-        console.warn('[Modern Gallery Reader] nhentai bootstrap failed: no gallery data');
+        console.warn('[Gallery Reader] nhentai bootstrap failed: no gallery data');
         return;
       }
 
@@ -419,7 +419,7 @@
 
       await ensureReaderContentScript();
       document.dispatchEvent(new CustomEvent('ehGalleryReaderReady', { detail: data }));
-      debugLog('[Modern Gallery Reader] nhentai reader event dispatched');
+      debugLog('[Gallery Reader] nhentai reader event dispatched');
     } finally {
       launchInFlight = false;
     }

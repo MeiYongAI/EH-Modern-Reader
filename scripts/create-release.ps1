@@ -1,11 +1,11 @@
-# Modern Gallery Reader - Create GitHub Release Script
+# Gallery Reader - Create GitHub Release Script
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-Write-Host "Modern Gallery Reader - Create Release" -ForegroundColor Cyan
-Write-Host "====================================`n" -ForegroundColor Cyan
+Write-Host "Gallery Reader - Create Release" -ForegroundColor Cyan
+Write-Host "==============================`n" -ForegroundColor Cyan
 
 $rootDir = Join-Path $PSScriptRoot ".."
 $manifestPath = Join-Path $rootDir "manifest.json"
@@ -14,7 +14,7 @@ $version = $manifest.version
 $tag = "v$version"
 
 $distDir = Join-Path $rootDir "dist"
-$zipName = "modern-gallery-reader-$tag.zip"
+$zipName = "gallery-reader-$tag.zip"
 $zipPath = Join-Path $distDir $zipName
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
@@ -44,12 +44,12 @@ if (-not (Test-Path $zipPath)) {
 
 $notesFile = New-TemporaryFile
 @"
-Modern Gallery Reader $tag
+Gallery Reader $tag
 
-- Renamed the extension to Modern Gallery Reader.
-- Added Chinese/English UI through Chrome i18n.
-- Fixed hitomi.la image CDN routing.
-- Switched image loading overlay to real network progress.
+- Shortened the extension name to Gallery Reader.
+- Replaced hitomi.la native Read Online and reader pages instead of adding a second entry.
+- Moved hitomi.la metadata and gg route fetches through the background service worker.
+- Fixed current hitomi.la image CDN routing and direct image fallbacks.
 
 See README.md for the bilingual changelog.
 "@ | Set-Content -Path $notesFile -Encoding UTF8
@@ -57,19 +57,19 @@ See README.md for the bilingual changelog.
 Push-Location $rootDir
 
 $exists = $false
-try {
-  gh release view $tag | Out-Null
+gh release view $tag | Out-Null
+if ($LASTEXITCODE -eq 0) {
   $exists = $true
-} catch {}
+}
 
 if ($exists) {
   Write-Host "Release $tag already exists; uploading asset..." -ForegroundColor Yellow
-  try { gh release delete-asset $tag $zipName -y | Out-Null } catch {}
+  gh release delete-asset $tag $zipName -y 2>$null | Out-Null
   gh release upload $tag $zipPath --clobber | Out-Host
   Write-Host "Release asset updated: $zipName" -ForegroundColor Green
 } else {
   Write-Host "Creating Release $tag ..." -ForegroundColor Yellow
-  gh release create $tag $zipPath -F $notesFile -t "Modern Gallery Reader $tag" --latest | Out-Host
+  gh release create $tag $zipPath -F $notesFile -t "Gallery Reader $tag" --latest | Out-Host
   Write-Host "Release created: $tag" -ForegroundColor Green
 }
 

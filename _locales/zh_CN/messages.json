@@ -1,8 +1,8 @@
 {
   "extName": {
-    "message": "Modern Gallery Reader"
+    "message": "Gallery Reader"
   },
   "extDescription": {
-    "message": "面向 E-Hentai、ExHentai、nhentai 和 hitomi.la 的现代化多站点阅读器，支持智能加载与阅读进度。"
+    "message": "面向 E-Hentai、ExHentai、nhentai 和 hitomi.la 的多站点阅读器，支持智能加载与阅读进度。"
   }
 }

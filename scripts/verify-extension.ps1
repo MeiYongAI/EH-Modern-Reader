@@ -1,11 +1,11 @@
-# Modern Gallery Reader - Extension Verification
+# Gallery Reader - Extension Verification
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-Write-Host "Modern Gallery Reader - Directory Verification" -ForegroundColor Cyan
-Write-Host "=============================================`n" -ForegroundColor Cyan
+Write-Host "Gallery Reader - Directory Verification" -ForegroundColor Cyan
+Write-Host "======================================`n" -ForegroundColor Cyan
 
 $basePath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $manifestPath = Join-Path $basePath "manifest.json"
@@ -67,7 +67,7 @@ if (Test-Path $manifestPath) {
         if ($manifest.version -match '^\d+\.\d+\.\d+$') { Pass "version is $($manifest.version)" } else { Fail "version should be semantic x.y.z" }
 
         $hosts = @($manifest.host_permissions)
-        foreach ($hostPermission in @("https://hitomi.la/*", "https://*.hitomi.la/*", "https://*.gold-usergeneratedcontent.net/*")) {
+        foreach ($hostPermission in @("https://hitomi.la/*", "https://*.hitomi.la/*", "https://gold-usergeneratedcontent.net/*", "https://*.gold-usergeneratedcontent.net/*")) {
             if ($hosts -contains $hostPermission) { Pass "host permission present: $hostPermission" } else { Fail "missing host permission: $hostPermission" }
         }
 
@@ -91,7 +91,7 @@ foreach ($localeFile in @("_locales/en/messages.json", "_locales/zh_CN/messages.
     if (Test-Path $fullPath) {
         try {
             $messages = Get-Content $fullPath -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($messages.extName.message -eq "Modern Gallery Reader") { Pass "$localeFile extName" } else { Fail "$localeFile extName is incorrect" }
+            if ($messages.extName.message -eq "Gallery Reader") { Pass "$localeFile extName" } else { Fail "$localeFile extName is incorrect" }
             if ($messages.extDescription.message) { Pass "$localeFile extDescription" } else { Fail "$localeFile extDescription is empty" }
         } catch {
             Fail "$localeFile is not valid JSON: $($_.Exception.Message)"
