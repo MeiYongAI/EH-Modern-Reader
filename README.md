@@ -1,79 +1,86 @@
-# EH Modern Reader
+# Modern Gallery Reader
 
-EH Modern Reader 是一个 Chrome / Edge 浏览器扩展，用于在 E-Hentai、ExHentai、nhentai 和 hitomi.la 上提供现代化阅读体验。
-
-![Version](https://img.shields.io/badge/version-2.5.3-blue)
+![Version](https://img.shields.io/badge/version-2.5.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20(Chromium)-brightgreen)
 
-## 功能
+Modern Gallery Reader 是一个 Chrome / Edge 浏览器扩展，为 E-Hentai、ExHentai、nhentai 和 hitomi.la 提供现代化多站点阅读体验。
+
+## 中文
+
+### 功能
 
 - 支持 E-Hentai / ExHentai MPV 页面自动接管。
 - 支持 E-Hentai / ExHentai Gallery 页面按钮启动和缩略图直达。
 - 支持 nhentai.net、nhentai.xxx 和 hitomi.la。
 - 支持横向单页、纵向单页、横向连续、纵向连续阅读模式。
-- 支持阅读进度记忆、真实图片 URL 缓存、缩略图懒加载、预加载和自动翻页。
-- Gallery / nhentai / Hitomi 页面默认只加载轻量入口脚本，启动阅读器时再注入核心脚本。
+- 支持真实图片加载进度、阅读进度记忆、智能预加载、缩略图懒加载和自动翻页。
+- 根据浏览器/系统语言自动切换中文或英文界面。
 
-## 安装
+### 安装与调试
 
-1. 在 GitHub Releases 下载最新 ZIP。
-2. 打开 `chrome://extensions/` 或 `edge://extensions/`。
-3. 开启开发者模式。
-4. 将 ZIP 拖入扩展页面，或解压后选择“加载已解压的扩展程序”。
+1. 打开 `chrome://extensions/` 或 `edge://extensions/`。
+2. 开启“开发者模式”。
+3. 选择“加载已解压的扩展程序”，加载本仓库目录。
+4. 修改代码后，在扩展管理页点击此扩展卡片上的刷新按钮。
+5. 如果需要调试日志，打开扩展设置页并启用 Debug mode。
 
-## 使用
-
-- MPV 页面：进入 `/mpv/` 后自动启用阅读器。
-- Gallery 页面：点击页面右侧的 `EH Modern Reader`，或点击缩略图直达对应页。
-- nhentai 页面：在 `/g/{id}/` 或 `/g/{id}/{page}/` 页面启动阅读器。
-- hitomi 页面：在详情页或 `/reader/{id}.html` 页面启动阅读器。
-
-## 快捷键
-
-- `←` / `→` / `A` / `D` / `Space`：翻页或连续模式滚动。
-- `Home` / `End`：跳到首页或末页。
-- `H` / `S`：切换阅读模式。
-- `P`：自动翻页或自动滚动。
-- `F11`：全屏。
-- `Esc`：退出全屏或关闭面板。
-
-## 项目结构
-
-```text
-EH-Modern-Reader/
-├─ manifest.json
-├─ content.js
-├─ gallery.js
-├─ nhentai.js
-├─ hitomi.js
-├─ background.js
-├─ popup.html / popup.js
-├─ options.html / options.js
-├─ welcome.html
-├─ style/
-├─ icons/
-├─ scripts/
-├─ dist/
-└─ README.md
-```
-
-## 构建
+### 构建
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
 
-构建产物会生成到 `dist/eh-modern-reader-v{version}.zip`。
+构建产物会生成到 `dist/modern-gallery-reader-v{version}.zip`。
 
-## 最新更新
+### 最新更新
 
-### v2.5.3 - 2026-06-08
+#### v2.5.4 - 2026-06-08
 
-- 精简仓库文件，只保留根目录 `README.md` 作为 Markdown 文档。
-- `dist` 目录只保留最新发布包，移除历史包和测试解包目录。
-- 优化阅读器设置面板布局，让分组、滚动区域和移动端显示更清晰。
-- 更新构建和发布脚本，适配精简后的文档结构。
+- 扩展更名为 Modern Gallery Reader，并加入 Chrome i18n 中英文界面。
+- 修复 hitomi.la 图片 CDN 子域选择逻辑，补充候选地址回退和权限匹配。
+- 图片加载动画改为真实网络下载进度；可读取响应流时显示实际百分比，不再播放假循环动画。
+- 精简 popup、options 和 welcome 页面，设置面板文案接入中英双语。
+- README 改为中英双语，并只保留最新更新日志。
+
+## English
+
+Modern Gallery Reader is a Chrome / Edge extension that provides a modern multi-site reading experience for E-Hentai, ExHentai, nhentai, and hitomi.la.
+
+### Features
+
+- Automatically takes over E-Hentai / ExHentai MPV pages.
+- Adds launch buttons and thumbnail deep-link handling on E-Hentai / ExHentai gallery pages.
+- Supports nhentai.net, nhentai.xxx, and hitomi.la.
+- Supports single horizontal, single vertical, continuous horizontal, and continuous vertical reading modes.
+- Includes real image loading progress, reading progress memory, smart preloading, lazy thumbnails, and auto paging.
+- Switches UI language automatically between Chinese and English based on browser/system language.
+
+### Install and Debug
+
+1. Open `chrome://extensions/` or `edge://extensions/`.
+2. Enable Developer mode.
+3. Click "Load unpacked" and select this repository folder.
+4. After changing code, click the reload button on this extension card.
+5. For logs, open the extension options page and enable Debug mode.
+
+### Build
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build.ps1
+```
+
+The release package is generated at `dist/modern-gallery-reader-v{version}.zip`.
+
+### Latest Update
+
+#### v2.5.4 - 2026-06-08
+
+- Renamed the extension to Modern Gallery Reader and added Chrome i18n for Chinese/English UI.
+- Fixed hitomi.la image CDN subdomain routing, with candidate URL fallback and expanded permissions.
+- Changed image loading animation to real network download progress; readable response streams now show actual percentage instead of a fake loop.
+- Simplified popup, options, and welcome pages; settings panel text now uses bilingual labels.
+- Reworked README as bilingual documentation with only the latest changelog entry.
 
 ## License
 

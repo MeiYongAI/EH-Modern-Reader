@@ -1,18 +1,20 @@
-﻿# EH Modern Reader - Build Script
+# Modern Gallery Reader - Build Script
+
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [Console]::OutputEncoding = $utf8NoBom
 $OutputEncoding = $utf8NoBom
 
-Write-Host "EH Modern Reader - Build Script" -ForegroundColor Cyan
+Write-Host "Modern Gallery Reader - Build Script" -ForegroundColor Cyan
 Write-Host "====================================`n" -ForegroundColor Cyan
 
-$manifestPath = Join-Path $PSScriptRoot "..\manifest.json"
+$rootDir = Join-Path $PSScriptRoot ".."
+$manifestPath = Join-Path $rootDir "manifest.json"
 $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
 $version = "v$($manifest.version)"
 
 Write-Host "Version: $version`n" -ForegroundColor Magenta
 
-$distDir = Join-Path $PSScriptRoot "..\dist"
+$distDir = Join-Path $rootDir "dist"
 if (Test-Path $distDir) {
     Write-Host "Clean old build artifacts..." -ForegroundColor Yellow
     Get-ChildItem $distDir -Filter "*.zip" | Remove-Item -Force
@@ -21,9 +23,26 @@ if (Test-Path $distDir) {
 }
 Write-Host "dist folder ready`n" -ForegroundColor Green
 
-$includeItems = @("manifest.json","content.js","gallery.js","nhentai.js","hitomi.js","background.js","popup.html","popup.js","options.html","options.js","welcome.html","README.md","LICENSE","style","icons")
+$includeItems = @(
+    "manifest.json",
+    "i18n.js",
+    "content.js",
+    "gallery.js",
+    "nhentai.js",
+    "hitomi.js",
+    "background.js",
+    "popup.html",
+    "popup.js",
+    "options.html",
+    "options.js",
+    "welcome.html",
+    "README.md",
+    "LICENSE",
+    "style",
+    "icons",
+    "_locales"
+)
 
-$rootDir = Join-Path $PSScriptRoot ".."
 $tempDir = Join-Path $rootDir "temp_build"
 if (Test-Path $tempDir) { Remove-Item -Path $tempDir -Recurse -Force }
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
@@ -45,13 +64,12 @@ foreach ($item in $includeItems) {
 
 Write-Host "`nCreate release zip..." -ForegroundColor Yellow
 
-$releaseZip = Join-Path $distDir "eh-modern-reader-$version.zip"
+$releaseZip = Join-Path $distDir "modern-gallery-reader-$version.zip"
 Write-Host "  Zipping $version ..." -ForegroundColor Cyan
 
-# 先使用标准方法创建 ZIP
 Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseZip -Force
 
-# 修复 ZIP 内部路径：将反斜杠替换为正斜杠（Chrome 要求）
+# Chrome expects forward slashes inside the ZIP.
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
@@ -64,7 +82,7 @@ try {
         $newName = $entry.FullName -replace '\\', '/'
         $newEntry = $targetZip.CreateEntry($newName)
         $newEntry.LastWriteTime = $entry.LastWriteTime
-        
+
         $sourceStream = $entry.Open()
         $targetStream = $newEntry.Open()
         $sourceStream.CopyTo($targetStream)
@@ -79,7 +97,7 @@ try {
 Remove-Item $releaseZip -Force
 Move-Item $tempZip $releaseZip
 
-Write-Host "  Created: eh-modern-reader-$version.zip (with forward slashes)" -ForegroundColor Green
+Write-Host "  Created: modern-gallery-reader-$version.zip (with forward slashes)" -ForegroundColor Green
 
 Write-Host "`nClean temp files..." -ForegroundColor Yellow
 Remove-Item -Path $tempDir -Recurse -Force
@@ -96,6 +114,6 @@ Write-Host "  * $($zipFile.Name) - ${size} KB" -ForegroundColor White
 Write-Host "`nNext steps:" -ForegroundColor Yellow
 Write-Host "  1. Test install the unpacked extension" -ForegroundColor White
 Write-Host "  2. Create GitHub Release and upload the ZIP" -ForegroundColor White
-Write-Host "  3. Use the latest update section from README.md for release notes" -ForegroundColor White
+Write-Host "  3. Use README.md for release notes" -ForegroundColor White
 
 Write-Host "`nBuild complete!" -ForegroundColor Cyan

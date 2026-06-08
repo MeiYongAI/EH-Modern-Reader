@@ -1,22 +1,16 @@
 /**
- * Background Script - 后台脚本
- * 处理扩展的后台逻辑
+ * Background service worker.
  */
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('[EH Modern Reader] 扩展已安装');
-    
-    // 显示欢迎页面
-    chrome.tabs.create({
-      url: 'welcome.html'
-    });
+    console.log('[Modern Gallery Reader] installed');
+    chrome.tabs.create({ url: 'welcome.html' });
   } else if (details.reason === 'update') {
-    console.log('[EH Modern Reader] 扩展已更新');
+    console.log('[Modern Gallery Reader] updated');
   }
 });
 
-// 监听来自 content script 的消息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'ensureReaderContentScript') {
     const tabId = sender && sender.tab && sender.tab.id;
@@ -35,7 +29,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     try {
       const injection = chrome.scripting.executeScript({
         target: { tabId, frameIds: [frameId] },
-        files: ['content.js']
+        files: ['i18n.js', 'content.js']
       });
 
       if (injection && typeof injection.then === 'function') {
@@ -66,7 +60,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
-  
+
   if (request.action === 'saveSettings') {
     chrome.storage.sync.set({ readerSettings: request.settings }, () => {
       sendResponse({ success: true });

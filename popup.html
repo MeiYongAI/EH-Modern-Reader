@@ -1,260 +1,207 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EH Modern Reader - 设置</title>
+  <title>Modern Gallery Reader</title>
   <style>
     * {
-      margin: 0;
-      padding: 0;
       box-sizing: border-box;
     }
 
     body {
-      width: 320px;
-      min-height: 400px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 0;
+      width: 340px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: #1d2430;
+      background: #f5f7fb;
     }
 
-    .popup-header {
-      padding: 20px;
-      text-align: center;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
+    header {
+      padding: 18px 18px 14px;
+      background: #ffffff;
+      border-bottom: 1px solid #dde3ee;
     }
 
-    .popup-header h1 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 8px;
+    h1 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.2;
+      letter-spacing: 0;
     }
 
-    .popup-header p {
+    .tagline {
+      margin: 6px 0 0;
+      color: #5b6678;
       font-size: 13px;
-      opacity: 0.9;
+      line-height: 1.45;
     }
 
-    .popup-content {
-      padding: 20px;
+    main {
+      padding: 14px 14px 16px;
     }
 
-    .status {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-      backdrop-filter: blur(10px);
-    }
-
-    .status-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .panel {
+      padding: 12px;
       margin-bottom: 12px;
+      background: #ffffff;
+      border: 1px solid #dde3ee;
+      border-radius: 8px;
     }
 
-    .status-item:last-child {
-      margin-bottom: 0;
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 28px;
+      font-size: 13px;
     }
 
-    .status-label {
-      font-size: 14px;
-      opacity: 0.9;
+    .row + .row {
+      margin-top: 8px;
     }
 
-    .status-value {
-      font-weight: 600;
-      font-size: 14px;
+    .label {
+      color: #5b6678;
     }
 
-    .indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      margin-right: 6px;
+    .value {
+      font-weight: 700;
+      text-align: right;
     }
 
-    .indicator.active {
-      background: #4ade80;
-      box-shadow: 0 0 8px #4ade80;
+    .value.ok {
+      color: #087f5b;
     }
 
-    .indicator.inactive {
-      background: #ef4444;
+    .value.warn {
+      color: #9a6700;
     }
 
-    .section {
-      margin-bottom: 16px;
+    .value.bad {
+      color: #c92a2a;
     }
 
     .section-title {
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      opacity: 0.8;
-    }
-
-    .info-card {
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 13px;
-      line-height: 1.6;
-      backdrop-filter: blur(10px);
-    }
-
-    .info-card ul {
-      list-style: none;
-      padding-left: 0;
-    }
-
-    .info-card li {
-      padding: 4px 0;
-      padding-left: 16px;
-      position: relative;
-    }
-
-    .info-card li:before {
-      content: "▹";
-      position: absolute;
-      left: 0;
-      color: #fbbf24;
-    }
-
-    .button-group {
-      display: flex;
-      gap: 8px;
-      margin-top: 16px;
-    }
-
-    .btn {
-      flex: 1;
-      height: 36px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      backdrop-filter: blur(10px);
-    }
-
-    .btn:hover {
-      background: rgba(255, 255, 255, 0.3);
-      transform: translateY(-1px);
-    }
-
-    .btn:active {
-      transform: translateY(0);
-    }
-
-    .btn.primary {
-      background: rgba(255, 255, 255, 0.9);
-      color: #667eea;
-    }
-
-    .btn.primary:hover {
-      background: white;
-    }
-
-    .popup-footer {
-      padding: 16px 20px;
-      text-align: center;
-      font-size: 12px;
-      opacity: 0.7;
-      border-top: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .popup-footer a {
-      color: white;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .popup-footer a:hover {
-      text-decoration: underline;
-    }
-
-    .version {
-      margin-top: 8px;
+      margin: 0 0 8px;
+      color: #5b6678;
       font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      color: #2f3a4a;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    kbd {
+      min-width: 56px;
+      color: #0b7285;
+      font-weight: 700;
+      font-family: inherit;
+      text-align: left;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button {
+      height: 36px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1d2430;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #0b7285;
+      color: #0b7285;
+    }
+
+    button.primary {
+      border-color: #0b7285;
+      background: #0b7285;
+      color: #ffffff;
+    }
+
+    footer {
+      padding: 0 14px 14px;
+      color: #6b7280;
+      font-size: 11px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <div class="popup-header">
-    <h1>📖 EH Modern Reader</h1>
-    <p>现代化 E-Hentai 阅读体验</p>
-  </div>
+  <header>
+    <h1 data-i18n="appName">Modern Gallery Reader</h1>
+    <p class="tagline" data-i18n="popupTagline">Modern multi-site reading experience</p>
+  </header>
 
-  <div class="popup-content">
-    <!-- 状态显示 -->
-    <div class="status">
-      <div class="status-item">
-        <span class="status-label">扩展状态</span>
-        <span class="status-value">
-          <span class="indicator active"></span>
-          运行中
-        </span>
+  <main>
+    <section class="panel">
+      <div class="row">
+        <span class="label" data-i18n="extensionStatus">Extension status</span>
+        <span class="value ok" data-i18n="running">Running</span>
       </div>
-      <div class="status-item">
-        <span class="status-label">当前站点</span>
-        <span class="status-value" id="current-site">检测中...</span>
+      <div class="row">
+        <span class="label" data-i18n="currentSite">Current site</span>
+        <span class="value warn" id="current-site" data-i18n="detecting">Detecting...</span>
       </div>
-    </div>
+    </section>
 
-    <!-- 快捷键说明 -->
-    <div class="section">
-      <div class="section-title">快捷键</div>
-      <div class="info-card">
-        <ul>
-          <li><strong>← / →</strong> 翻页</li>
-          <li><strong>Home / End</strong> 首页/末页</li>
-          <li><strong>F</strong> 切换侧边栏</li>
-          <li><strong>F11</strong> 全屏</li>
-          <li><strong>Esc</strong> 退出全屏</li>
-        </ul>
-      </div>
-    </div>
+    <section class="panel">
+      <h2 class="section-title" data-i18n="shortcuts">Shortcuts</h2>
+      <ul>
+        <li><kbd>← / →</kbd><span data-i18n="turnPage">Turn pages</span></li>
+        <li><kbd>Home</kbd><span data-i18n="homeEnd">First/last page</span></li>
+        <li><kbd>F</kbd><span data-i18n="toggleSidebar">Toggle thumbnail bar</span></li>
+        <li><kbd>F11</kbd><span data-i18n="fullscreen">Fullscreen (F11)</span></li>
+        <li><kbd>Esc</kbd><span data-i18n="exitFullscreen">Exit fullscreen</span></li>
+      </ul>
+    </section>
 
-    <!-- 功能特性 -->
-    <div class="section">
-      <div class="section-title">核心特性</div>
-      <div class="info-card">
-        <ul>
-          <li>现代化 UI 设计</li>
-          <li>深色模式支持</li>
-          <li>智能图片预加载</li>
-          <li>阅读进度记忆</li>
-          <li>响应式布局</li>
-          <li>键盘/鼠标操控</li>
-        </ul>
-      </div>
-    </div>
+    <section class="panel">
+      <h2 class="section-title" data-i18n="features">Core Features</h2>
+      <ul>
+        <li><span data-i18n="multiSiteSupport">Multi-site support</span></li>
+        <li><span data-i18n="realLoadingProgress">Real image loading progress</span></li>
+        <li><span data-i18n="smartPreload">Smart image preloading</span></li>
+        <li><span data-i18n="progressMemory">Reading progress memory</span></li>
+      </ul>
+    </section>
 
-    <!-- 操作按钮 -->
-    <div class="button-group">
-      <button class="btn" id="open-options">设置</button>
-      <button class="btn primary" id="reload-tab">刷新页面</button>
+    <div class="actions">
+      <button type="button" id="open-options" data-i18n="options">Options</button>
+      <button type="button" class="primary" id="reload-tab" data-i18n="reloadPage">Reload page</button>
     </div>
-  </div>
+  </main>
 
-  <div class="popup-footer">
-    <div>
-      Made with ❤️ for better reading
-    </div>
-    <div class="version" id="ext-version">v2.5.3</div>
-  </div>
+  <footer>
+    <span data-i18n="footer">Made for better reading</span>
+    <span id="ext-version">v-</span>
+  </footer>
 
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

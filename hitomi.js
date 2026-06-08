@@ -1,6 +1,6 @@
 /**
  * hitomi.la Bootstrap Script
- * Build page data from hitomi gallery/reader globals and launch EH Modern Reader.
+ * Build page data from hitomi gallery/reader globals and launch Modern Gallery Reader.
  */
 
 (function() {
@@ -143,7 +143,7 @@
         ggMetaCache = { routePrefix, mSet };
         return ggMetaCache;
       } catch (e) {
-        debugLog('[EH Reader] gg.js parse fallback:', e && e.message ? e.message : e);
+        debugLog('[Modern Gallery Reader] gg.js parse fallback:', e && e.message ? e.message : e);
         ggMetaCache = { routePrefix: DEFAULT_GG_B, mSet: new Set() };
         return ggMetaCache;
       }
@@ -155,18 +155,17 @@
   }
 
   function imageSubdomainFromHash(hash, dir, ggMeta) {
-    let prefix = '';
-    if (dir === 'webp') {
-      prefix = 'w';
-    } else if (dir === 'avif') {
-      prefix = 'a';
-    }
-
     const rv = hashRouteValue(hash);
-    if (!Number.isFinite(rv)) return `${prefix}1`;
+    if (!Number.isFinite(rv)) return (dir === 'webp' || dir === 'avif') ? 'aa' : '1';
 
-    const mapped = ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? 1 : 0;
-    return `${prefix}${1 + mapped}`;
+    // hitomi's gg.m() defaults to 1 and returns 0 for values listed in case blocks.
+    // Original images use 1/2. AVIF/WebP reader sources use aa/ba, matching common.js
+    // url_from_url_from_hash(..., dir, undefined, 'a').
+    const ggM = ggMeta && ggMeta.mSet && ggMeta.mSet.has(rv) ? 0 : 1;
+    if (dir === 'webp' || dir === 'avif') {
+      return `${String.fromCharCode(97 + ggM)}a`;
+    }
+    return `${1 + ggM}`;
   }
 
   function fullPathFromHash(hash, ggMeta) {
@@ -345,7 +344,7 @@
           dataCache = detail;
           return detail;
         } catch (e) {
-          debugLog('[EH Reader] hitomi fetch retry:', i + 1, e && e.message ? e.message : e);
+          debugLog('[Modern Gallery Reader] hitomi fetch retry:', i + 1, e && e.message ? e.message : e);
           await new Promise((r) => setTimeout(r, 350));
         }
       }
@@ -426,7 +425,7 @@
     try {
       const data = await buildReaderData(startAt);
       if (!data || !data.imagelist || data.imagelist.length === 0) {
-        console.warn('[EH Reader] hitomi bootstrap failed: no gallery data');
+        console.warn('[Modern Gallery Reader] hitomi bootstrap failed: no gallery data');
         return;
       }
 
@@ -445,7 +444,7 @@
 
       await ensureReaderContentScript();
       document.dispatchEvent(new CustomEvent('ehGalleryReaderReady', { detail: data }));
-      debugLog('[EH Reader] hitomi reader event dispatched');
+      debugLog('[Modern Gallery Reader] hitomi reader event dispatched');
     } finally {
       launchInFlight = false;
     }
@@ -464,7 +463,7 @@
         const btn = document.createElement('a');
         btn.id = 'eh-hitomi-launch';
         btn.href = '#';
-        btn.innerHTML = '<h1>EH Modern Reader</h1>';
+        btn.innerHTML = `<h1>${window.MGR_I18N ? window.MGR_I18N.t('appName') : 'Modern Gallery Reader'}</h1>`;
         btn.style.marginTop = '8px';
         btn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -478,7 +477,7 @@
     // reader 页或按钮容器不存在时，降级为悬浮按钮
     const floating = document.createElement('button');
     floating.id = 'eh-hitomi-launch';
-    floating.textContent = 'EH Modern Reader';
+    floating.textContent = window.MGR_I18N ? window.MGR_I18N.t('appName') : 'Modern Gallery Reader';
     floating.style.cssText = [
       'position:fixed',
       'top:12px',
